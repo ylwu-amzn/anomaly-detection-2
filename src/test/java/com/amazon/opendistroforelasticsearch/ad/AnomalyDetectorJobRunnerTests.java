@@ -1,4 +1,15 @@
 /*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * The OpenSearch Contributors require contributions made to
+ * this file be licensed under the Apache-2.0 license or a
+ * compatible open source license.
+ *
+ * Modifications Copyright OpenSearch Contributors. See
+ * GitHub history for details.
+ */
+
+/*
  * Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
@@ -15,7 +26,6 @@
 
 package com.amazon.opendistroforelasticsearch.ad;
 
-import static org.elasticsearch.index.seqno.SequenceNumbers.UNASSIGNED_SEQ_NO;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
@@ -26,6 +36,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.opensearch.index.seqno.SequenceNumbers.UNASSIGNED_SEQ_NO;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -62,6 +73,26 @@ import org.junit.rules.ExpectedException;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
+import org.opensearch.action.ActionListener;
+import org.opensearch.action.get.GetRequest;
+import org.opensearch.action.get.GetResponse;
+import org.opensearch.action.index.IndexRequest;
+import org.opensearch.action.index.IndexResponse;
+import org.opensearch.client.Client;
+import org.opensearch.cluster.metadata.IndexNameExpressionResolver;
+import org.opensearch.cluster.service.ClusterService;
+import org.opensearch.common.bytes.BytesReference;
+import org.opensearch.common.settings.Settings;
+import org.opensearch.common.unit.TimeValue;
+import org.opensearch.common.util.concurrent.OpenSearchExecutors;
+import org.opensearch.common.util.concurrent.ThreadContext;
+import org.opensearch.common.xcontent.NamedXContentRegistry;
+import org.opensearch.common.xcontent.ToXContent;
+import org.opensearch.index.Index;
+import org.opensearch.index.get.GetResult;
+import org.opensearch.index.mapper.MapperService;
+import org.opensearch.index.shard.ShardId;
+import org.opensearch.threadpool.ThreadPool;
 
 import com.amazon.opendistroforelasticsearch.ad.common.exception.EndRunException;
 import com.amazon.opendistroforelasticsearch.ad.indices.AnomalyDetectionIndices;
@@ -128,9 +159,9 @@ public class AnomalyDetectorJobRunnerTests extends AbstractADTest {
         super.setUp();
         super.setUpLog4jForJUnit(AnomalyDetectorJobRunner.class);
         MockitoAnnotations.initMocks(this);
-        ThreadFactory threadFactory = EsExecutors.daemonThreadFactory(EsExecutors.threadName("node1", "test-ad"));
+        ThreadFactory threadFactory = OpenSearchExecutors.daemonThreadFactory(OpenSearchExecutors.threadName("node1", "test-ad"));
         ThreadContext threadContext = new ThreadContext(Settings.EMPTY);
-        executorService = EsExecutors.newFixed("test-ad", 4, 100, threadFactory, threadContext);
+        executorService = OpenSearchExecutors.newFixed("test-ad", 4, 100, threadFactory, threadContext);
         Mockito.doReturn(executorService).when(mockedThreadPool).executor(anyString());
         Mockito.doReturn(mockedThreadPool).when(client).threadPool();
         Mockito.doReturn(threadContext).when(mockedThreadPool).getThreadContext();

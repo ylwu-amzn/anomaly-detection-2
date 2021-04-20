@@ -1,4 +1,15 @@
 /*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * The OpenSearch Contributors require contributions made to
+ * this file be licensed under the Apache-2.0 license or a
+ * compatible open source license.
+ *
+ * Modifications Copyright OpenSearch Contributors. See
+ * GitHub history for details.
+ */
+
+/*
  * Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
@@ -25,17 +36,17 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-import org.elasticsearch.action.support.ActionFilters;
-import org.elasticsearch.client.Client;
-import org.elasticsearch.cluster.metadata.IndexNameExpressionResolver;
-import org.elasticsearch.common.settings.Settings;
-import org.elasticsearch.monitor.jvm.JvmService;
-import org.elasticsearch.monitor.jvm.JvmStats;
-import org.elasticsearch.test.ESIntegTestCase;
-import org.elasticsearch.threadpool.ThreadPool;
-import org.elasticsearch.transport.TransportService;
 import org.junit.Before;
 import org.junit.Test;
+import org.opensearch.action.support.ActionFilters;
+import org.opensearch.client.Client;
+import org.opensearch.cluster.metadata.IndexNameExpressionResolver;
+import org.opensearch.common.settings.Settings;
+import org.opensearch.monitor.jvm.JvmService;
+import org.opensearch.monitor.jvm.JvmStats;
+import org.opensearch.test.OpenSearchIntegTestCase;
+import org.opensearch.threadpool.ThreadPool;
+import org.opensearch.transport.TransportService;
 
 import com.amazon.opendistroforelasticsearch.ad.caching.CacheProvider;
 import com.amazon.opendistroforelasticsearch.ad.caching.EntityCache;
@@ -51,7 +62,7 @@ import com.amazon.opendistroforelasticsearch.ad.util.ClientUtil;
 import com.amazon.opendistroforelasticsearch.ad.util.IndexUtils;
 import com.amazon.opendistroforelasticsearch.ad.util.Throttler;
 
-public class ADStatsNodesTransportActionTests extends ESIntegTestCase {
+public class ADStatsNodesTransportActionTests extends OpenSearchIntegTestCase {
 
     private ADStatsNodesTransportAction action;
     private ADStats adStats;

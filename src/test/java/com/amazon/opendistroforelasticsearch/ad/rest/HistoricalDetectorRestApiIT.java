@@ -1,4 +1,15 @@
 /*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * The OpenSearch Contributors require contributions made to
+ * this file be licensed under the Apache-2.0 license or a
+ * compatible open source license.
+ *
+ * Modifications Copyright OpenSearch Contributors. See
+ * GitHub history for details.
+ */
+
+/*
  * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
@@ -24,6 +35,10 @@ import java.util.Map;
 import org.elasticsearch.client.Response;
 import org.elasticsearch.rest.RestStatus;
 import org.junit.Before;
+import org.opensearch.client.Response;
+import org.opensearch.client.ResponseException;
+import org.opensearch.common.xcontent.ToXContentObject;
+import org.opensearch.rest.RestStatus;
 
 import com.amazon.opendistroforelasticsearch.ad.HistoricalDetectorRestTestCase;
 import com.amazon.opendistroforelasticsearch.ad.TestHelpers;

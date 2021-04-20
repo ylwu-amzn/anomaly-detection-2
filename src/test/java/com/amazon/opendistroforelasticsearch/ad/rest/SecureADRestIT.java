@@ -1,4 +1,15 @@
 /*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * The OpenSearch Contributors require contributions made to
+ * this file be licensed under the Apache-2.0 license or a
+ * compatible open source license.
+ *
+ * Modifications Copyright OpenSearch Contributors. See
+ * GitHub history for details.
+ */
+
+/*
  * Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
@@ -21,12 +32,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 
 import org.apache.http.HttpHost;
-import org.elasticsearch.client.Response;
-import org.elasticsearch.client.RestClient;
-import org.elasticsearch.rest.RestStatus;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
+import org.opensearch.client.Response;
+import org.opensearch.client.RestClient;
+import org.opensearch.rest.RestStatus;
 
 import com.amazon.opendistroforelasticsearch.ad.AnomalyDetectorRestTestCase;
 import com.amazon.opendistroforelasticsearch.ad.model.AnomalyDetector;

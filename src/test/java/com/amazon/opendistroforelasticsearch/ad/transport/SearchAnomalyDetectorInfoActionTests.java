@@ -1,4 +1,15 @@
 /*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * The OpenSearch Contributors require contributions made to
+ * this file be licensed under the Apache-2.0 license or a
+ * compatible open source license.
+ *
+ * Modifications Copyright OpenSearch Contributors. See
+ * GitHub history for details.
+ */
+
+/*
  * Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
@@ -19,21 +30,21 @@ import static org.mockito.Mockito.mock;
 
 import java.io.IOException;
 
-import org.elasticsearch.action.ActionListener;
-import org.elasticsearch.action.support.ActionFilters;
-import org.elasticsearch.common.io.stream.BytesStreamOutput;
-import org.elasticsearch.common.io.stream.StreamInput;
-import org.elasticsearch.common.xcontent.ToXContent;
-import org.elasticsearch.tasks.Task;
-import org.elasticsearch.test.ESIntegTestCase;
-import org.elasticsearch.transport.TransportService;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.opensearch.action.ActionListener;
+import org.opensearch.action.support.ActionFilters;
+import org.opensearch.common.io.stream.BytesStreamOutput;
+import org.opensearch.common.io.stream.StreamInput;
+import org.opensearch.common.xcontent.ToXContent;
+import org.opensearch.tasks.Task;
+import org.opensearch.test.OpenSearchIntegTestCase;
+import org.opensearch.transport.TransportService;
 
 import com.amazon.opendistroforelasticsearch.ad.TestHelpers;
 
-public class SearchAnomalyDetectorInfoActionTests extends ESIntegTestCase {
+public class SearchAnomalyDetectorInfoActionTests extends OpenSearchIntegTestCase {
     private SearchAnomalyDetectorInfoRequest request;
     private ActionListener<SearchAnomalyDetectorInfoResponse> response;
     private SearchAnomalyDetectorInfoTransportAction action;

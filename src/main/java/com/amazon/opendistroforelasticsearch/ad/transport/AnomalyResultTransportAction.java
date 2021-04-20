@@ -1,4 +1,15 @@
 /*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * The OpenSearch Contributors require contributions made to
+ * this file be licensed under the Apache-2.0 license or a
+ * compatible open source license.
+ *
+ * Modifications Copyright OpenSearch Contributors. See
+ * GitHub history for details.
+ */
+
+/*
  * Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
@@ -113,8 +124,7 @@ public class AnomalyResultTransportAction extends HandledTransportAction<ActionR
     static final String NODE_UNRESPONSIVE_ERR_MSG = "Model node is unresponsive.  Mute model";
     static final String READ_WRITE_BLOCKED = "Cannot read/write due to global block.";
     static final String INDEX_READ_BLOCKED = "Cannot read user index due to read block.";
-    static final String LIMIT_EXCEEDED_EXCEPTION_NAME_UNDERSCORE = ElasticsearchException
-        .getExceptionName(new LimitExceededException("", ""));
+    static final String LIMIT_EXCEEDED_EXCEPTION_NAME_UNDERSCORE = OpenSearchException.getExceptionName(new LimitExceededException("", ""));
     static final String NULL_RESPONSE = "Received null response from";
     static final String BUG_RESPONSE = "We might have bugs.";
     static final String TROUBLE_QUERYING_ERR_MSG = "Having trouble querying data: ";
@@ -555,7 +565,7 @@ public class AnomalyResultTransportAction extends HandledTransportAction<ActionR
      * @throws AnomalyDetectionException List of exceptions we can throw
      *     1. Exception from cold start:
      *       1). InternalFailure due to
-     *         a. ElasticsearchTimeoutException thrown by putModelCheckpoint during cold start
+     *         a. OpenSearchTimeoutException thrown by putModelCheckpoint during cold start
      *       2). EndRunException with endNow equal to false
      *         a. training data not available
      *         b. cold start cannot succeed
@@ -564,7 +574,7 @@ public class AnomalyResultTransportAction extends HandledTransportAction<ActionR
      *         a. invalid search query
      *     2. LimitExceededException from one of RCF model node when the total size of the models
      *      is more than X% of heap memory.
-     *     3. InternalFailure wrapping ElasticsearchTimeoutException inside caused by
+     *     3. InternalFailure wrapping OpenSearchTimeoutException inside caused by
      *      RCF/Threshold model node failing to get checkpoint to restore model before timeout.
      */
     private AnomalyDetectionException coldStartIfNoModel(AtomicReference<AnomalyDetectionException> failure, AnomalyDetector detector)
@@ -609,8 +619,8 @@ public class AnomalyResultTransportAction extends HandledTransportAction<ActionR
             failure.set(new ResourceNotFoundException(adID, causeException.getMessage()));
         } else if (ExceptionUtil.isException(causeException, LimitExceededException.class, LIMIT_EXCEEDED_EXCEPTION_NAME_UNDERSCORE)) {
             failure.set(new LimitExceededException(adID, causeException.getMessage(), false));
-        } else if (causeException instanceof ElasticsearchTimeoutException) {
-            // we can have ElasticsearchTimeoutException when a node tries to load RCF or
+        } else if (causeException instanceof OpenSearchTimeoutException) {
+            // we can have OpenSearchTimeoutException when a node tries to load RCF or
             // threshold model
             failure.set(new InternalFailure(adID, causeException));
         } else {
@@ -1022,7 +1032,7 @@ public class AnomalyResultTransportAction extends HandledTransportAction<ActionR
                                     detectorId,
                                     new EndRunException(detectorId, "Invalid training data", exception, false)
                                 );
-                        } else if (exception instanceof ElasticsearchTimeoutException) {
+                        } else if (exception instanceof OpenSearchTimeoutException) {
                             stateManager
                                 .setLastColdStartException(
                                     detectorId,
@@ -1047,7 +1057,7 @@ public class AnomalyResultTransportAction extends HandledTransportAction<ActionR
                 stateManager.setLastColdStartException(detectorId, new EndRunException(detectorId, "Cannot get training data", false));
             }
         }, exception -> {
-            if (exception instanceof ElasticsearchTimeoutException) {
+            if (exception instanceof OpenSearchTimeoutException) {
                 stateManager
                     .setLastColdStartException(
                         detectorId,

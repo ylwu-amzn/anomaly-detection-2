@@ -1,4 +1,15 @@
 /*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * The OpenSearch Contributors require contributions made to
+ * this file be licensed under the Apache-2.0 license or a
+ * compatible open source license.
+ *
+ * Modifications Copyright OpenSearch Contributors. See
+ * GitHub history for details.
+ */
+
+/*
  * Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
@@ -27,11 +38,11 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import org.elasticsearch.test.ESTestCase;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.opensearch.test.OpenSearchTestCase;
 
 import test.com.amazon.opendistroforelasticsearch.ad.util.MLUtil;
 
@@ -43,7 +54,7 @@ import com.amazon.opendistroforelasticsearch.ad.ml.ModelManager;
 import com.amazon.opendistroforelasticsearch.ad.ml.ModelState;
 import com.amazon.randomcutforest.RandomCutForest;
 
-public class ModelsOnNodeSupplierTests extends ESTestCase {
+public class ModelsOnNodeSupplierTests extends OpenSearchTestCase {
     private RandomCutForest rcf;
     private HybridThresholdingModel thresholdingModel;
     private List<ModelState<?>> expectedResults;

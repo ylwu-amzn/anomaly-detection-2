@@ -1,4 +1,15 @@
 /*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * The OpenSearch Contributors require contributions made to
+ * this file be licensed under the Apache-2.0 license or a
+ * compatible open source license.
+ *
+ * Modifications Copyright OpenSearch Contributors. See
+ * GitHub history for details.
+ */
+
+/*
  * Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
@@ -25,11 +36,11 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.Arrays;
 
-import org.elasticsearch.ElasticsearchException;
-import org.elasticsearch.action.ActionListener;
-import org.elasticsearch.index.IndexNotFoundException;
-import org.elasticsearch.index.reindex.BulkByScrollResponse;
-import org.elasticsearch.index.reindex.DeleteByQueryAction;
+import org.opensearch.OpenSearchException;
+import org.opensearch.action.ActionListener;
+import org.opensearch.index.IndexNotFoundException;
+import org.opensearch.index.reindex.BulkByScrollResponse;
+import org.opensearch.index.reindex.DeleteByQueryAction;
 
 import com.amazon.opendistroforelasticsearch.ad.AbstractADTest;
 import com.amazon.opendistroforelasticsearch.ad.util.ClientUtil;
@@ -70,7 +81,7 @@ public class DailyCronTests extends AbstractADTest {
             if (mode == DailyCronTestExecutionMode.INDEX_NOT_EXIST) {
                 listener.onFailure(new IndexNotFoundException("foo", "bar"));
             } else if (mode == DailyCronTestExecutionMode.FAIL) {
-                listener.onFailure(new ElasticsearchException("bar"));
+                listener.onFailure(new OpenSearchException("bar"));
             } else {
                 BulkByScrollResponse deleteByQueryResponse = mock(BulkByScrollResponse.class);
                 when(deleteByQueryResponse.getDeleted()).thenReturn(10L);

@@ -1,4 +1,15 @@
 /*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * The OpenSearch Contributors require contributions made to
+ * this file be licensed under the Apache-2.0 license or a
+ * compatible open source license.
+ *
+ * Modifications Copyright OpenSearch Contributors. See
+ * GitHub history for details.
+ */
+
+/*
  * Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
@@ -22,21 +33,21 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 
-import org.elasticsearch.cluster.service.ClusterService;
-import org.elasticsearch.common.settings.ClusterSettings;
-import org.elasticsearch.common.settings.Settings;
-import org.elasticsearch.common.unit.ByteSizeValue;
-import org.elasticsearch.monitor.jvm.JvmInfo;
-import org.elasticsearch.monitor.jvm.JvmInfo.Mem;
-import org.elasticsearch.monitor.jvm.JvmService;
-import org.elasticsearch.test.ESTestCase;
+import org.opensearch.cluster.service.ClusterService;
+import org.opensearch.common.settings.ClusterSettings;
+import org.opensearch.common.settings.Settings;
+import org.opensearch.common.unit.ByteSizeValue;
+import org.opensearch.monitor.jvm.JvmInfo;
+import org.opensearch.monitor.jvm.JvmInfo.Mem;
+import org.opensearch.monitor.jvm.JvmService;
+import org.opensearch.test.OpenSearchTestCase;
 
 import com.amazon.opendistroforelasticsearch.ad.common.exception.LimitExceededException;
 import com.amazon.opendistroforelasticsearch.ad.model.AnomalyDetector;
 import com.amazon.opendistroforelasticsearch.ad.settings.AnomalyDetectorSettings;
 import com.amazon.randomcutforest.RandomCutForest;
 
-public class MemoryTrackerTests extends ESTestCase {
+public class MemoryTrackerTests extends OpenSearchTestCase {
 
     int rcfNumFeatures;
     int rcfSampleSize;

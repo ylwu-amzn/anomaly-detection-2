@@ -1,4 +1,15 @@
 /*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * The OpenSearch Contributors require contributions made to
+ * this file be licensed under the Apache-2.0 license or a
+ * compatible open source license.
+ *
+ * Modifications Copyright OpenSearch Contributors. See
+ * GitHub history for details.
+ */
+
+/*
  * Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
@@ -26,9 +37,9 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map.Entry;
 
-import org.elasticsearch.test.ESTestCase;
 import org.junit.Before;
 import org.mockito.ArgumentCaptor;
+import org.opensearch.test.OpenSearchTestCase;
 
 import test.com.amazon.opendistroforelasticsearch.ad.util.MLUtil;
 
@@ -36,7 +47,7 @@ import com.amazon.opendistroforelasticsearch.ad.MemoryTracker;
 import com.amazon.opendistroforelasticsearch.ad.ml.CheckpointDao;
 import com.amazon.opendistroforelasticsearch.ad.settings.AnomalyDetectorSettings;
 
-public class CacheBufferTests extends ESTestCase {
+public class CacheBufferTests extends OpenSearchTestCase {
     CacheBuffer cacheBuffer;
     CheckpointDao checkpointDao;
     MemoryTracker memoryTracker;

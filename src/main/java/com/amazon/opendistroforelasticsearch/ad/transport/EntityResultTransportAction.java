@@ -1,4 +1,15 @@
 /*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * The OpenSearch Contributors require contributions made to
+ * this file be licensed under the Apache-2.0 license or a
+ * compatible open source license.
+ *
+ * Modifications Copyright OpenSearch Contributors. See
+ * GitHub history for details.
+ */
+
+/*
  * Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
@@ -183,7 +194,7 @@ public class EntityResultTransportAction extends HandledTransportAction<EntityRe
                 ThresholdingResult result = manager.getAnomalyResultForEntity(detectorId, datapoint, entityName, entityModel, modelId);
                 // result.getRcfScore() = 0 means the model is not initialized
                 // result.getGrade() = 0 means it is not an anomaly
-                // So many EsRejectedExecutionException if we write no matter what
+                // So many OpenSearchRejectedExecutionException if we write no matter what
                 if (result.getRcfScore() > 0 && (!onlySaveAnomalies || result.getGrade() > 0)) {
                     currentBulkRequest
                         .add(

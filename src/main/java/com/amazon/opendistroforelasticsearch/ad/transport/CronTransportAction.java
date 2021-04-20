@@ -1,4 +1,15 @@
 /*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * The OpenSearch Contributors require contributions made to
+ * this file be licensed under the Apache-2.0 license or a
+ * compatible open source license.
+ *
+ * Modifications Copyright OpenSearch Contributors. See
+ * GitHub history for details.
+ */
+
+/*
  * Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
@@ -18,14 +29,14 @@ package com.amazon.opendistroforelasticsearch.ad.transport;
 import java.io.IOException;
 import java.util.List;
 
-import org.elasticsearch.action.FailedNodeException;
-import org.elasticsearch.action.support.ActionFilters;
-import org.elasticsearch.action.support.nodes.TransportNodesAction;
-import org.elasticsearch.cluster.service.ClusterService;
-import org.elasticsearch.common.inject.Inject;
-import org.elasticsearch.common.io.stream.StreamInput;
-import org.elasticsearch.threadpool.ThreadPool;
-import org.elasticsearch.transport.TransportService;
+import org.opensearch.action.FailedNodeException;
+import org.opensearch.action.support.ActionFilters;
+import org.opensearch.action.support.nodes.TransportNodesAction;
+import org.opensearch.cluster.service.ClusterService;
+import org.opensearch.common.inject.Inject;
+import org.opensearch.common.io.stream.StreamInput;
+import org.opensearch.threadpool.ThreadPool;
+import org.opensearch.transport.TransportService;
 
 import com.amazon.opendistroforelasticsearch.ad.NodeStateManager;
 import com.amazon.opendistroforelasticsearch.ad.caching.CacheProvider;

@@ -1,4 +1,15 @@
 /*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * The OpenSearch Contributors require contributions made to
+ * this file be licensed under the Apache-2.0 license or a
+ * compatible open source license.
+ *
+ * Modifications Copyright OpenSearch Contributors. See
+ * GitHub history for details.
+ */
+
+/*
  * Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
@@ -19,10 +30,10 @@ import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
 
-import org.elasticsearch.action.support.nodes.BaseNodesRequest;
-import org.elasticsearch.cluster.node.DiscoveryNode;
-import org.elasticsearch.common.io.stream.StreamInput;
-import org.elasticsearch.common.io.stream.StreamOutput;
+import org.opensearch.action.support.nodes.BaseNodesRequest;
+import org.opensearch.cluster.node.DiscoveryNode;
+import org.opensearch.common.io.stream.StreamInput;
+import org.opensearch.common.io.stream.StreamOutput;
 
 import com.amazon.opendistroforelasticsearch.ad.model.DetectorProfileName;
 

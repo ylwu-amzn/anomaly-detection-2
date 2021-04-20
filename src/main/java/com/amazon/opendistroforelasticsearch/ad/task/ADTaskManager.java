@@ -1,4 +1,15 @@
 /*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * The OpenSearch Contributors require contributions made to
+ * this file be licensed under the Apache-2.0 license or a
+ * compatible open source license.
+ *
+ * Modifications Copyright OpenSearch Contributors. See
+ * GitHub history for details.
+ */
+
+/*
  * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
@@ -39,8 +50,8 @@ import static com.amazon.opendistroforelasticsearch.ad.settings.AnomalyDetectorS
 import static com.amazon.opendistroforelasticsearch.ad.settings.AnomalyDetectorSettings.REQUEST_TIMEOUT;
 import static com.amazon.opendistroforelasticsearch.ad.util.ExceptionUtil.getErrorMessage;
 import static com.amazon.opendistroforelasticsearch.ad.util.ExceptionUtil.getShardsFailure;
-import static org.elasticsearch.action.DocWriteResponse.Result.CREATED;
-import static org.elasticsearch.common.xcontent.XContentParserUtils.ensureExpectedToken;
+import static org.opensearch.action.DocWriteResponse.Result.CREATED;
+import static org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -400,7 +411,7 @@ public class ADTaskManager {
         GetRequest getRequest = new GetRequest(AnomalyDetector.ANOMALY_DETECTORS_INDEX).id(detectorId);
         client.get(getRequest, ActionListener.wrap(response -> {
             if (!response.isExists()) {
-                listener.onFailure(new ElasticsearchStatusException("AnomalyDetector is not found", RestStatus.NOT_FOUND));
+                listener.onFailure(new OpenSearchStatusException("AnomalyDetector is not found", RestStatus.NOT_FOUND));
                 return;
             }
             try (
@@ -413,7 +424,7 @@ public class ADTaskManager {
             } catch (Exception e) {
                 String message = "Failed to start anomaly detector " + detectorId;
                 logger.error(message, e);
-                listener.onFailure(new ElasticsearchStatusException(message, RestStatus.INTERNAL_SERVER_ERROR));
+                listener.onFailure(new OpenSearchStatusException(message, RestStatus.INTERNAL_SERVER_ERROR));
             }
         }, exception -> listener.onFailure(exception)));
     }
@@ -566,7 +577,7 @@ public class ADTaskManager {
             } catch (Exception e) {
                 String message = "Failed to parse AD task for detector " + detectorId;
                 logger.error(message, e);
-                listener.onFailure(new ElasticsearchStatusException(message, RestStatus.INTERNAL_SERVER_ERROR));
+                listener.onFailure(new OpenSearchStatusException(message, RestStatus.INTERNAL_SERVER_ERROR));
             }
         }, e -> {
             if (e instanceof IndexNotFoundException) {
@@ -1056,7 +1067,7 @@ public class ADTaskManager {
             error = "Can't start detector job as no enabled features configured";
         }
         if (error != null) {
-            listener.onFailure(new ElasticsearchStatusException(error, RestStatus.BAD_REQUEST));
+            listener.onFailure(new OpenSearchStatusException(error, RestStatus.BAD_REQUEST));
             return false;
         }
         return true;
@@ -1109,7 +1120,7 @@ public class ADTaskManager {
                     } else {
                         String error = "Create index " + CommonName.DETECTION_STATE_INDEX + " with mappings not acknowledged";
                         logger.warn(error);
-                        listener.onFailure(new ElasticsearchStatusException(error, RestStatus.INTERNAL_SERVER_ERROR));
+                        listener.onFailure(new OpenSearchStatusException(error, RestStatus.INTERNAL_SERVER_ERROR));
                     }
                 }, e -> {
                     if (ExceptionsHelper.unwrapCause(e) instanceof ResourceAlreadyExistsException) {
@@ -1265,14 +1276,14 @@ public class ADTaskManager {
     ) {
         if (response == null || response.getResult() != CREATED) {
             String errorMsg = getShardsFailure(response);
-            listener.onFailure(new ElasticsearchStatusException(errorMsg, response.status()));
+            listener.onFailure(new OpenSearchStatusException(errorMsg, response.status()));
             return;
         }
         adTask.setTaskId(response.getId());
         ActionListener<AnomalyDetectorJobResponse> delegatedListener = ActionListener.wrap(r -> { listener.onResponse(r); }, e -> {
             handleADTaskException(adTask, e); // TODO: handle HC detector task here?
             if (e instanceof DuplicateTaskException) {
-                listener.onFailure(new ElasticsearchStatusException(DETECTOR_IS_RUNNING, RestStatus.BAD_REQUEST));
+                listener.onFailure(new OpenSearchStatusException(DETECTOR_IS_RUNNING, RestStatus.BAD_REQUEST));
             } else {
                 listener.onFailure(e);
                 // if (!adTask.getTaskType().startsWith("HISTORICAL_HC_")) {

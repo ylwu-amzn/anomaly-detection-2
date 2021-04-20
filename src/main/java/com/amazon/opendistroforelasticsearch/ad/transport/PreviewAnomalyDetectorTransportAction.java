@@ -1,4 +1,15 @@
 /*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * The OpenSearch Contributors require contributions made to
+ * this file be licensed under the Apache-2.0 license or a
+ * compatible open source license.
+ *
+ * Modifications Copyright OpenSearch Contributors. See
+ * GitHub history for details.
+ */
+
+/*
  * Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
@@ -19,7 +30,7 @@ import static com.amazon.opendistroforelasticsearch.ad.settings.AnomalyDetectorS
 import static com.amazon.opendistroforelasticsearch.ad.settings.AnomalyDetectorSettings.MAX_ANOMALY_FEATURES;
 import static com.amazon.opendistroforelasticsearch.ad.util.ParseUtils.getUserContext;
 import static com.amazon.opendistroforelasticsearch.ad.util.ParseUtils.resolveUserAndExecute;
-import static org.elasticsearch.common.xcontent.XContentParserUtils.ensureExpectedToken;
+import static org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -28,23 +39,23 @@ import java.util.List;
 import org.apache.commons.lang.StringUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.elasticsearch.ElasticsearchException;
-import org.elasticsearch.action.ActionListener;
-import org.elasticsearch.action.get.GetRequest;
-import org.elasticsearch.action.get.GetResponse;
-import org.elasticsearch.action.support.ActionFilters;
-import org.elasticsearch.action.support.HandledTransportAction;
-import org.elasticsearch.client.Client;
-import org.elasticsearch.cluster.service.ClusterService;
-import org.elasticsearch.common.CheckedConsumer;
-import org.elasticsearch.common.inject.Inject;
-import org.elasticsearch.common.settings.Settings;
-import org.elasticsearch.common.util.concurrent.ThreadContext;
-import org.elasticsearch.common.xcontent.NamedXContentRegistry;
-import org.elasticsearch.common.xcontent.XContentParser;
-import org.elasticsearch.rest.RestStatus;
-import org.elasticsearch.tasks.Task;
-import org.elasticsearch.transport.TransportService;
+import org.opensearch.OpenSearchException;
+import org.opensearch.action.ActionListener;
+import org.opensearch.action.get.GetRequest;
+import org.opensearch.action.get.GetResponse;
+import org.opensearch.action.support.ActionFilters;
+import org.opensearch.action.support.HandledTransportAction;
+import org.opensearch.client.Client;
+import org.opensearch.cluster.service.ClusterService;
+import org.opensearch.common.CheckedConsumer;
+import org.opensearch.common.inject.Inject;
+import org.opensearch.common.settings.Settings;
+import org.opensearch.common.util.concurrent.ThreadContext;
+import org.opensearch.common.xcontent.NamedXContentRegistry;
+import org.opensearch.common.xcontent.XContentParser;
+import org.opensearch.rest.RestStatus;
+import org.opensearch.tasks.Task;
+import org.opensearch.transport.TransportService;
 
 import com.amazon.opendistroforelasticsearch.ad.AnomalyDetectorRunner;
 import com.amazon.opendistroforelasticsearch.ad.model.AnomalyDetector;
@@ -118,7 +129,7 @@ public class PreviewAnomalyDetectorTransportAction extends
             if (detector != null) {
                 String error = validateDetector(detector);
                 if (StringUtils.isNotBlank(error)) {
-                    listener.onFailure(new ElasticsearchException(error, RestStatus.BAD_REQUEST));
+                    listener.onFailure(new OpenSearchException(error, RestStatus.BAD_REQUEST));
                     return;
                 }
                 anomalyDetectorRunner.executeDetector(detector, startTime, endTime, getPreviewDetectorActionListener(listener, detector));
@@ -153,7 +164,7 @@ public class PreviewAnomalyDetectorTransportAction extends
             logger.error("Unexpected error running anomaly detector " + detector.getDetectorId(), exception);
             listener
                 .onFailure(
-                    new ElasticsearchException(
+                    new OpenSearchException(
                         "Unexpected error running anomaly detector " + detector.getDetectorId(),
                         RestStatus.INTERNAL_SERVER_ERROR
                     )
@@ -188,7 +199,7 @@ public class PreviewAnomalyDetectorTransportAction extends
                 if (!response.isExists()) {
                     listener
                         .onFailure(
-                            new ElasticsearchException("Can't find anomaly detector with id:" + response.getId(), RestStatus.NOT_FOUND)
+                            new OpenSearchException("Can't find anomaly detector with id:" + response.getId(), RestStatus.NOT_FOUND)
                         );
                     return;
                 }
@@ -205,6 +216,6 @@ public class PreviewAnomalyDetectorTransportAction extends
                     listener.onFailure(e);
                 }
             }
-        }, exception -> { listener.onFailure(new ElasticsearchException("Could not execute get query to find detector")); });
+        }, exception -> { listener.onFailure(new OpenSearchException("Could not execute get query to find detector")); });
     }
 }

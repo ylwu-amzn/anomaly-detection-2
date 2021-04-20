@@ -1,4 +1,15 @@
 /*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * The OpenSearch Contributors require contributions made to
+ * this file be licensed under the Apache-2.0 license or a
+ * compatible open source license.
+ *
+ * Modifications Copyright OpenSearch Contributors. See
+ * GitHub history for details.
+ */
+
+/*
  * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
@@ -21,17 +32,17 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
 
-import org.elasticsearch.Version;
-import org.elasticsearch.action.ActionRequestValidationException;
-import org.elasticsearch.cluster.ClusterName;
-import org.elasticsearch.cluster.node.DiscoveryNode;
-import org.elasticsearch.common.UUIDs;
-import org.elasticsearch.common.io.stream.BytesStreamOutput;
-import org.elasticsearch.common.io.stream.NamedWriteableAwareStreamInput;
-import org.elasticsearch.common.io.stream.NamedWriteableRegistry;
-import org.elasticsearch.plugins.Plugin;
-import org.elasticsearch.test.ESSingleNodeTestCase;
-import org.elasticsearch.test.InternalSettingsPlugin;
+import org.opensearch.Version;
+import org.opensearch.action.ActionRequestValidationException;
+import org.opensearch.cluster.ClusterName;
+import org.opensearch.cluster.node.DiscoveryNode;
+import org.opensearch.common.UUIDs;
+import org.opensearch.common.io.stream.BytesStreamOutput;
+import org.opensearch.common.io.stream.NamedWriteableAwareStreamInput;
+import org.opensearch.common.io.stream.NamedWriteableRegistry;
+import org.opensearch.plugins.Plugin;
+import org.opensearch.test.InternalSettingsPlugin;
+import org.opensearch.test.OpenSearchSingleNodeTestCase;
 
 import com.amazon.opendistroforelasticsearch.ad.AnomalyDetectorPlugin;
 import com.amazon.opendistroforelasticsearch.ad.TestHelpers;
@@ -39,7 +50,7 @@ import com.amazon.opendistroforelasticsearch.ad.constant.CommonErrorMessages;
 import com.amazon.opendistroforelasticsearch.ad.model.ADTaskProfile;
 import com.google.common.collect.ImmutableList;
 
-public class ADTaskProfileTests extends ESSingleNodeTestCase {
+public class ADTaskProfileTests extends OpenSearchSingleNodeTestCase {
     @Override
     protected Collection<Class<? extends Plugin>> getPlugins() {
         return pluginList(InternalSettingsPlugin.class, AnomalyDetectorPlugin.class);

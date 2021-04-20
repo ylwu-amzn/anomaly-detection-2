@@ -1,4 +1,15 @@
 /*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * The OpenSearch Contributors require contributions made to
+ * this file be licensed under the Apache-2.0 license or a
+ * compatible open source license.
+ *
+ * Modifications Copyright OpenSearch Contributors. See
+ * GitHub history for details.
+ */
+
+/*
  * Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
@@ -23,8 +34,8 @@ import java.util.Map;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.elasticsearch.cluster.service.ClusterService;
-import org.elasticsearch.monitor.jvm.JvmService;
+import org.opensearch.cluster.service.ClusterService;
+import org.opensearch.monitor.jvm.JvmService;
 
 import com.amazon.opendistroforelasticsearch.ad.common.exception.LimitExceededException;
 import com.amazon.opendistroforelasticsearch.ad.model.AnomalyDetector;

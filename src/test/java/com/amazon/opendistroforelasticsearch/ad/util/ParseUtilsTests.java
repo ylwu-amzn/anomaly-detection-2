@@ -1,4 +1,15 @@
 /*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * The OpenSearch Contributors require contributions made to
+ * this file be licensed under the Apache-2.0 license or a
+ * compatible open source license.
+ *
+ * Modifications Copyright OpenSearch Contributors. See
+ * GitHub history for details.
+ */
+
+/*
  * Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
@@ -21,13 +32,13 @@ import java.io.IOException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 
-import org.elasticsearch.common.xcontent.XContentBuilder;
-import org.elasticsearch.common.xcontent.XContentFactory;
-import org.elasticsearch.common.xcontent.XContentParser;
-import org.elasticsearch.search.aggregations.AggregationBuilder;
-import org.elasticsearch.search.aggregations.AggregatorFactories;
-import org.elasticsearch.search.builder.SearchSourceBuilder;
-import org.elasticsearch.test.ESTestCase;
+import org.opensearch.common.xcontent.XContentBuilder;
+import org.opensearch.common.xcontent.XContentFactory;
+import org.opensearch.common.xcontent.XContentParser;
+import org.opensearch.search.aggregations.AggregationBuilder;
+import org.opensearch.search.aggregations.AggregatorFactories;
+import org.opensearch.search.builder.SearchSourceBuilder;
+import org.opensearch.test.OpenSearchTestCase;
 
 import com.amazon.opendistroforelasticsearch.ad.TestHelpers;
 import com.amazon.opendistroforelasticsearch.ad.common.exception.AnomalyDetectionException;
@@ -37,7 +48,7 @@ import com.amazon.opendistroforelasticsearch.ad.model.Feature;
 import com.amazon.opendistroforelasticsearch.commons.authuser.User;
 import com.google.common.collect.ImmutableList;
 
-public class ParseUtilsTests extends ESTestCase {
+public class ParseUtilsTests extends OpenSearchTestCase {
 
     public void testToInstant() throws IOException {
         long epochMilli = Instant.now().toEpochMilli();

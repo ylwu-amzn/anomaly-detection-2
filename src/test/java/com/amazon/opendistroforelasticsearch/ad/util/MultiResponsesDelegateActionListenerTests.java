@@ -1,4 +1,15 @@
 /*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * The OpenSearch Contributors require contributions made to
+ * this file be licensed under the Apache-2.0 license or a
+ * compatible open source license.
+ *
+ * Modifications Copyright OpenSearch Contributors. See
+ * GitHub history for details.
+ */
+
+/*
  * Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
@@ -23,14 +34,14 @@ import java.util.ArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-import org.elasticsearch.action.ActionListener;
-import org.elasticsearch.test.ESTestCase;
+import org.opensearch.action.ActionListener;
+import org.opensearch.test.OpenSearchTestCase;
 
 import com.amazon.opendistroforelasticsearch.ad.model.AnomalyResult;
 import com.amazon.opendistroforelasticsearch.ad.model.DetectorProfile;
 import com.amazon.opendistroforelasticsearch.ad.model.EntityAnomalyResult;
 
-public class MultiResponsesDelegateActionListenerTests extends ESTestCase {
+public class MultiResponsesDelegateActionListenerTests extends OpenSearchTestCase {
 
     public void testEmptyResponse() throws InterruptedException {
         final CountDownLatch inProgressLatch = new CountDownLatch(1);

@@ -1,4 +1,15 @@
 /*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * The OpenSearch Contributors require contributions made to
+ * this file be licensed under the Apache-2.0 license or a
+ * compatible open source license.
+ *
+ * Modifications Copyright OpenSearch Contributors. See
+ * GitHub history for details.
+ */
+
+/*
  * Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
@@ -15,10 +26,10 @@
 
 package com.amazon.opendistroforelasticsearch.ad.stats.suppliers;
 
-import org.elasticsearch.test.ESTestCase;
 import org.junit.Test;
+import org.opensearch.test.OpenSearchTestCase;
 
-public class CounterSupplierTests extends ESTestCase {
+public class CounterSupplierTests extends OpenSearchTestCase {
     @Test
     public void testGetAndIncrement() {
         CounterSupplier counterSupplier = new CounterSupplier();

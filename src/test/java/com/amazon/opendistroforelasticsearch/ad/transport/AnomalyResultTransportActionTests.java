@@ -1,4 +1,15 @@
 /*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * The OpenSearch Contributors require contributions made to
+ * this file be licensed under the Apache-2.0 license or a
+ * compatible open source license.
+ *
+ * Modifications Copyright OpenSearch Contributors. See
+ * GitHub history for details.
+ */
+
+/*
  * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
@@ -23,11 +34,11 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 
-import org.elasticsearch.action.get.GetResponse;
-import org.elasticsearch.common.io.stream.NotSerializableExceptionWrapper;
-import org.elasticsearch.search.aggregations.AggregationBuilder;
-import org.elasticsearch.test.rest.ESRestTestCase;
 import org.junit.Before;
+import org.opensearch.action.get.GetResponse;
+import org.opensearch.common.io.stream.NotSerializableExceptionWrapper;
+import org.opensearch.search.aggregations.AggregationBuilder;
+import org.opensearch.test.rest.OpenSearchRestTestCase;
 
 import com.amazon.opendistroforelasticsearch.ad.ADIntegTestCase;
 import com.amazon.opendistroforelasticsearch.ad.TestHelpers;
@@ -210,8 +221,8 @@ public class AnomalyResultTransportActionTests extends ADIntegTestCase {
             indices,
             features,
             randomQuery("{\"bool\":{\"filter\":[{\"exists\":{\"field\":\"value\"}}]}}"),
-            new IntervalTimeConfiguration(ESRestTestCase.randomLongBetween(1, 5), ChronoUnit.MINUTES),
-            new IntervalTimeConfiguration(ESRestTestCase.randomLongBetween(1, 5), ChronoUnit.MINUTES),
+            new IntervalTimeConfiguration(OpenSearchRestTestCase.randomLongBetween(1, 5), ChronoUnit.MINUTES),
+            new IntervalTimeConfiguration(OpenSearchRestTestCase.randomLongBetween(1, 5), ChronoUnit.MINUTES),
             8,
             null,
             randomInt(),
@@ -231,8 +242,8 @@ public class AnomalyResultTransportActionTests extends ADIntegTestCase {
             indices,
             features,
             randomQuery("{\"bool\":{\"filter\":[{\"exists\":{\"field\":\"value\"}}]}}"),
-            new IntervalTimeConfiguration(ESRestTestCase.randomLongBetween(1, 5), ChronoUnit.MINUTES),
-            new IntervalTimeConfiguration(ESRestTestCase.randomLongBetween(1, 5), ChronoUnit.MINUTES),
+            new IntervalTimeConfiguration(OpenSearchRestTestCase.randomLongBetween(1, 5), ChronoUnit.MINUTES),
+            new IntervalTimeConfiguration(OpenSearchRestTestCase.randomLongBetween(1, 5), ChronoUnit.MINUTES),
             8,
             null,
             randomInt(),

@@ -1,4 +1,15 @@
 /*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * The OpenSearch Contributors require contributions made to
+ * this file be licensed under the Apache-2.0 license or a
+ * compatible open source license.
+ *
+ * Modifications Copyright OpenSearch Contributors. See
+ * GitHub history for details.
+ */
+
+/*
  * Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
@@ -16,7 +27,6 @@
 package com.amazon.opendistroforelasticsearch.ad.transport;
 
 import static com.amazon.opendistroforelasticsearch.ad.TestHelpers.createIndexBlockedState;
-import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
 import static org.hamcrest.CoreMatchers.startsWith;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.empty;
@@ -39,6 +49,7 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.opensearch.common.xcontent.XContentFactory.jsonBuilder;
 
 import java.io.IOException;
 import java.time.Clock;
@@ -95,6 +106,45 @@ import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.opensearch.OpenSearchTimeoutException;
+import org.opensearch.action.ActionListener;
+import org.opensearch.action.ActionRequestValidationException;
+import org.opensearch.action.get.GetRequest;
+import org.opensearch.action.get.GetResponse;
+import org.opensearch.action.index.IndexRequest;
+import org.opensearch.action.index.IndexResponse;
+import org.opensearch.action.support.ActionFilters;
+import org.opensearch.action.support.PlainActionFuture;
+import org.opensearch.client.Client;
+import org.opensearch.cluster.ClusterName;
+import org.opensearch.cluster.ClusterState;
+import org.opensearch.cluster.block.ClusterBlocks;
+import org.opensearch.cluster.metadata.IndexMetadata;
+import org.opensearch.cluster.metadata.IndexNameExpressionResolver;
+import org.opensearch.cluster.node.DiscoveryNode;
+import org.opensearch.cluster.service.ClusterService;
+import org.opensearch.common.Strings;
+import org.opensearch.common.io.stream.BytesStreamOutput;
+import org.opensearch.common.io.stream.NotSerializableExceptionWrapper;
+import org.opensearch.common.io.stream.StreamInput;
+import org.opensearch.common.settings.Settings;
+import org.opensearch.common.util.concurrent.ThreadContext;
+import org.opensearch.common.xcontent.ToXContent;
+import org.opensearch.common.xcontent.XContentBuilder;
+import org.opensearch.index.Index;
+import org.opensearch.index.IndexNotFoundException;
+import org.opensearch.index.shard.ShardId;
+import org.opensearch.threadpool.ThreadPool;
+import org.opensearch.transport.NodeNotConnectedException;
+import org.opensearch.transport.RemoteTransportException;
+import org.opensearch.transport.Transport;
+import org.opensearch.transport.TransportException;
+import org.opensearch.transport.TransportInterceptor;
+import org.opensearch.transport.TransportRequest;
+import org.opensearch.transport.TransportRequestOptions;
+import org.opensearch.transport.TransportResponse;
+import org.opensearch.transport.TransportResponseHandler;
+import org.opensearch.transport.TransportService;
 
 import test.com.amazon.opendistroforelasticsearch.ad.util.JsonDeserializer;
 
@@ -1158,7 +1208,7 @@ public class AnomalyResultTests extends AbstractADTest {
 
         doAnswer(invocation -> {
             ActionListener<Optional<double[][]>> listener = invocation.getArgument(2);
-            listener.onFailure(new ElasticsearchTimeoutException(""));
+            listener.onFailure(new OpenSearchTimeoutException(""));
             return null;
         }).when(normalModelManager).trainModel(any(AnomalyDetector.class), any(double[][].class), any(ActionListener.class));
 

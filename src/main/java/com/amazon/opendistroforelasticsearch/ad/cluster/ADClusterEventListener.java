@@ -1,4 +1,15 @@
 /*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * The OpenSearch Contributors require contributions made to
+ * this file be licensed under the Apache-2.0 license or a
+ * compatible open source license.
+ *
+ * Modifications Copyright OpenSearch Contributors. See
+ * GitHub history for details.
+ */
+
+/*
  * Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
@@ -21,13 +32,13 @@ import java.util.concurrent.Semaphore;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.elasticsearch.cluster.ClusterChangedEvent;
-import org.elasticsearch.cluster.ClusterStateListener;
-import org.elasticsearch.cluster.node.DiscoveryNode;
-import org.elasticsearch.cluster.node.DiscoveryNodes.Delta;
-import org.elasticsearch.cluster.service.ClusterService;
-import org.elasticsearch.common.inject.Inject;
-import org.elasticsearch.gateway.GatewayService;
+import org.opensearch.cluster.ClusterChangedEvent;
+import org.opensearch.cluster.ClusterStateListener;
+import org.opensearch.cluster.node.DiscoveryNode;
+import org.opensearch.cluster.node.DiscoveryNodes.Delta;
+import org.opensearch.cluster.service.ClusterService;
+import org.opensearch.common.inject.Inject;
+import org.opensearch.gateway.GatewayService;
 
 import com.amazon.opendistroforelasticsearch.ad.ml.ModelManager;
 import com.amazon.opendistroforelasticsearch.ad.util.DiscoveryNodeFilterer;
@@ -123,7 +134,7 @@ public class ADClusterEventListener implements ClusterStateListener {
                 }
             }
         } catch (Exception ex) {
-            // One possible exception is ElasticsearchTimeoutException thrown when we fail
+            // One possible exception is OpenSearchTimeoutException thrown when we fail
             // to put checkpoint when ModelManager stops model.
             LOG.error("Cluster state change handler has issue(s)", ex);
         } finally {

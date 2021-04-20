@@ -1,4 +1,15 @@
 /*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * The OpenSearch Contributors require contributions made to
+ * this file be licensed under the Apache-2.0 license or a
+ * compatible open source license.
+ *
+ * Modifications Copyright OpenSearch Contributors. See
+ * GitHub history for details.
+ */
+
+/*
  * Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
@@ -17,13 +28,13 @@ package com.amazon.opendistroforelasticsearch.ad.transport;
 
 import java.time.Instant;
 
-import org.elasticsearch.common.io.stream.BytesStreamOutput;
-import org.elasticsearch.common.io.stream.NamedWriteableAwareStreamInput;
-import org.elasticsearch.common.io.stream.NamedWriteableRegistry;
-import org.elasticsearch.common.xcontent.ToXContent;
-import org.elasticsearch.test.ESSingleNodeTestCase;
 import org.junit.Assert;
 import org.junit.Test;
+import org.opensearch.common.io.stream.BytesStreamOutput;
+import org.opensearch.common.io.stream.NamedWriteableAwareStreamInput;
+import org.opensearch.common.io.stream.NamedWriteableRegistry;
+import org.opensearch.common.xcontent.ToXContent;
+import org.opensearch.test.OpenSearchSingleNodeTestCase;
 
 import com.amazon.opendistroforelasticsearch.ad.TestHelpers;
 import com.amazon.opendistroforelasticsearch.ad.model.AnomalyDetector;
@@ -31,7 +42,7 @@ import com.amazon.opendistroforelasticsearch.ad.model.AnomalyResult;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 
-public class PreviewAnomalyDetectorActionTests extends ESSingleNodeTestCase {
+public class PreviewAnomalyDetectorActionTests extends OpenSearchSingleNodeTestCase {
 
     @Override
     protected NamedWriteableRegistry writableRegistry() {

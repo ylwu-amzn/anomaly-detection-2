@@ -1,4 +1,15 @@
 /*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * The OpenSearch Contributors require contributions made to
+ * this file be licensed under the Apache-2.0 license or a
+ * compatible open source license.
+ *
+ * Modifications Copyright OpenSearch Contributors. See
+ * GitHub history for details.
+ */
+
+/*
  * Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
@@ -27,16 +38,16 @@ import java.util.HashMap;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.elasticsearch.ElasticsearchException;
-import org.elasticsearch.Version;
-import org.elasticsearch.action.ActionListener;
-import org.elasticsearch.action.FailedNodeException;
-import org.elasticsearch.client.Client;
-import org.elasticsearch.cluster.ClusterName;
-import org.elasticsearch.cluster.ClusterState;
-import org.elasticsearch.cluster.service.ClusterService;
-import org.elasticsearch.common.io.stream.BytesStreamOutput;
-import org.elasticsearch.common.io.stream.StreamInput;
+import org.opensearch.OpenSearchException;
+import org.opensearch.Version;
+import org.opensearch.action.ActionListener;
+import org.opensearch.action.FailedNodeException;
+import org.opensearch.client.Client;
+import org.opensearch.cluster.ClusterName;
+import org.opensearch.cluster.ClusterState;
+import org.opensearch.cluster.service.ClusterService;
+import org.opensearch.common.io.stream.BytesStreamOutput;
+import org.opensearch.common.io.stream.StreamInput;
 
 import test.com.amazon.opendistroforelasticsearch.ad.util.ClusterCreation;
 
@@ -81,11 +92,11 @@ public class HourlyCronTests extends AbstractADTest {
                         new CronResponse(
                             new ClusterName("test"),
                             Collections.singletonList(new CronNodeResponse(state.nodes().getLocalNode())),
-                            Collections.singletonList(new FailedNodeException("foo0", "blah", new ElasticsearchException("bar")))
+                            Collections.singletonList(new FailedNodeException("foo0", "blah", new OpenSearchException("bar")))
                         )
                     );
             } else if (mode == HourlyCronTestExecutionMode.ALL_FAIL) {
-                listener.onFailure(new ElasticsearchException("bar"));
+                listener.onFailure(new OpenSearchException("bar"));
             } else {
                 CronNodeResponse nodeResponse = new CronNodeResponse(state.nodes().getLocalNode());
                 BytesStreamOutput nodeResponseOut = new BytesStreamOutput();

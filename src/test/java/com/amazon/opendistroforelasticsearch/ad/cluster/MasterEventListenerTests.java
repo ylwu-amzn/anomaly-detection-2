@@ -1,4 +1,15 @@
 /*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * The OpenSearch Contributors require contributions made to
+ * this file be licensed under the Apache-2.0 license or a
+ * compatible open source license.
+ *
+ * Modifications Copyright OpenSearch Contributors. See
+ * GitHub history for details.
+ */
+
+/*
  * Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
@@ -27,13 +38,13 @@ import java.time.Clock;
 import java.util.Arrays;
 import java.util.HashMap;
 
-import org.elasticsearch.client.Client;
-import org.elasticsearch.cluster.service.ClusterService;
-import org.elasticsearch.common.component.LifecycleListener;
-import org.elasticsearch.common.unit.TimeValue;
-import org.elasticsearch.threadpool.Scheduler.Cancellable;
-import org.elasticsearch.threadpool.ThreadPool;
 import org.junit.Before;
+import org.opensearch.client.Client;
+import org.opensearch.cluster.service.ClusterService;
+import org.opensearch.common.component.LifecycleListener;
+import org.opensearch.common.unit.TimeValue;
+import org.opensearch.threadpool.Scheduler.Cancellable;
+import org.opensearch.threadpool.ThreadPool;
 
 import com.amazon.opendistroforelasticsearch.ad.AbstractADTest;
 import com.amazon.opendistroforelasticsearch.ad.cluster.diskcleanup.ModelCheckpointIndexRetention;

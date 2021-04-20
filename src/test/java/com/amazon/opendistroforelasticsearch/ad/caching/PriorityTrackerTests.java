@@ -1,4 +1,15 @@
 /*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * The OpenSearch Contributors require contributions made to
+ * this file be licensed under the Apache-2.0 license or a
+ * compatible open source license.
+ *
+ * Modifications Copyright OpenSearch Contributors. See
+ * GitHub history for details.
+ */
+
+/*
  * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
@@ -23,10 +34,10 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 
-import org.elasticsearch.test.ESTestCase;
 import org.junit.Before;
+import org.opensearch.test.OpenSearchTestCase;
 
-public class PriorityTrackerTests extends ESTestCase {
+public class PriorityTrackerTests extends OpenSearchTestCase {
     Clock clock;
     PriorityTracker tracker;
     Instant now;

@@ -1,4 +1,15 @@
 /*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * The OpenSearch Contributors require contributions made to
+ * this file be licensed under the Apache-2.0 license or a
+ * compatible open source license.
+ *
+ * Modifications Copyright OpenSearch Contributors. See
+ * GitHub history for details.
+ */
+
+/*
  * Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
@@ -36,13 +47,13 @@ import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Queue;
 
-import org.elasticsearch.action.ActionListener;
-import org.elasticsearch.action.get.GetRequest;
-import org.elasticsearch.action.get.GetResponse;
-import org.elasticsearch.client.Client;
-import org.elasticsearch.common.settings.Settings;
-import org.elasticsearch.common.util.concurrent.EsRejectedExecutionException;
-import org.elasticsearch.threadpool.ThreadPool;
+import org.opensearch.action.ActionListener;
+import org.opensearch.action.get.GetRequest;
+import org.opensearch.action.get.GetResponse;
+import org.opensearch.client.Client;
+import org.opensearch.common.settings.Settings;
+import org.opensearch.common.util.concurrent.OpenSearchRejectedExecutionException;
+import org.opensearch.threadpool.ThreadPool;
 
 import test.com.amazon.opendistroforelasticsearch.ad.util.MLUtil;
 
@@ -366,7 +377,7 @@ public class EntityColdStarterTests extends AbstractADTest {
 
         doAnswer(invocation -> {
             ActionListener<Entry<Optional<Long>, Optional<Long>>> listener = invocation.getArgument(2);
-            listener.onFailure(new EsRejectedExecutionException(""));
+            listener.onFailure(new OpenSearchRejectedExecutionException(""));
             return null;
         }).when(searchFeatureDao).getEntityMinMaxDataTime(any(), any(), any());
 

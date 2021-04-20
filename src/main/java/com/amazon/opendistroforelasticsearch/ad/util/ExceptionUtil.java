@@ -1,4 +1,15 @@
 /*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * The OpenSearch Contributors require contributions made to
+ * this file be licensed under the Apache-2.0 license or a
+ * compatible open source license.
+ *
+ * Modifications Copyright OpenSearch Contributors. See
+ * GitHub history for details.
+ */
+
+/*
  * Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
@@ -16,23 +27,23 @@
 package com.amazon.opendistroforelasticsearch.ad.util;
 
 import org.apache.commons.lang.exception.ExceptionUtils;
-import org.elasticsearch.ElasticsearchException;
-import org.elasticsearch.action.index.IndexResponse;
-import org.elasticsearch.action.support.replication.ReplicationResponse;
-import org.elasticsearch.common.io.stream.NotSerializableExceptionWrapper;
+import org.opensearch.OpenSearchException;
+import org.opensearch.action.index.IndexResponse;
+import org.opensearch.action.support.replication.ReplicationResponse;
+import org.opensearch.common.io.stream.NotSerializableExceptionWrapper;
 
 import com.amazon.opendistroforelasticsearch.ad.common.exception.AnomalyDetectionException;
 import com.amazon.opendistroforelasticsearch.ad.common.exception.ResourceNotFoundException;
 
 public class ExceptionUtil {
-    public static final String RESOURCE_NOT_FOUND_EXCEPTION_NAME_UNDERSCORE = ElasticsearchException
+    public static final String RESOURCE_NOT_FOUND_EXCEPTION_NAME_UNDERSCORE = OpenSearchException
         .getExceptionName(new ResourceNotFoundException("", ""));
 
     /**
-     * Elasticsearch restricts the kind of exceptions can be thrown over the wire
-     * (See ElasticsearchException.ElasticsearchExceptionHandle). Since we cannot
+     * OpenSearch restricts the kind of exceptions can be thrown over the wire
+     * (See OpenSearchException.OpenSearchExceptionHandle). Since we cannot
      * add our own exception like ResourceNotFoundException without modifying
-     * Elasticsearch's code, we have to unwrap the remote transport exception and
+     * OpenSearch's code, we have to unwrap the remote transport exception and
      * check its root cause message.
      *
      * @param exception exception thrown locally or over the wire
@@ -52,7 +63,7 @@ public class ExceptionUtil {
         // all exception that has not been registered to sent over wire can be wrapped
         // inside NotSerializableExceptionWrapper.
         // see StreamOutput.writeException
-        // ElasticsearchException.getExceptionName(exception) returns exception
+        // OpenSearchException.getExceptionName(exception) returns exception
         // separated by underscore. For example, ResourceNotFoundException is converted
         // to "resource_not_found_exception".
         if (exception instanceof NotSerializableExceptionWrapper && exception.getMessage().trim().startsWith(expectedExceptionName)) {
@@ -100,8 +111,8 @@ public class ExceptionUtil {
     public static String getErrorMessage(Exception e) {
         if (e instanceof IllegalArgumentException || e instanceof AnomalyDetectionException) {
             return e.getMessage();
-        } else if (e instanceof ElasticsearchException) {
-            return ((ElasticsearchException) e).getDetailedMessage();
+        } else if (e instanceof OpenSearchException) {
+            return ((OpenSearchException) e).getDetailedMessage();
         } else {
             return ExceptionUtils.getFullStackTrace(e);
         }

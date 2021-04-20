@@ -4,17 +4,17 @@
 [![Forum](https://img.shields.io/badge/chat-on%20forums-blue)](https://discuss.opendistrocommunity.dev/c/Use-this-category-for-all-questions-around-machine-learning-plugins)
 ![PRs welcome!](https://img.shields.io/badge/PRs-welcome!-success)
 
-## Open Distro for Elasticsearch Anomaly Detection
+## OpenSearch Anomaly Detection
 
-The Open Distro for Elasticsearch Anomaly Detection plugin enables you to leverage Machine Learning based algorithms to automatically detect anomalies as your log data is ingested. Combined with Alerting, you can monitor your data in near real time and automatically send alert notifications . With an intuitive Kibana interface and a powerful API, it is easy to set up, tune, and monitor your anomaly detectors.
+The OpenSearch Anomaly Detection plugin enables you to leverage Machine Learning based algorithms to automatically detect anomalies as your log data is ingested. Combined with Alerting, you can monitor your data in near real time and automatically send alert notifications . With an intuitive Kibana interface and a powerful API, it is easy to set up, tune, and monitor your anomaly detectors.
 
 ## Highlights
 
 Anomaly detection is using [Random Cut Forest (RCF) algorithm](https://github.com/aws/random-cut-forest-by-aws) for detecting anomalous data points.
 
-Anomaly detections run a scheduled job based on [job-scheduler](https://github.com/opendistro-for-elasticsearch/job-scheduler).
+Anomaly detections run a scheduled job based on [job-scheduler](https://github.com/opensearch-project/job-scheduler).
 
-You should use anomaly detection plugin with the same version of [Open Distro Alerting plugin](https://github.com/opendistro-for-elasticsearch/alerting). You can also create a monitor based on the anomaly detector. A scheduled monitor run checks the anomaly detection results regularly and collects anomalies to trigger alerts based on custom trigger conditions.
+You should use anomaly detection plugin with the same version of [OpenSearch Alerting plugin](https://github.com/opensearch-project/alerting). You can also create a monitor based on the anomaly detector. A scheduled monitor run checks the anomaly detection results regularly and collects anomalies to trigger alerts based on custom trigger conditions.
   
 ## Current Limitations
 * We will continuously add new unit test cases, but we don't have 100% unit test coverage for now. This is a great area for developers from the community to contribute and help improve test coverage.
@@ -82,7 +82,7 @@ The **test runner JVM** will start suspended and wait for a debugger to attach t
 
 ### Advanced: Launching multi node clusters locally
 
-Sometimes you need to launch a cluster with more than one Elasticsearch server process.
+Sometimes you need to launch a cluster with more than one OpenSearch server process.
 
 You can do this by running `./gradlew run -PnumNodes=<numberOfNodesYouWant>`
 
@@ -91,23 +91,20 @@ But, you must set up debugger configurations to listen on each port starting fro
 
 ## Interested in contributing to the Anomaly Detection plugin
 
-We welcome you to get involved in development, documentation, testing the anomaly detection plugin. See our [contribution guidelines](https://github.com/opendistro-for-elasticsearch/anomaly-detection/blob/master/CONTRIBUTING.md) and join in.
+We welcome you to get involved in development, documentation, testing the anomaly detection plugin. See our [contribution guidelines](CONTRIBUTING.md) and join in.
 
 ## Code of Conduct
 
-This project has adopted an [Open Source Code of Conduct](https://opendistro.github.io/for-elasticsearch/codeofconduct.html).
-
+This project has adopted an [Open Source Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Security issue notifications
 
 If you discover a potential security issue in this project we ask that you notify AWS/Amazon Security via our [vulnerability reporting page](http://aws.amazon.com/security/vulnerability-reporting/). Please do **not** create a public GitHub issue.
 
-
 ## Licensing
 
-See the [LICENSE](./LICENSE.txt) file for our project's licensing. We will ask you to confirm the licensing of your contribution.
-
+See the [LICENSE](LICENSE.txt) file for our project's licensing. We will ask you to confirm the licensing of your contribution.
 
 ## Copyright
 
-Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+Copyright 2021 OpenSearch Contributors

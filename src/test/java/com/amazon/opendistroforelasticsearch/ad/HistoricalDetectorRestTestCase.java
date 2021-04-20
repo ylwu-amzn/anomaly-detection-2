@@ -1,4 +1,15 @@
 /*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * The OpenSearch Contributors require contributions made to
+ * this file be licensed under the Apache-2.0 license or a
+ * compatible open source license.
+ *
+ * Modifications Copyright OpenSearch Contributors. See
+ * GitHub history for details.
+ */
+
+/*
  * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
@@ -28,13 +39,13 @@ import java.util.function.ToIntFunction;
 import org.apache.http.HttpHeaders;
 import org.apache.http.message.BasicHeader;
 import org.apache.http.util.EntityUtils;
-import org.elasticsearch.client.Response;
-import org.elasticsearch.client.RestClient;
-import org.elasticsearch.common.xcontent.ToXContentObject;
-import org.elasticsearch.common.xcontent.XContentParser;
-import org.elasticsearch.rest.RestStatus;
-import org.elasticsearch.search.aggregations.AggregationBuilder;
 import org.junit.Before;
+import org.opensearch.client.Response;
+import org.opensearch.client.RestClient;
+import org.opensearch.common.xcontent.ToXContentObject;
+import org.opensearch.common.xcontent.XContentParser;
+import org.opensearch.rest.RestStatus;
+import org.opensearch.search.aggregations.AggregationBuilder;
 
 import com.amazon.opendistroforelasticsearch.ad.mock.model.MockSimpleLog;
 import com.amazon.opendistroforelasticsearch.ad.model.ADTaskProfile;
