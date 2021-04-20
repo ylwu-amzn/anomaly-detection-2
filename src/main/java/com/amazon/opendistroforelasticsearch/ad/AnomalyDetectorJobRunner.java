@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 
@@ -50,17 +51,20 @@ import com.amazon.opendistroforelasticsearch.ad.common.exception.EndRunException
 import com.amazon.opendistroforelasticsearch.ad.common.exception.InternalFailure;
 import com.amazon.opendistroforelasticsearch.ad.indices.ADIndex;
 import com.amazon.opendistroforelasticsearch.ad.indices.AnomalyDetectionIndices;
+import com.amazon.opendistroforelasticsearch.ad.model.ADTask;
+import com.amazon.opendistroforelasticsearch.ad.model.ADTaskState;
+import com.amazon.opendistroforelasticsearch.ad.model.ADTaskType;
 import com.amazon.opendistroforelasticsearch.ad.model.AnomalyDetectorJob;
 import com.amazon.opendistroforelasticsearch.ad.model.AnomalyResult;
 import com.amazon.opendistroforelasticsearch.ad.model.FeatureData;
 import com.amazon.opendistroforelasticsearch.ad.model.IntervalTimeConfiguration;
 import com.amazon.opendistroforelasticsearch.ad.settings.AnomalyDetectorSettings;
+import com.amazon.opendistroforelasticsearch.ad.task.ADTaskManager;
 import com.amazon.opendistroforelasticsearch.ad.transport.AnomalyResultAction;
 import com.amazon.opendistroforelasticsearch.ad.transport.AnomalyResultRequest;
 import com.amazon.opendistroforelasticsearch.ad.transport.AnomalyResultResponse;
 import com.amazon.opendistroforelasticsearch.ad.transport.AnomalyResultTransportAction;
 import com.amazon.opendistroforelasticsearch.ad.transport.handler.AnomalyIndexHandler;
-import com.amazon.opendistroforelasticsearch.ad.transport.handler.DetectionStateHandler;
 import com.amazon.opendistroforelasticsearch.ad.util.ClientUtil;
 import com.amazon.opendistroforelasticsearch.commons.InjectSecurity;
 import com.amazon.opendistroforelasticsearch.commons.authuser.User;
@@ -72,6 +76,7 @@ import com.amazon.opendistroforelasticsearch.jobscheduler.spi.schedule.IntervalS
 import com.amazon.opendistroforelasticsearch.jobscheduler.spi.utils.LockService;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 
 /**
  * JobScheduler will call AD job runner to get anomaly result periodically
@@ -86,8 +91,9 @@ public class AnomalyDetectorJobRunner implements ScheduledJobRunner {
     private ThreadPool threadPool;
     private AnomalyIndexHandler<AnomalyResult> anomalyResultHandler;
     private ConcurrentHashMap<String, Integer> detectorEndRunExceptionCount;
-    private DetectionStateHandler detectionStateHandler;
+    // private DetectionStateHandler detectionStateHandler;
     private AnomalyDetectionIndices indexUtil;
+    private ADTaskManager adTaskManager;
 
     public static AnomalyDetectorJobRunner getJobRunnerInstance() {
         if (INSTANCE != null) {
@@ -128,8 +134,12 @@ public class AnomalyDetectorJobRunner implements ScheduledJobRunner {
         this.maxRetryForEndRunException = AnomalyDetectorSettings.MAX_RETRY_FOR_END_RUN_EXCEPTION.get(settings);
     }
 
-    public void setDetectionStateHandler(DetectionStateHandler detectionStateHandler) {
-        this.detectionStateHandler = detectionStateHandler;
+    // public void setDetectionStateHandler(DetectionStateHandler detectionStateHandler) {
+    // this.detectionStateHandler = detectionStateHandler;
+    // }
+
+    public void setAdTaskManager(ADTaskManager adTaskManager) {
+        this.adTaskManager = adTaskManager;
     }
 
     public void setIndexUtil(AnomalyDetectionIndices indexUtil) {
@@ -430,6 +440,12 @@ public class AnomalyDetectorJobRunner implements ScheduledJobRunner {
                                         if (indexResponse != null
                                             && (indexResponse.getResult() == CREATED || indexResponse.getResult() == UPDATED)) {
                                             log.info("AD Job was disabled by JobRunner for " + detectorId);
+                                            adTaskManager
+                                                .updateLatestADTask(
+                                                    detectorId,
+                                                    ADTaskType.getRealtimeTaskTypes(),
+                                                    ImmutableMap.of(ADTask.STATE_FIELD, ADTaskState.STOPPED.name())
+                                                );
                                         } else {
                                             log.warn("Failed to disable AD job for " + detectorId);
                                         }
@@ -488,7 +504,13 @@ public class AnomalyDetectorJobRunner implements ScheduledJobRunner {
                 indexUtil.getSchemaVersion(ADIndex.RESULT)
             );
             anomalyResultHandler.index(anomalyResult, detectorId);
-            detectionStateHandler.saveError(response.getError(), detectorId);
+            adTaskManager
+                .updateLatestADTask(
+                    detectorId,
+                    ADTaskType.getRealtimeTaskTypes(),
+                    ImmutableMap.of(ADTask.ERROR_FIELD, Optional.ofNullable(response.getError()).orElse(""))
+                );
+            // detectionStateHandler.saveError(response.getError(), detectorId);
         } catch (Exception e) {
             log.error("Failed to index anomaly result for " + detectorId, e);
         } finally {
@@ -546,7 +568,9 @@ public class AnomalyDetectorJobRunner implements ScheduledJobRunner {
                 indexUtil.getSchemaVersion(ADIndex.RESULT)
             );
             anomalyResultHandler.index(anomalyResult, detectorId);
-            detectionStateHandler.saveError(errorMessage, detectorId);
+            adTaskManager
+                .updateLatestADTask(detectorId, ADTaskType.getRealtimeTaskTypes(), ImmutableMap.of(ADTask.ERROR_FIELD, errorMessage));
+            // detectionStateHandler.saveError(errorMessage, detectorId);
         } catch (Exception e) {
             log.error("Failed to index anomaly result for " + detectorId, e);
         } finally {

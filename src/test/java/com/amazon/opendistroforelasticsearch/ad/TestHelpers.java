@@ -270,6 +270,7 @@ public class TestHelpers {
         );
     }
 
+    // TODO: remove this method
     public static AnomalyDetector randomAnomalyDetector(
         List<String> indices,
         List<Feature> features,
@@ -298,11 +299,11 @@ public class TestHelpers {
             lastUpdateTime,
             null,
             user,
-            detectorType,
-            dateRange
+            detectorType
         );
     }
 
+    // TODO: remove this method
     public static AnomalyDetector randomDetector(
         DetectionDateRange dateRange,
         List<Feature> features,
@@ -310,9 +311,7 @@ public class TestHelpers {
         int detectionIntervalInMinutes,
         String timeField
     ) throws IOException {
-        String detectorType = dateRange == null
-            ? AnomalyDetectorType.REALTIME_SINGLE_ENTITY.name()
-            : AnomalyDetectorType.HISTORICAL_SINGLE_ENTITY.name();
+        String detectorType = dateRange == null ? AnomalyDetectorType.SINGLE_ENTITY.name() : AnomalyDetectorType.SINGLE_ENTITY.name();
         return new AnomalyDetector(
             randomAlphaOfLength(10),
             randomLong(),
@@ -330,8 +329,7 @@ public class TestHelpers {
             Instant.now(),
             null,
             null,
-            detectorType,
-            dateRange
+            detectorType
         );
     }
 
@@ -881,7 +879,7 @@ public class TestHelpers {
         ADTask task = ADTask
             .builder()
             .taskId(taskId)
-            .taskType(ADTaskType.HISTORICAL.name())
+            .taskType(ADTaskType.HISTORICAL_SINGLE_ENTITY.name())
             .detectorId(detectorId)
             .detector(detector)
             .state(state.name())
@@ -909,7 +907,7 @@ public class TestHelpers {
         ADTask task = ADTask
             .builder()
             .taskId(taskId)
-            .taskType(ADTaskType.HISTORICAL.name())
+            .taskType(ADTaskType.HISTORICAL_SINGLE_ENTITY.name())
             .detectorId(randomAlphaOfLength(5))
             .detector(detector)
             .state(state.name())

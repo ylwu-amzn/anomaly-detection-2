@@ -42,9 +42,13 @@ import org.elasticsearch.common.xcontent.XContentParser;
 import org.elasticsearch.rest.RestStatus;
 
 import com.amazon.opendistroforelasticsearch.ad.indices.AnomalyDetectionIndices;
+import com.amazon.opendistroforelasticsearch.ad.model.ADTask;
+import com.amazon.opendistroforelasticsearch.ad.model.ADTaskState;
+import com.amazon.opendistroforelasticsearch.ad.model.ADTaskType;
 import com.amazon.opendistroforelasticsearch.ad.model.AnomalyDetector;
 import com.amazon.opendistroforelasticsearch.ad.model.AnomalyDetectorJob;
 import com.amazon.opendistroforelasticsearch.ad.model.IntervalTimeConfiguration;
+import com.amazon.opendistroforelasticsearch.ad.task.ADTaskManager;
 import com.amazon.opendistroforelasticsearch.ad.transport.AnomalyDetectorJobResponse;
 import com.amazon.opendistroforelasticsearch.ad.transport.StopDetectorAction;
 import com.amazon.opendistroforelasticsearch.ad.transport.StopDetectorRequest;
@@ -52,6 +56,7 @@ import com.amazon.opendistroforelasticsearch.ad.transport.StopDetectorResponse;
 import com.amazon.opendistroforelasticsearch.ad.util.RestHandlerUtils;
 import com.amazon.opendistroforelasticsearch.jobscheduler.spi.schedule.IntervalSchedule;
 import com.amazon.opendistroforelasticsearch.jobscheduler.spi.schedule.Schedule;
+import com.google.common.collect.ImmutableMap;
 
 /**
  * Anomaly detector job REST action handler to process POST/PUT request.
@@ -65,6 +70,7 @@ public class IndexAnomalyDetectorJobActionHandler {
     private final Client client;
     private final ActionListener<AnomalyDetectorJobResponse> listener;
     private final NamedXContentRegistry xContentRegistry;
+    private final ADTaskManager adTaskManager;
 
     private final Logger logger = LogManager.getLogger(IndexAnomalyDetectorJobActionHandler.class);
     private final TimeValue requestTimeout;
@@ -80,6 +86,7 @@ public class IndexAnomalyDetectorJobActionHandler {
      * @param primaryTerm             primary term of last modification
      * @param requestTimeout          request time out configuration
      * @param xContentRegistry        Registry which is used for XContentParser
+     * @param adTaskManager           AD task manager
      */
     public IndexAnomalyDetectorJobActionHandler(
         Client client,
@@ -89,7 +96,8 @@ public class IndexAnomalyDetectorJobActionHandler {
         Long seqNo,
         Long primaryTerm,
         TimeValue requestTimeout,
-        NamedXContentRegistry xContentRegistry
+        NamedXContentRegistry xContentRegistry,
+        ADTaskManager adTaskManager
     ) {
         this.client = client;
         this.listener = listener;
@@ -99,6 +107,7 @@ public class IndexAnomalyDetectorJobActionHandler {
         this.primaryTerm = primaryTerm;
         this.requestTimeout = requestTimeout;
         this.xContentRegistry = xContentRegistry;
+        this.adTaskManager = adTaskManager;
     }
 
     /**
@@ -147,7 +156,7 @@ public class IndexAnomalyDetectorJobActionHandler {
                 detector.getUser()
             );
 
-            getAnomalyDetectorJobForWrite(job);
+            getAnomalyDetectorJobForWrite(detector, job);
         } catch (Exception e) {
             String message = "Failed to parse anomaly detector job " + detectorId;
             logger.error(message, e);
@@ -155,17 +164,19 @@ public class IndexAnomalyDetectorJobActionHandler {
         }
     }
 
-    private void getAnomalyDetectorJobForWrite(AnomalyDetectorJob job) {
+    private void getAnomalyDetectorJobForWrite(AnomalyDetector detector, AnomalyDetectorJob job) {
         GetRequest getRequest = new GetRequest(AnomalyDetectorJob.ANOMALY_DETECTOR_JOB_INDEX).id(detectorId);
 
         client
             .get(
                 getRequest,
-                ActionListener.wrap(response -> onGetAnomalyDetectorJobForWrite(response, job), exception -> listener.onFailure(exception))
+                ActionListener
+                    .wrap(response -> onGetAnomalyDetectorJobForWrite(response, detector, job), exception -> listener.onFailure(exception))
             );
     }
 
-    private void onGetAnomalyDetectorJobForWrite(GetResponse response, AnomalyDetectorJob job) throws IOException {
+    private void onGetAnomalyDetectorJobForWrite(GetResponse response, AnomalyDetector detector, AnomalyDetectorJob job)
+        throws IOException {
         if (response.isExists()) {
             try (
                 XContentParser parser = RestHandlerUtils.createXContentParserFromRegistry(xContentRegistry, response.getSourceAsBytesRef())
@@ -190,7 +201,10 @@ public class IndexAnomalyDetectorJobActionHandler {
                         job.getLockDurationSeconds(),
                         job.getUser()
                     );
-                    indexAnomalyDetectorJob(newJob, null);
+                    indexAnomalyDetectorJob(
+                        newJob,
+                        () -> { adTaskManager.startAnomalyDetector(detector, null, job.getUser(), null, listener); }
+                    );
                 }
             } catch (IOException e) {
                 String message = "Failed to parse anomaly detector job " + job.getName();
@@ -198,7 +212,7 @@ public class IndexAnomalyDetectorJobActionHandler {
                 listener.onFailure(new ElasticsearchStatusException(message, RestStatus.INTERNAL_SERVER_ERROR));
             }
         } else {
-            indexAnomalyDetectorJob(job, null);
+            indexAnomalyDetectorJob(job, () -> { adTaskManager.startAnomalyDetector(detector, null, job.getUser(), null, listener); });
         }
     }
 
@@ -310,9 +324,43 @@ public class IndexAnomalyDetectorJobActionHandler {
                         RestStatus.OK
                     );
                     listener.onResponse(anomalyDetectorJobResponse);
+                    adTaskManager
+                        .updateLatestADTask(
+                            detectorId,
+                            ADTaskType.getRealtimeTaskTypes(),
+                            ImmutableMap.of(ADTask.STATE_FIELD, ADTaskState.STOPPED.name())
+                        );
+                    // adTaskManager.updateLatestADTask(detectorId, ImmutableList.of(ADTaskType.REALTIME_HC_DETECTOR,
+                    // ADTaskType.REALTIME_SINGLE_ENTITY),
+                    // ImmutableMap.of(ADTask.STATE_FIELD, ADTaskState.STOPPED.name()),
+                    // ActionListener.wrap(r -> {
+                    // AnomalyDetectorJobResponse anomalyDetectorJobResponse = new AnomalyDetectorJobResponse(
+                    // detectorId,
+                    // 0,
+                    // 0,
+                    // 0,
+                    // RestStatus.OK
+                    // );
+                    // listener.onResponse(anomalyDetectorJobResponse);
+                    // }, e -> listener.onFailure(new ElasticsearchStatusException("Failed to delete AD model",
+                    // RestStatus.INTERNAL_SERVER_ERROR))));
                 } else {
                     logger.error("Failed to delete AD model for detector {}", detectorId);
+                    // adTaskManager.updateLatestADTask(detectorId, ImmutableList.of(ADTaskType.REALTIME_HC_DETECTOR,
+                    // ADTaskType.REALTIME_SINGLE_ENTITY),
+                    // ImmutableMap.of(ADTask.STATE_FIELD, ADTaskState.FAILED.name(),
+                    // ADTask.ERROR_FIELD, "Failed to delete AD model"),
+                    // ActionListener.wrap(r -> {listener.onFailure(new ElasticsearchStatusException("Failed to delete AD model",
+                    // RestStatus.INTERNAL_SERVER_ERROR));},
+                    // e -> {listener.onFailure(new ElasticsearchStatusException("Failed to delete AD model",
+                    // RestStatus.INTERNAL_SERVER_ERROR));}));
                     listener.onFailure(new ElasticsearchStatusException("Failed to delete AD model", RestStatus.INTERNAL_SERVER_ERROR));
+                    adTaskManager
+                        .updateLatestADTask(
+                            detectorId,
+                            ADTaskType.getRealtimeTaskTypes(),
+                            ImmutableMap.of(ADTask.STATE_FIELD, ADTaskState.STOPPED.name())
+                        );
                 }
             }
 

@@ -277,7 +277,7 @@ List<String> jacocoExclusions = [
         //TODO: add more test cases later for these package
         'com.amazon.opendistroforelasticsearch.ad.model.*',
         'com.amazon.opendistroforelasticsearch.ad.rest.*',
-        'com.amazon.opendistroforelasticsearch.ad.transport.handler.DetectionStateHandler',
+//        'com.amazon.opendistroforelasticsearch.ad.transport.handler.DetectionStateHandler',
         'com.amazon.opendistroforelasticsearch.ad.AnomalyDetectorJobRunner',
 
         // Class containing just constants.  Don't need to test
@@ -312,6 +312,33 @@ List<String> jacocoExclusions = [
         'com.amazon.opendistroforelasticsearch.ad.indices.AnomalyDetectionIndices',
         'com.amazon.opendistroforelasticsearch.ad.transport.handler.MultiEntityResultHandler',
         'com.amazon.opendistroforelasticsearch.ad.util.ThrowingSupplierWrapper',
+
+        //TODO: fix later for unified flow
+        'com.amazon.opendistroforelasticsearch.ad.transport.AnomalyDetectorJobRequest',
+        'com.amazon.opendistroforelasticsearch.ad.transport.ForwardADTaskRequest',
+        'com.amazon.opendistroforelasticsearch.ad.transport.EntityResultTransportAction',
+        'com.amazon.opendistroforelasticsearch.ad.transport.ADTaskProfileTransportAction',
+        'com.amazon.opendistroforelasticsearch.ad.transport.AnomalyResultTransportAction.RCFActionListener',
+        'com.amazon.opendistroforelasticsearch.ad.transport.AnomalyResultTransportAction',
+        'com.amazon.opendistroforelasticsearch.ad.transport.ADCancelTaskRequest',
+        'com.amazon.opendistroforelasticsearch.ad.transport.AnomalyResultTransportAction.ThresholdActionListener',
+        'com.amazon.opendistroforelasticsearch.ad.transport.GetAnomalyDetectorResponse',
+        'com.amazon.opendistroforelasticsearch.ad.transport.ADTaskProfileNodeRequest',
+        'com.amazon.opendistroforelasticsearch.ad.transport.ForwardADTaskTransportAction',
+        'com.amazon.opendistroforelasticsearch.ad.transport.ADCancelTaskTransportAction',
+        'com.amazon.opendistroforelasticsearch.ad.transport.ThresholdResultRequest',
+        'com.amazon.opendistroforelasticsearch.ad.transport.ADTaskProfileRequest',
+        'com.amazon.opendistroforelasticsearch.ad.transport.ADCancelTaskNodeRequest',
+        'com.amazon.opendistroforelasticsearch.ad.transport.DeleteAnomalyResultsTransportAction',
+        'com.amazon.opendistroforelasticsearch.ad.AnomalyDetectorProfileRunner',
+        'com.amazon.opendistroforelasticsearch.ad.task.ADHCTaskCache',
+        'com.amazon.opendistroforelasticsearch.ad.task.ADBatchTaskRunner',
+        'com.amazon.opendistroforelasticsearch.ad.task.ADTaskManager',
+        'com.amazon.opendistroforelasticsearch.ad.task.ADBatchTaskCache',
+        'com.amazon.opendistroforelasticsearch.ad.task.ADTaskCacheManager',
+        'com.amazon.opendistroforelasticsearch.ad.transport.ADBatchAnomalyResultRequest',
+        'com.amazon.opendistroforelasticsearch.ad.transport.ADBatchTaskRemoteExecutionTransportAction',
+        'com.amazon.opendistroforelasticsearch.ad.transport.ADBatchAnomalyResultResponse'
 ]
 
 jacocoTestCoverageVerification {
