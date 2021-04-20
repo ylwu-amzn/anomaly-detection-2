@@ -15,8 +15,8 @@
 
 package com.amazon.opendistroforelasticsearch.ad.transport;
 
-import org.elasticsearch.action.ActionType;
-import org.elasticsearch.index.reindex.BulkByScrollResponse;
+import org.opensearch.action.ActionType;
+import org.opensearch.index.reindex.BulkByScrollResponse;
 
 import com.amazon.opendistroforelasticsearch.ad.constant.CommonValue;
 

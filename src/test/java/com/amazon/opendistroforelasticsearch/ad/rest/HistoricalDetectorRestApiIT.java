@@ -32,8 +32,8 @@ import static com.amazon.opendistroforelasticsearch.ad.settings.AnomalyDetectorS
 import java.io.IOException;
 import java.util.Map;
 
-import org.elasticsearch.client.Response;
-import org.elasticsearch.rest.RestStatus;
+import org.opensearch.client.Response;
+import org.opensearch.rest.RestStatus;
 import org.junit.Before;
 import org.opensearch.client.Response;
 import org.opensearch.client.ResponseException;
