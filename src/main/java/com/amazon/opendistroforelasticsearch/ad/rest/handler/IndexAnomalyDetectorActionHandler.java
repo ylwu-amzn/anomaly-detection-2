@@ -266,7 +266,7 @@ public class IndexAnomalyDetectorActionHandler {
             adTaskManager.getLatestADTask(detectorId, ADTaskType.getHistoricalDetectorTaskTypes(), (adTask) -> {
                 if (adTask.isPresent() && !adTaskManager.isADTaskEnded(adTask.get())) {
                     // can't update detector if there is AD task running
-                    listener.onFailure(new ElasticsearchStatusException("Detector is running", RestStatus.INTERNAL_SERVER_ERROR));
+                    listener.onFailure(new OpenSearchStatusException("Detector is running", RestStatus.INTERNAL_SERVER_ERROR));
                 } else {
                     // TODO: change to validateDetector method when we support HC historical detector
                     searchAdInputIndices(detectorId);

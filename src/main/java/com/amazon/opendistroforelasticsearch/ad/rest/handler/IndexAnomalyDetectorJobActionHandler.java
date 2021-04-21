@@ -362,7 +362,7 @@ public class IndexAnomalyDetectorJobActionHandler {
                     // RestStatus.INTERNAL_SERVER_ERROR));},
                     // e -> {listener.onFailure(new ElasticsearchStatusException("Failed to delete AD model",
                     // RestStatus.INTERNAL_SERVER_ERROR));}));
-                    listener.onFailure(new ElasticsearchStatusException("Failed to delete AD model", RestStatus.INTERNAL_SERVER_ERROR));
+                    listener.onFailure(new OpenSearchStatusException("Failed to delete AD model", RestStatus.INTERNAL_SERVER_ERROR));
                     adTaskManager
                         .updateLatestADTask(
                             detectorId,

@@ -72,7 +72,7 @@ import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.util.Strings;
 import org.apache.lucene.search.TotalHits;
 import org.apache.lucene.search.join.ScoreMode;
-import org.opensearch.ElasticsearchStatusException;
+import org.opensearch.OpenSearchStatusException;
 import org.opensearch.ExceptionsHelper;
 import org.opensearch.ResourceAlreadyExistsException;
 import org.opensearch.action.ActionListener;
@@ -248,7 +248,7 @@ public class ADTaskManager {
                         logger.debug("Can't find eligible node to run as AD task's coordinating node");
                         listener
                             .onFailure(
-                                new ElasticsearchStatusException("No eligible node to run detector", RestStatus.INTERNAL_SERVER_ERROR)
+                                new OpenSearchStatusException("No eligible node to run detector", RestStatus.INTERNAL_SERVER_ERROR)
                             );
                         return;
                     }
@@ -652,7 +652,7 @@ public class ADTaskManager {
                 } catch (Exception e) {
                     String message = "Failed to parse AD task for detector " + detectorId;
                     logger.error(message, e);
-                    listener.onFailure(new ElasticsearchStatusException(message, RestStatus.INTERNAL_SERVER_ERROR));
+                    listener.onFailure(new OpenSearchStatusException(message, RestStatus.INTERNAL_SERVER_ERROR));
                 }
             }
             function.accept(adTasks);
@@ -1105,7 +1105,7 @@ public class ADTaskManager {
                         if (!adTask.isPresent() || isADTaskEnded(adTask.get())) {
                             executeAnomalyDetector(detector, detectionDateRange, user, listener);
                         } else {
-                            listener.onFailure(new ElasticsearchStatusException(DETECTOR_IS_RUNNING, RestStatus.BAD_REQUEST));
+                            listener.onFailure(new OpenSearchStatusException(DETECTOR_IS_RUNNING, RestStatus.BAD_REQUEST));
                         }
                     },
                     transportService,

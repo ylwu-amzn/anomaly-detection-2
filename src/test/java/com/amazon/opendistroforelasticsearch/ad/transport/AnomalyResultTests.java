@@ -63,7 +63,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 
-import org.opensearch.ElasticsearchTimeoutException;
+import org.opensearch.OpenSearchTimeoutException;
 import org.opensearch.action.ActionListener;
 import org.opensearch.action.ActionRequestValidationException;
 import org.opensearch.action.get.GetRequest;

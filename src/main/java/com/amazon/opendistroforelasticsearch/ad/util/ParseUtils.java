@@ -32,9 +32,9 @@ import static com.amazon.opendistroforelasticsearch.ad.constant.CommonName.FEATU
 import static com.amazon.opendistroforelasticsearch.ad.model.AnomalyDetector.QUERY_PARAM_PERIOD_END;
 import static com.amazon.opendistroforelasticsearch.ad.model.AnomalyDetector.QUERY_PARAM_PERIOD_START;
 import static com.amazon.opendistroforelasticsearch.ad.settings.AnomalyDetectorSettings.MAX_BATCH_TASK_PIECE_SIZE;
-import static org.elasticsearch.common.xcontent.XContentParserUtils.ensureExpectedToken;
-import static org.elasticsearch.search.aggregations.AggregationBuilders.dateRange;
-import static org.elasticsearch.search.aggregations.AggregatorFactories.VALID_AGG_NAME;
+import static org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken;
+import static org.opensearch.search.aggregations.AggregationBuilders.dateRange;
+import static org.opensearch.search.aggregations.AggregatorFactories.VALID_AGG_NAME;
 
 import java.io.IOException;
 import java.time.Instant;

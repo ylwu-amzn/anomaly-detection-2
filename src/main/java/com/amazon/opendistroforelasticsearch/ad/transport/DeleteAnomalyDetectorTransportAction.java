@@ -142,7 +142,7 @@ public class DeleteAnomalyDetectorTransportAction extends HandledTransportAction
                                         if (adTask.isPresent() && !adTaskManager.isADTaskEnded(adTask.get())) {
                                             listener
                                                 .onFailure(
-                                                    new ElasticsearchStatusException(
+                                                    new OpenSearchStatusException(
                                                         "Detector is running",
                                                         RestStatus.INTERNAL_SERVER_ERROR
                                                     )
