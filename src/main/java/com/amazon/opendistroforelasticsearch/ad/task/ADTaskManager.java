@@ -1286,10 +1286,10 @@ public class ADTaskManager {
                 listener.onFailure(new OpenSearchStatusException(DETECTOR_IS_RUNNING, RestStatus.BAD_REQUEST));
             } else {
                 listener.onFailure(e);
-                // if (!adTask.getTaskType().startsWith("HISTORICAL_HC_")) {
-                // adTaskCacheManager.removeDetector(adTask.getDetectorId());
-                // }
-
+                //TODO: delete these lines as they are moved to function handleADTaskException
+//                if(adTask.getTaskType().equals(ADTaskType.HISTORICAL_SINGLE_ENTITY.name())) {
+//                    adTaskCacheManager.removeDetector(adTask.getDetectorId());
+//                }
             }
         });
         try {
@@ -1443,6 +1443,9 @@ public class ADTaskManager {
                 );
             deleteADTask(adTask.getTaskId());
             return;
+        } else if (adTask.getTaskType().equals(ADTaskType.HISTORICAL_SINGLE_ENTITY.name())) {
+            //TODO: remove detector cache
+            adTaskCacheManager.removeDetector(adTask.getDetectorId());
         }
         if (e instanceof ADTaskCancelledException) {
             logger.info("AD task cancelled, taskId: {}, detectorId: {}", adTask.getTaskId(), adTask.getDetectorId());
