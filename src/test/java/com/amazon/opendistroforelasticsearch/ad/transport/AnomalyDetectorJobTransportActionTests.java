@@ -52,7 +52,6 @@ import org.opensearch.index.IndexNotFoundException;
 import org.opensearch.test.OpenSearchIntegTestCase;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.opensearch.OpenSearchStatusException;
 import org.opensearch.action.ActionListener;
 import org.opensearch.action.get.GetResponse;
@@ -370,6 +369,75 @@ public class AnomalyDetectorJobTransportActionTests extends HistoricalDetectorIn
     // assertNotNull(taskProfile2.getNodeId());
     // assertNotEquals(taskProfile1.getNodeId(), taskProfile2.getNodeId());
     // }
+    public void testStopRealtimeDetector() throws IOException {
+        String detectorId = startRealtimeDetector();
+        AnomalyDetectorJobRequest request = stopDetectorJobRequest(detectorId);
+        client().execute(AnomalyDetectorJobAction.INSTANCE, request).actionGet(10000);
+        GetResponse doc = getDoc(AnomalyDetectorJob.ANOMALY_DETECTOR_JOB_INDEX, detectorId);
+        AnomalyDetectorJob job = toADJob(doc);
+        assertFalse(job.isEnabled());
+        assertEquals(detectorId, job.getName());
+    }
+
+    public void testStopHistoricalDetector() throws IOException, InterruptedException {
+        updateTransientSettings(ImmutableMap.of(BATCH_TASK_PIECE_INTERVAL_SECONDS.getKey(), 5));
+        ADTask adTask = startHistoricalDetector(startTime, endTime);
+        assertEquals(ADTaskState.INIT.name(), adTask.getState());
+        assertNull(adTask.getStartedBy());
+        assertNull(adTask.getUser());
+        AnomalyDetectorJobRequest request = stopDetectorJobRequest(adTask.getDetectorId());
+        client().execute(AnomalyDetectorJobAction.INSTANCE, request).actionGet(10000);
+        waitUntil(() -> {
+            try {
+                ADTask task = getADTask(adTask.getTaskId());
+                return !TestHelpers.historicalDetectorRunningStats.contains(task.getState());
+            } catch (IOException e) {
+                return false;
+            }
+        }, 20, TimeUnit.SECONDS);
+        ADTask stoppedTask = getADTask(adTask.getTaskId());
+        assertEquals(ADTaskState.STOPPED.name(), stoppedTask.getState());
+        assertEquals(0, getExecutingADTask());
+    }
+
+    public void testProfileHistoricalDetector() throws IOException, InterruptedException {
+        ADTask adTask = startHistoricalDetector(startTime, endTime);
+        GetAnomalyDetectorRequest request = taskProfileRequest(adTask.getDetectorId());
+        GetAnomalyDetectorResponse response = client().execute(GetAnomalyDetectorAction.INSTANCE, request).actionGet(10000);
+        assertNotNull(response.getDetectorProfile().getAdTaskProfile());
+
+        ADTask finishedTask = getADTask(adTask.getTaskId());
+        int i = 0;
+        while (TestHelpers.historicalDetectorRunningStats.contains(finishedTask.getState()) && i < 10) {
+            finishedTask = getADTask(adTask.getTaskId());
+            Thread.sleep(2000);
+            i++;
+        }
+        assertEquals(ADTaskState.FINISHED.name(), finishedTask.getState());
+
+        response = client().execute(GetAnomalyDetectorAction.INSTANCE, request).actionGet(10000);
+        assertNull(response.getDetectorProfile().getAdTaskProfile().getNodeId());
+        ADTask profileAdTask = response.getDetectorProfile().getAdTaskProfile().getAdTask();
+        assertEquals(finishedTask.getTaskId(), profileAdTask.getTaskId());
+        assertEquals(finishedTask.getDetectorId(), profileAdTask.getDetectorId());
+        assertEquals(finishedTask.getDetector(), profileAdTask.getDetector());
+        assertEquals(finishedTask.getState(), profileAdTask.getState());
+    }
+
+    public void testProfileWithMultipleRunningTask() throws IOException {
+        ADTask adTask1 = startHistoricalDetector(startTime, endTime);
+        ADTask adTask2 = startHistoricalDetector(startTime, endTime);
+
+        GetAnomalyDetectorRequest request1 = taskProfileRequest(adTask1.getDetectorId());
+        GetAnomalyDetectorRequest request2 = taskProfileRequest(adTask2.getDetectorId());
+        GetAnomalyDetectorResponse response1 = client().execute(GetAnomalyDetectorAction.INSTANCE, request1).actionGet(10000);
+        GetAnomalyDetectorResponse response2 = client().execute(GetAnomalyDetectorAction.INSTANCE, request2).actionGet(10000);
+        ADTaskProfile taskProfile1 = response1.getDetectorProfile().getAdTaskProfile();
+        ADTaskProfile taskProfile2 = response2.getDetectorProfile().getAdTaskProfile();
+        assertNotNull(taskProfile1.getNodeId());
+        assertNotNull(taskProfile2.getNodeId());
+        assertNotEquals(taskProfile1.getNodeId(), taskProfile2.getNodeId());
+    }
 
     private GetAnomalyDetectorRequest taskProfileRequest(String detectorId) throws IOException {
         return new GetAnomalyDetectorRequest(detectorId, Versions.MATCH_ANY, false, false, "", PROFILE, true, null);

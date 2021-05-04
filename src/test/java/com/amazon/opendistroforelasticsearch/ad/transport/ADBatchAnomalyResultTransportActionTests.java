@@ -35,7 +35,6 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 
 import org.junit.Before;
-import org.junit.Ignore;
 import org.opensearch.action.ActionRequestValidationException;
 import org.opensearch.action.get.GetResponse;
 import org.opensearch.common.io.stream.NotSerializableExceptionWrapper;
@@ -198,6 +197,23 @@ public class ADBatchAnomalyResultTransportActionTests extends HistoricalDetector
     // assertEquals(ADTaskState.FINISHED.name(), doc.getSourceAsMap().get(ADTask.STATE_FIELD));
     // updateTransientSettings(ImmutableMap.of(MAX_BATCH_TASK_PER_NODE.getKey(), 1));
     // }
+    public void testMultipleTasks() throws IOException, InterruptedException {
+        updateTransientSettings(ImmutableMap.of(MAX_BATCH_TASK_PER_NODE.getKey(), 2));
+
+        DetectionDateRange dateRange = new DetectionDateRange(startTime, endTime);
+        for (int i = 0; i < getDataNodes().size(); i++) {
+            client().execute(ADBatchAnomalyResultAction.INSTANCE, adBatchAnomalyResultRequest(dateRange));
+        }
+
+        ADBatchAnomalyResultRequest request = adBatchAnomalyResultRequest(
+            new DetectionDateRange(startTime, startTime.plus(2000, ChronoUnit.MINUTES))
+        );
+        client().execute(ADBatchAnomalyResultAction.INSTANCE, request).actionGet(5000);
+        Thread.sleep(10000);
+        GetResponse doc = getDoc(CommonName.DETECTION_STATE_INDEX, request.getAdTask().getTaskId());
+        assertEquals(ADTaskState.FINISHED.name(), doc.getSourceAsMap().get(ADTask.STATE_FIELD));
+        updateTransientSettings(ImmutableMap.of(MAX_BATCH_TASK_PER_NODE.getKey(), 1));
+    }
 
     private ADBatchAnomalyResultRequest adBatchAnomalyResultRequest(DetectionDateRange dateRange) throws IOException {
         return adBatchAnomalyResultRequest(dateRange, testIndex);
