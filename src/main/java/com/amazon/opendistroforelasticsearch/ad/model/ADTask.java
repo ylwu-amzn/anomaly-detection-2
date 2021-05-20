@@ -206,6 +206,10 @@ public class ADTask implements ToXContentObject, Writeable {
         return taskType.startsWith(HISTORICAL_TASK_PREFIX);
     }
 
+    public boolean isEntityTask() {
+        return getParentTaskId() != null && getEntity() != null && getEntity().size() > 0;
+    }
+
     public static class Builder {
         private String taskId = null;
         private String taskType = null;
