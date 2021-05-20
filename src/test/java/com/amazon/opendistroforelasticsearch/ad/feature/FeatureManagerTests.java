@@ -1029,7 +1029,7 @@ public class FeatureManagerTests {
     }
 
     @Test
-    public void testGetShingledFeatureForHistoricalAnalysisFromEmptyShingleWithoutMissingData() {
+    public void testGetShingledFeatureForHistoricalDetectorFromEmptyShingleWithoutMissingData() {
         long millisecondsPerMinute = 60000;
         int shingleSize = 8;
         when(detector.getShingleSize()).thenReturn(shingleSize);
@@ -1077,7 +1077,7 @@ public class FeatureManagerTests {
     }
 
     @Test
-    public void testGetShingledFeatureForHistoricalAnalysisWithTooManyMissingData() {
+    public void testGetShingledFeatureForHistoricalDetectorWithTooManyMissingData() {
         long millisecondsPerMinute = 60000;
         int shingleSize = 8;
         when(detector.getShingleSize()).thenReturn(shingleSize);
@@ -1103,7 +1103,7 @@ public class FeatureManagerTests {
     }
 
     @Test
-    public void testGetShingledFeatureForHistoricalAnalysisWithOneMissingData() {
+    public void testGetShingledFeatureForHistoricalDetectorWithOneMissingData() {
         long millisecondsPerMinute = 60000;
         int shingleSize = 8;
         when(detector.getShingleSize()).thenReturn(shingleSize);

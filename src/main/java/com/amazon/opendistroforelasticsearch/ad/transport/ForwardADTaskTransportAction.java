@@ -30,6 +30,7 @@ import static com.amazon.opendistroforelasticsearch.ad.model.ADTask.ERROR_FIELD;
 import static com.amazon.opendistroforelasticsearch.ad.model.ADTask.STATE_FIELD;
 import static com.amazon.opendistroforelasticsearch.ad.model.ADTask.TASK_PROGRESS_FIELD;
 
+import java.util.Arrays;
 import java.util.List;
 
 import org.apache.logging.log4j.LogManager;
@@ -68,26 +69,37 @@ public class ForwardADTaskTransportAction extends HandledTransportAction<Forward
         AnomalyDetector detector = request.getDetector();
         String detectorId = detector.getDetectorId();
         ADTask adTask = request.getAdTask();
-        logger.debug("Received task {} for action {}, detector {}", adTask.getTaskId(), adTaskAction, detectorId);
+
         switch (adTaskAction) {
             case START:
-                adTaskManager.startDetector(detector, request.getDetectionDateRange(), request.getUser(), transportService, listener);
+                adTaskManager
+                    .startHistoricalAnalysisTask(detector, request.getDetectionDateRange(), request.getUser(), transportService, listener);
                 break;
             case FINISHED:
                 adTaskManager.removeDetectorFromCache(detectorId);
                 listener.onResponse(new AnomalyDetectorJobResponse(detectorId, 0, 0, 0, RestStatus.OK));
                 break;
             case NEXT_ENTITY:
+                logger.debug("3333333333 Received task for NEXT_ENTITY action: {}", adTask.getTaskId());
                 if (detector.isMultientityDetector()) {
                     adTaskManager.removeRunningEntity(detectorId, adTask.getEntity());
+
+                    logger
+                        .debug(
+                            "3333333333 HC detector done: {}, taskId: {}, detectorId: {}",
+                            adTaskManager.hcDetectorDone(detectorId),
+                            adTask.getTaskId(),
+                            detectorId
+                        );
                     if (adTaskManager.hcDetectorDone(detectorId)) {
-                        logger.debug("Historical HC detector done, will remove from cache, detector id:{}", detectorId);
+                        logger.debug("3333333333-2 Historical HC detector done, will remove from cache, detector id:{}", detectorId);
                         listener.onResponse(new AnomalyDetectorJobResponse(detectorId, 0, 0, 0, RestStatus.OK));
+                        // TODO: reset task state when get task
                         ADTaskState state = !adTask.isEntityTask() && adTask.getError() != null ? ADTaskState.FAILED : ADTaskState.FINISHED;
                         adTaskManager.setHCDetectorTaskDone(adTask, state, adTask.getError(), listener);
                     } else {
-                        logger.debug("Run next entity for detector " + detectorId);
-                        adTaskManager.runBatchResultAction(adTask, listener);
+                        logger.debug("3333333333-3 Run next entity for detector " + detectorId);
+                        adTaskManager.runBatchResultActionForEntity(adTask, listener);
                         adTaskManager
                             .updateADHCDetectorTask(
                                 detectorId,
@@ -115,24 +127,49 @@ public class ForwardADTaskTransportAction extends HandledTransportAction<Forward
 
                 break;
             case PUSH_BACK_ENTITY:
+                logger
+                    .debug(
+                        "3333333333 Received task for PUSH_BACK_ENTITY action: {}, HC detector done: {}",
+                        adTask.getTaskId(),
+                        adTaskManager.hcDetectorDone(detectorId)
+                    );
                 if (detector.isMultientityDetector() && adTask.isEntityTask()) {
                     adTaskManager.removeRunningEntity(detectorId, adTask.getEntity());
+                    // logger.warn("Push back entity to cache : " + adTask.getEntity().get(0).getValue());
+                    // if (adTaskManager.retryableError(adTask.getError()) && !adTaskManager.taskRetryExceedLimits(detectorId,
+                    // adTask.getTaskId())) {
+                    // adTaskManager.pushBackEntityToCache(adTask.getTaskId(), adTask.getDetectorId(),
+                    // adTask.getEntity().get(0).getValue());
+                    // } else {
+                    // logger.warn("Task retry exceed limits. Task id: {}, entity: {}", adTask.getTaskId(),
+                    // adTask.getEntity().get(0).getValue());
+                    // }
+
                     if (adTaskManager.hcDetectorDone(detectorId)) {
                         adTaskManager.setHCDetectorTaskDone(adTask, ADTaskState.FINISHED, null, listener);
                     } else {
-                        adTaskManager.runBatchResultAction(adTask, listener);
+                        adTaskManager.runBatchResultActionForEntity(adTask, listener);
                     }
+
                 } else {
                     logger.warn("Can only push back entity task");
                     listener.onFailure(new IllegalArgumentException("Can only push back entity task"));
                 }
+
                 break;
 
             case CANCEL:
-                if (detector.isMultientityDetector()) {
+                if (detector.isMultientityDetector()/* && adTask.isEntityTask()*/) {
                     adTaskManager.clearPendingEntities(detectorId);
                     adTaskManager.removeRunningEntity(detectorId, adTask.getEntity());
                     if (adTaskManager.hcDetectorDone(detectorId) || !adTask.isEntityTask()) {
+                        // String taskId = adTask.isEntityTask()? adTask.getParentTaskId() : adTask.getTaskId();
+                        // logger.info("Set HC task as stopped : task id {}", taskId);
+                        // adTaskManager.updateADHCDetectorTask(detectorId, taskId,
+                        // ImmutableMap.of(STATE_FIELD, ADTaskState.STOPPED.name(),
+                        // EXECUTION_END_TIME_FIELD, Instant.now().toEpochMilli()));//TODO: change to false?
+                        // logger.info("Historical HC detector run cancelled. Remove from cache, detector id:{}", detectorId);
+                        // adTaskManager.removeDetectorFromCache(detectorId);
                         adTaskManager.setHCDetectorTaskDone(adTask, ADTaskState.STOPPED, adTask.getError(), listener);
                     }
                     listener.onResponse(new AnomalyDetectorJobResponse(adTask.getTaskId(), 0, 0, 0, RestStatus.OK));
@@ -143,6 +180,12 @@ public class ForwardADTaskTransportAction extends HandledTransportAction<Forward
                 break;
             case CLEAN_RUNNING_ENTITY:
                 List<String> staleRunningEntities = request.getStaleRunningEntities();
+                logger
+                    .debug(
+                        "4444444444 received CLEAN_RUNNING_ENTITY for task {}, staleRunningEntities: {}",
+                        adTask.getTaskId(),
+                        Arrays.toString(staleRunningEntities.toArray(new String[0]))
+                    );
                 for (String entity : staleRunningEntities) {
                     // TODO: sleep for some time before run next entity?
                     adTaskManager.removeStaleRunningEntity(adTask, entity, listener);
@@ -153,6 +196,5 @@ public class ForwardADTaskTransportAction extends HandledTransportAction<Forward
                 listener.onFailure(new OpenSearchStatusException("Unsupported AD task action " + adTaskAction, RestStatus.BAD_REQUEST));
                 break;
         }
-
     }
 }

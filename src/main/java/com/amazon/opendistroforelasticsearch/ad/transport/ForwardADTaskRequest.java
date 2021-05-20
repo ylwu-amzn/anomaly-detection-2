@@ -51,10 +51,6 @@ public class ForwardADTaskRequest extends ActionRequest {
     private User user;
     private ADTaskAction adTaskAction;
 
-    public ForwardADTaskRequest(AnomalyDetector detector, DetectionDateRange detectionDateRange, User user, ADTaskAction adTaskAction) {
-        this(detector, null, detectionDateRange, null, user, adTaskAction);
-    }
-
     public ForwardADTaskRequest(
         AnomalyDetector detector,
         ADTask adTask,
@@ -69,10 +65,6 @@ public class ForwardADTaskRequest extends ActionRequest {
         this.staleRunningEntities = staleRunningEntities;
         this.user = user;
         this.adTaskAction = adTaskAction;
-        if (adTask != null) {
-            this.detector = adTask.getDetector();
-            this.detectionDateRange = adTask.getDetectionDateRange();
-        }
     }
 
     public ForwardADTaskRequest(StreamInput in) throws IOException {

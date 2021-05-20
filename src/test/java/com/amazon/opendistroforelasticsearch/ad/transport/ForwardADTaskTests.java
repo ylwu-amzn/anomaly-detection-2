@@ -42,6 +42,7 @@ import com.amazon.opendistroforelasticsearch.ad.AnomalyDetectorPlugin;
 import com.amazon.opendistroforelasticsearch.ad.TestHelpers;
 import com.amazon.opendistroforelasticsearch.ad.constant.CommonErrorMessages;
 import com.amazon.opendistroforelasticsearch.ad.model.ADTaskAction;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 
 public class ForwardADTaskTests extends OpenSearchSingleNodeTestCase {
@@ -59,7 +60,9 @@ public class ForwardADTaskTests extends OpenSearchSingleNodeTestCase {
     public void testForwardADTaskRequest() throws IOException {
         ForwardADTaskRequest request = new ForwardADTaskRequest(
             TestHelpers.randomAnomalyDetector(ImmutableMap.of(), Instant.now()),
+            TestHelpers.randomAdTask(),
             TestHelpers.randomDetectionDateRange(),
+            ImmutableList.of(),
             TestHelpers.randomUser(),
             ADTaskAction.START
         );
@@ -69,7 +72,9 @@ public class ForwardADTaskTests extends OpenSearchSingleNodeTestCase {
     public void testForwardADTaskRequestWithoutUser() throws IOException {
         ForwardADTaskRequest request = new ForwardADTaskRequest(
             TestHelpers.randomAnomalyDetector(ImmutableMap.of(), Instant.now()),
+            TestHelpers.randomAdTask(),
             TestHelpers.randomDetectionDateRange(),
+            null,
             null,
             ADTaskAction.START
         );
@@ -79,7 +84,9 @@ public class ForwardADTaskTests extends OpenSearchSingleNodeTestCase {
     public void testInvalidForwardADTaskRequest() {
         ForwardADTaskRequest request = new ForwardADTaskRequest(
             null,
+            null,
             TestHelpers.randomDetectionDateRange(),
+            null,
             TestHelpers.randomUser(),
             ADTaskAction.START
         );

@@ -45,6 +45,25 @@ import java.util.Iterator;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 
+import org.opensearch.action.ActionListener;
+import org.opensearch.action.get.GetRequest;
+import org.opensearch.action.get.GetResponse;
+import org.opensearch.action.index.IndexRequest;
+import org.opensearch.action.index.IndexResponse;
+import org.opensearch.client.Client;
+import org.opensearch.cluster.metadata.IndexNameExpressionResolver;
+import org.opensearch.cluster.service.ClusterService;
+import org.opensearch.common.bytes.BytesReference;
+import org.opensearch.common.settings.Settings;
+import org.opensearch.common.unit.TimeValue;
+import org.opensearch.common.util.concurrent.OpenSearchExecutors;
+import org.opensearch.common.util.concurrent.ThreadContext;
+import org.opensearch.common.xcontent.ToXContent;
+import org.opensearch.index.Index;
+import org.opensearch.index.get.GetResult;
+import org.opensearch.index.mapper.MapperService;
+import org.opensearch.index.shard.ShardId;
+import org.opensearch.threadpool.ThreadPool;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -81,10 +100,8 @@ import com.amazon.opendistroforelasticsearch.ad.model.AnomalyDetectorJob;
 import com.amazon.opendistroforelasticsearch.ad.model.AnomalyResult;
 import com.amazon.opendistroforelasticsearch.ad.model.IntervalTimeConfiguration;
 import com.amazon.opendistroforelasticsearch.ad.transport.handler.AnomalyIndexHandler;
-import com.amazon.opendistroforelasticsearch.ad.transport.handler.DetectionStateHandler;
 import com.amazon.opendistroforelasticsearch.ad.util.ClientUtil;
 import com.amazon.opendistroforelasticsearch.ad.util.IndexUtils;
-import com.amazon.opendistroforelasticsearch.ad.util.ThrowingConsumerWrapper;
 import com.amazon.opendistroforelasticsearch.jobscheduler.spi.JobExecutionContext;
 import com.amazon.opendistroforelasticsearch.jobscheduler.spi.LockModel;
 import com.amazon.opendistroforelasticsearch.jobscheduler.spi.ScheduledJobParameter;
@@ -127,8 +144,6 @@ public class AnomalyDetectorJobRunnerTests extends AbstractADTest {
     @Mock
     private AnomalyDetectionIndices indexUtil;
 
-    private DetectionStateHandler detectorStateHandler;
-
     @BeforeClass
     public static void setUpBeforeClass() {
         setUpThreadPool(AnomalyDetectorJobRunnerTests.class.getSimpleName());
@@ -169,19 +184,6 @@ public class AnomalyDetectorJobRunnerTests extends AbstractADTest {
         IndexNameExpressionResolver indexNameResolver = mock(IndexNameExpressionResolver.class);
         IndexUtils indexUtils = new IndexUtils(client, clientUtil, clusterService, indexNameResolver);
         NodeStateManager stateManager = mock(NodeStateManager.class);
-        detectorStateHandler = new DetectionStateHandler(
-            client,
-            settings,
-            threadPool,
-            ThrowingConsumerWrapper.throwingConsumerWrapper(anomalyDetectionIndices::initDetectionStateIndex),
-            anomalyDetectionIndices::doesDetectorStateIndexExist,
-            this.clientUtil,
-            indexUtils,
-            clusterService,
-            NamedXContentRegistry.EMPTY,
-            stateManager
-        );
-        runner.setDetectionStateHandler(detectorStateHandler);
 
         runner.setIndexUtil(indexUtil);
 

@@ -143,7 +143,7 @@ public class RCFResultTests extends OpenSearchTestCase {
     }
 
     public void testSerialzationResponse() throws IOException {
-        RCFResultResponse response = new RCFResultResponse(0.3, 0, 26, attribution);
+        RCFResultResponse response = new RCFResultResponse(0.3, 0, 26, attribution, 100);
         BytesStreamOutput output = new BytesStreamOutput();
         response.writeTo(output);
 
@@ -155,7 +155,7 @@ public class RCFResultTests extends OpenSearchTestCase {
     }
 
     public void testJsonResponse() throws IOException, JsonPathNotFoundException {
-        RCFResultResponse response = new RCFResultResponse(0.3, 0, 26, attribution);
+        RCFResultResponse response = new RCFResultResponse(0.3, 0, 26, attribution, 100);
         XContentBuilder builder = jsonBuilder();
         response.toXContent(builder, ToXContent.EMPTY_PARAMS);
 

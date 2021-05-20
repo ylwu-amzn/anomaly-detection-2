@@ -39,6 +39,7 @@ import org.opensearch.threadpool.ThreadPool;
 import com.amazon.opendistroforelasticsearch.ad.cluster.diskcleanup.IndexCleanup;
 import com.amazon.opendistroforelasticsearch.ad.cluster.diskcleanup.ModelCheckpointIndexRetention;
 import com.amazon.opendistroforelasticsearch.ad.settings.AnomalyDetectorSettings;
+import com.amazon.opendistroforelasticsearch.ad.task.ADTaskManager;
 import com.amazon.opendistroforelasticsearch.ad.util.ClientUtil;
 import com.amazon.opendistroforelasticsearch.ad.util.DiscoveryNodeFilterer;
 import com.google.common.annotations.VisibleForTesting;
@@ -53,6 +54,7 @@ public class MasterEventListener implements LocalNodeMasterListener {
     private Clock clock;
     private ClientUtil clientUtil;
     private DiscoveryNodeFilterer nodeFilter;
+    private ADTaskManager adTaskManager;
 
     public MasterEventListener(
         ClusterService clusterService,
@@ -60,7 +62,8 @@ public class MasterEventListener implements LocalNodeMasterListener {
         Client client,
         Clock clock,
         ClientUtil clientUtil,
-        DiscoveryNodeFilterer nodeFilter
+        DiscoveryNodeFilterer nodeFilter,
+        ADTaskManager adTaskManager
     ) {
         this.clusterService = clusterService;
         this.threadPool = threadPool;
@@ -69,12 +72,14 @@ public class MasterEventListener implements LocalNodeMasterListener {
         this.clock = clock;
         this.clientUtil = clientUtil;
         this.nodeFilter = nodeFilter;
+        this.adTaskManager = adTaskManager;
     }
 
     @Override
     public void onMaster() {
         if (hourlyCron == null) {
-            hourlyCron = threadPool.scheduleWithFixedDelay(new HourlyCron(client, nodeFilter), TimeValue.timeValueHours(1), executorName());
+            hourlyCron = threadPool
+                .scheduleWithFixedDelay(new HourlyCron(client, nodeFilter, adTaskManager), TimeValue.timeValueHours(1), executorName());
             clusterService.addLifecycleListener(new LifecycleListener() {
                 @Override
                 public void beforeStop() {

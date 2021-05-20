@@ -59,7 +59,6 @@ import org.opensearch.rest.RestStatus;
 import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
 
-import com.amazon.opendistroforelasticsearch.ad.constant.CommonName;
 import com.amazon.opendistroforelasticsearch.ad.model.AnomalyDetector;
 import com.amazon.opendistroforelasticsearch.ad.model.AnomalyDetectorJob;
 import com.amazon.opendistroforelasticsearch.ad.rest.handler.AnomalyDetectorFunction;
@@ -137,7 +136,7 @@ public class DeleteAnomalyDetectorTransportAction extends HandledTransportAction
             .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
         client.delete(deleteRequest, ActionListener.wrap(response -> {
             if (response.getResult() == DocWriteResponse.Result.DELETED || response.getResult() == DocWriteResponse.Result.NOT_FOUND) {
-                deleteDetectorStateDoc(detectorId, listener);
+                deleteAnomalyDetectorDoc(detectorId, listener);
             } else {
                 String message = "Fail to delete anomaly detector job " + detectorId;
                 LOG.error(message);
@@ -145,7 +144,7 @@ public class DeleteAnomalyDetectorTransportAction extends HandledTransportAction
             }
         }, exception -> {
             if (exception instanceof IndexNotFoundException) {
-                deleteDetectorStateDoc(detectorId, listener);
+                deleteAnomalyDetectorDoc(detectorId, listener);
             } else {
                 LOG.error("Failed to delete anomaly detector job", exception);
                 listener.onFailure(exception);
@@ -153,29 +152,29 @@ public class DeleteAnomalyDetectorTransportAction extends HandledTransportAction
         }));
     }
 
-    private void deleteDetectorStateDoc(String detectorId, ActionListener<DeleteResponse> listener) {
-        LOG.info("Delete detector info {}", detectorId);
-        DeleteRequest deleteRequest = new DeleteRequest(CommonName.DETECTION_STATE_INDEX, detectorId);
-        client
-            .delete(
-                deleteRequest,
-                ActionListener
-                    .wrap(
-                        response -> {
-                            // whether deleted state doc or not, continue as state doc may not exist
-                            deleteAnomalyDetectorDoc(detectorId, listener);
-                        },
-                        exception -> {
-                            if (exception instanceof IndexNotFoundException) {
-                                deleteAnomalyDetectorDoc(detectorId, listener);
-                            } else {
-                                LOG.error("Failed to delete detector state", exception);
-                                listener.onFailure(exception);
-                            }
-                        }
-                    )
-            );
-    }
+    // private void deleteDetectorStateDoc(String detectorId, ActionListener<DeleteResponse> listener) {
+    // LOG.info("Delete detector info {}", detectorId);
+    // DeleteRequest deleteRequest = new DeleteRequest(CommonName.DETECTION_STATE_INDEX, detectorId);
+    // client
+    // .delete(
+    // deleteRequest,
+    // ActionListener
+    // .wrap(
+    // response -> {
+    // // whether deleted state doc or not, continue as state doc may not exist
+    // deleteAnomalyDetectorDoc(detectorId, listener);
+    // },
+    // exception -> {
+    // if (exception instanceof IndexNotFoundException) {
+    // deleteAnomalyDetectorDoc(detectorId, listener);
+    // } else {
+    // LOG.error("Failed to delete detector state", exception);
+    // listener.onFailure(exception);
+    // }
+    // }
+    // )
+    // );
+    // }
 
     private void deleteAnomalyDetectorDoc(String detectorId, ActionListener<DeleteResponse> listener) {
         LOG.info("Delete anomaly detector {}", detectorId);

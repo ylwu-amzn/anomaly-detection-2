@@ -30,13 +30,11 @@ import static org.hamcrest.Matchers.containsString;
 
 import java.io.IOException;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.Map;
 
 import org.apache.http.entity.ContentType;
 import org.apache.http.nio.entity.NStringEntity;
 import org.junit.Assert;
-import org.junit.Ignore;
 import org.opensearch.client.Response;
 import org.opensearch.client.ResponseException;
 import org.opensearch.common.UUIDs;
@@ -53,7 +51,6 @@ import com.amazon.opendistroforelasticsearch.ad.model.AnomalyDetector;
 import com.amazon.opendistroforelasticsearch.ad.model.AnomalyDetectorExecutionInput;
 import com.amazon.opendistroforelasticsearch.ad.model.AnomalyDetectorJob;
 import com.amazon.opendistroforelasticsearch.ad.model.AnomalyResult;
-import com.amazon.opendistroforelasticsearch.ad.model.DetectionDateRange;
 import com.amazon.opendistroforelasticsearch.ad.settings.EnabledSetting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -952,42 +949,42 @@ public class AnomalyDetectorRestApiIT extends AnomalyDetectorRestTestCase {
             );
     }
 
-    public void testStartDisabledAdjob() throws IOException {
-        AnomalyDetector detector = createRandomAnomalyDetector(true, false, client());
-        Response startAdJobResponse = TestHelpers
-            .makeRequest(
-                client(),
-                "POST",
-                TestHelpers.AD_BASE_DETECTORS_URI + "/" + detector.getDetectorId() + "/_start",
-                ImmutableMap.of(),
-                "",
-                null
-            );
-        assertEquals("Fail to start AD job", RestStatus.OK, restStatus(startAdJobResponse));
-
-        Response stopAdJobResponse = TestHelpers
-            .makeRequest(
-                client(),
-                "POST",
-                TestHelpers.AD_BASE_DETECTORS_URI + "/" + detector.getDetectorId() + "/_stop",
-                ImmutableMap.of(),
-                "",
-                null
-            );
-        assertEquals("Fail to stop AD job", RestStatus.OK, restStatus(stopAdJobResponse));
-
-        startAdJobResponse = TestHelpers
-            .makeRequest(
-                client(),
-                "POST",
-                TestHelpers.AD_BASE_DETECTORS_URI + "/" + detector.getDetectorId() + "/_start",
-                ImmutableMap.of(),
-                "",
-                null
-            );
-
-        assertEquals("Fail to start AD job", RestStatus.OK, restStatus(startAdJobResponse));
-    }
+    // public void testStartDisabledAdjob() throws IOException {
+    // AnomalyDetector detector = createRandomAnomalyDetector(true, false, client());
+    // Response startAdJobResponse = TestHelpers
+    // .makeRequest(
+    // client(),
+    // "POST",
+    // TestHelpers.AD_BASE_DETECTORS_URI + "/" + detector.getDetectorId() + "/_start",
+    // ImmutableMap.of(),
+    // "",
+    // null
+    // );
+    // assertEquals("Fail to start AD job", RestStatus.OK, restStatus(startAdJobResponse));
+    //
+    // Response stopAdJobResponse = TestHelpers
+    // .makeRequest(
+    // client(),
+    // "POST",
+    // TestHelpers.AD_BASE_DETECTORS_URI + "/" + detector.getDetectorId() + "/_stop",
+    // ImmutableMap.of(),
+    // "",
+    // null
+    // );
+    // assertEquals("Fail to stop AD job", RestStatus.OK, restStatus(stopAdJobResponse));
+    //
+    // startAdJobResponse = TestHelpers
+    // .makeRequest(
+    // client(),
+    // "POST",
+    // TestHelpers.AD_BASE_DETECTORS_URI + "/" + detector.getDetectorId() + "/_start",
+    // ImmutableMap.of(),
+    // "",
+    // null
+    // );
+    //
+    // assertEquals("Fail to start AD job", RestStatus.OK, restStatus(startAdJobResponse));
+    // }
 
     public void testStartAdjobWithNullFeatures() throws Exception {
         AnomalyDetector detectorWithoutFeature = TestHelpers.randomAnomalyDetector(null, null, Instant.now());
@@ -1045,7 +1042,6 @@ public class AnomalyDetectorRestApiIT extends AnomalyDetectorRestTestCase {
         assertEquals("Incorrect profile status", RestStatus.OK, restStatus(profileResponse));
     }
 
-    @Ignore
     public void testAllProfileAnomalyDetector() throws Exception {
         AnomalyDetector detector = createRandomAnomalyDetector(true, true, client());
 
@@ -1053,7 +1049,6 @@ public class AnomalyDetectorRestApiIT extends AnomalyDetectorRestTestCase {
         assertEquals("Incorrect profile status", RestStatus.OK, restStatus(profileResponse));
     }
 
-    @Ignore
     public void testCustomizedProfileAnomalyDetector() throws Exception {
         AnomalyDetector detector = createRandomAnomalyDetector(true, true, client());
 
@@ -1102,24 +1097,14 @@ public class AnomalyDetectorRestApiIT extends AnomalyDetectorRestTestCase {
     public void testRunDetectorWithNoEnabledFeature() throws Exception {
         AnomalyDetector detector = createRandomAnomalyDetector(true, true, client(), false);
         Assert.assertNotNull(detector.getDetectorId());
-        Instant now = Instant.now();
-        ResponseException e = expectThrows(
-            ResponseException.class,
-            () -> startAnomalyDetector(detector.getDetectorId(), new DetectionDateRange(now.minus(10, ChronoUnit.DAYS), now), client())
-        );
+        ResponseException e = expectThrows(ResponseException.class, () -> startAnomalyDetector(detector.getDetectorId(), client()));
         assertTrue(e.getMessage().contains("Can't start detector job as no enabled features configured"));
     }
 
-    @Ignore
     public void testDeleteAnomalyDetectorWhileRunning() throws Exception {
         AnomalyDetector detector = createRandomAnomalyDetector(true, true, client());
         Assert.assertNotNull(detector.getDetectorId());
-        Instant now = Instant.now();
-        Response response = startAnomalyDetector(
-            detector.getDetectorId(),
-            new DetectionDateRange(now.minus(10, ChronoUnit.DAYS), now),
-            client()
-        );
+        Response response = startAnomalyDetector(detector.getDetectorId(), client());
         Assert.assertEquals(response.getStatusLine().toString(), "HTTP/1.1 200 OK");
 
         // Deleting detector should fail while its running

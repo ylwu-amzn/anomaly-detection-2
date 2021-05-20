@@ -201,15 +201,16 @@ public class ParseUtilsTests extends OpenSearchTestCase {
                 ImmutableList.of(feature1, feature2),
                 null,
                 now,
-                AnomalyDetectorType.HISTORICAL_MULTI_ENTITY.name(),
+                AnomalyDetectorType.MULTI_ENTITY.name(),
                 1,
+                TestHelpers.randomDetectionDateRange(),
                 false
             );
 
         long startTime = now.minus(10, ChronoUnit.DAYS).toEpochMilli();
         long endTime = now.plus(10, ChronoUnit.DAYS).toEpochMilli();
         SearchSourceBuilder searchSourceBuilder = ParseUtils
-            .batchFeatureQuery(detector, startTime, endTime, TestHelpers.xContentRegistry());
+            .batchFeatureQuery(detector, null, startTime, endTime, TestHelpers.xContentRegistry());
         assertEquals(
             "{\"size\":0,\"query\":{\"bool\":{\"must\":[{\"range\":{\""
                 + detector.getTimeField()
@@ -223,7 +224,7 @@ public class ParseUtilsTests extends OpenSearchTestCase {
                 + "\"to\":20,\"include_lower\":true,\"include_upper\":true,\"boost\":1.0}}}],\"should\":[{\"term\":{\"tag\":"
                 + "{\"value\":\"wow\",\"boost\":1.0}}},{\"term\":{\"tag\":{\"value\":\"elasticsearch\",\"boost\":1.0}}}],"
                 + "\"adjust_pure_negative\":true,\"minimum_should_match\":\"1\",\"boost\":1.0}}],\"adjust_pure_negative"
-                + "\":true,\"boost\":1.0}},\"aggregations\":{\"feature_aggs\":{\"composite\":{\"size\":1000,\"sources\":"
+                + "\":true,\"boost\":1.0}},\"aggregations\":{\"feature_aggs\":{\"composite\":{\"size\":10000,\"sources\":"
                 + "[{\"date_histogram\":{\"date_histogram\":{\"field\":\""
                 + detector.getTimeField()
                 + "\",\"missing_bucket\":false,\"order\":\"asc\","
@@ -243,8 +244,9 @@ public class ParseUtilsTests extends OpenSearchTestCase {
                 ImmutableList.of(TestHelpers.randomFeature(false)),
                 null,
                 now,
-                AnomalyDetectorType.HISTORICAL_MULTI_ENTITY.name(),
+                AnomalyDetectorType.MULTI_ENTITY.name(),
                 1,
+                TestHelpers.randomDetectionDateRange(),
                 false
             );
 
@@ -253,7 +255,7 @@ public class ParseUtilsTests extends OpenSearchTestCase {
 
         AnomalyDetectionException exception = expectThrows(
             AnomalyDetectionException.class,
-            () -> ParseUtils.batchFeatureQuery(detector, startTime, endTime, TestHelpers.xContentRegistry())
+            () -> ParseUtils.batchFeatureQuery(detector, null, startTime, endTime, TestHelpers.xContentRegistry())
         );
         assertEquals("No enabled feature configured", exception.getMessage());
     }
@@ -267,8 +269,9 @@ public class ParseUtilsTests extends OpenSearchTestCase {
                 ImmutableList.of(),
                 null,
                 now,
-                AnomalyDetectorType.HISTORICAL_MULTI_ENTITY.name(),
+                AnomalyDetectorType.MULTI_ENTITY.name(),
                 1,
+                TestHelpers.randomDetectionDateRange(),
                 false
             );
 
@@ -276,7 +279,7 @@ public class ParseUtilsTests extends OpenSearchTestCase {
         long endTime = now.plus(10, ChronoUnit.DAYS).toEpochMilli();
         AnomalyDetectionException exception = expectThrows(
             AnomalyDetectionException.class,
-            () -> ParseUtils.batchFeatureQuery(detector, startTime, endTime, TestHelpers.xContentRegistry())
+            () -> ParseUtils.batchFeatureQuery(detector, null, startTime, endTime, TestHelpers.xContentRegistry())
         );
         assertEquals("No enabled feature configured", exception.getMessage());
     }

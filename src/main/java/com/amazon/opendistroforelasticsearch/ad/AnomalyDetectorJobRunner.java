@@ -65,6 +65,7 @@ import com.amazon.opendistroforelasticsearch.ad.indices.ADIndex;
 import com.amazon.opendistroforelasticsearch.ad.indices.AnomalyDetectionIndices;
 import com.amazon.opendistroforelasticsearch.ad.model.ADTask;
 import com.amazon.opendistroforelasticsearch.ad.model.ADTaskState;
+import com.amazon.opendistroforelasticsearch.ad.model.ADTaskType;
 import com.amazon.opendistroforelasticsearch.ad.model.AnomalyDetectorJob;
 import com.amazon.opendistroforelasticsearch.ad.model.AnomalyResult;
 import com.amazon.opendistroforelasticsearch.ad.model.FeatureData;
@@ -76,7 +77,6 @@ import com.amazon.opendistroforelasticsearch.ad.transport.AnomalyResultRequest;
 import com.amazon.opendistroforelasticsearch.ad.transport.AnomalyResultResponse;
 import com.amazon.opendistroforelasticsearch.ad.transport.AnomalyResultTransportAction;
 import com.amazon.opendistroforelasticsearch.ad.transport.handler.AnomalyIndexHandler;
-import com.amazon.opendistroforelasticsearch.ad.transport.handler.DetectionStateHandler;
 import com.amazon.opendistroforelasticsearch.ad.util.ClientUtil;
 import com.amazon.opendistroforelasticsearch.commons.InjectSecurity;
 import com.amazon.opendistroforelasticsearch.commons.authuser.User;
@@ -103,7 +103,6 @@ public class AnomalyDetectorJobRunner implements ScheduledJobRunner {
     private ThreadPool threadPool;
     private AnomalyIndexHandler<AnomalyResult> anomalyResultHandler;
     private ConcurrentHashMap<String, Integer> detectorEndRunExceptionCount;
-    private DetectionStateHandler detectionStateHandler;
     private AnomalyDetectionIndices indexUtil;
     private ADTaskManager adTaskManager;
 
@@ -144,10 +143,6 @@ public class AnomalyDetectorJobRunner implements ScheduledJobRunner {
     public void setSettings(Settings settings) {
         this.settings = settings;
         this.maxRetryForEndRunException = AnomalyDetectorSettings.MAX_RETRY_FOR_END_RUN_EXCEPTION.get(settings);
-    }
-
-    public void setDetectionStateHandler(DetectionStateHandler detectionStateHandler) {
-        this.detectionStateHandler = detectionStateHandler;
     }
 
     public void setAdTaskManager(ADTaskManager adTaskManager) {
@@ -516,7 +511,6 @@ public class AnomalyDetectorJobRunner implements ScheduledJobRunner {
                 indexUtil.getSchemaVersion(ADIndex.RESULT)
             );
             anomalyResultHandler.index(anomalyResult, detectorId);
-            detectionStateHandler.saveError(response.getError(), detectorId);
             adTaskManager
                 .updateLatestADTask(
                     detectorId,
@@ -580,7 +574,6 @@ public class AnomalyDetectorJobRunner implements ScheduledJobRunner {
                 indexUtil.getSchemaVersion(ADIndex.RESULT)
             );
             anomalyResultHandler.index(anomalyResult, detectorId);
-            detectionStateHandler.saveError(errorMessage, detectorId);
             adTaskManager.updateLatestADTask(detectorId, REALTIME_TASK_TYPES, ImmutableMap.of(ADTask.ERROR_FIELD, errorMessage));
         } catch (Exception e) {
             log.error("Failed to index anomaly result for " + detectorId, e);

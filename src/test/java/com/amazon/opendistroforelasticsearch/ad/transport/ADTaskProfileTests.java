@@ -87,7 +87,7 @@ public class ADTaskProfileTests extends OpenSearchSingleNodeTestCase {
             randomLong(),
             randomAlphaOfLength(5)
         );
-        ADTaskProfileNodeResponse response = new ADTaskProfileNodeResponse(randomDiscoveryNode(), adTaskProfile);
+        ADTaskProfileNodeResponse response = new ADTaskProfileNodeResponse(randomDiscoveryNode(), ImmutableList.of(adTaskProfile));
         testADTaskProfileResponse(response);
     }
 
@@ -105,7 +105,7 @@ public class ADTaskProfileTests extends OpenSearchSingleNodeTestCase {
             randomLong(),
             randomAlphaOfLength(5)
         );
-        ADTaskProfileNodeResponse response = new ADTaskProfileNodeResponse(randomDiscoveryNode(), adTaskProfile);
+        ADTaskProfileNodeResponse response = new ADTaskProfileNodeResponse(randomDiscoveryNode(), ImmutableList.of(adTaskProfile));
         testADTaskProfileResponse(response);
     }
 
@@ -119,10 +119,10 @@ public class ADTaskProfileTests extends OpenSearchSingleNodeTestCase {
         response.writeTo(output);
         NamedWriteableAwareStreamInput input = new NamedWriteableAwareStreamInput(output.bytes().streamInput(), writableRegistry());
         ADTaskProfileNodeResponse parsedResponse = ADTaskProfileNodeResponse.readNodeResponse(input);
-        if (response.getAdTaskProfile() != null) {
-            assertTrue(response.getAdTaskProfile().equals(parsedResponse.getAdTaskProfile()));
+        if (response.getAdTaskProfiles() != null) {
+            assertTrue(response.getAdTaskProfiles().equals(parsedResponse.getAdTaskProfiles()));
         } else {
-            assertNull(parsedResponse.getAdTaskProfile());
+            assertNull(parsedResponse.getAdTaskProfiles());
         }
     }
 
@@ -137,7 +137,7 @@ public class ADTaskProfileTests extends OpenSearchSingleNodeTestCase {
             randomLong(),
             randomAlphaOfLength(5)
         );
-        ADTaskProfileNodeResponse nodeResponse = new ADTaskProfileNodeResponse(node, profile);
+        ADTaskProfileNodeResponse nodeResponse = new ADTaskProfileNodeResponse(node, ImmutableList.of(profile));
         ImmutableList<ADTaskProfileNodeResponse> nodes = ImmutableList.of(nodeResponse);
         ADTaskProfileResponse response = new ADTaskProfileResponse(new ClusterName("test"), nodes, ImmutableList.of());
 
@@ -147,7 +147,7 @@ public class ADTaskProfileTests extends OpenSearchSingleNodeTestCase {
 
         List<ADTaskProfileNodeResponse> adTaskProfileNodeResponses = response.readNodesFrom(input);
         assertEquals(1, adTaskProfileNodeResponses.size());
-        assertEquals(profile, adTaskProfileNodeResponses.get(0).getAdTaskProfile());
+        assertEquals(profile, adTaskProfileNodeResponses.get(0).getAdTaskProfiles().get(0));
 
         BytesStreamOutput output2 = new BytesStreamOutput();
         response.writeTo(output2);
@@ -155,6 +155,6 @@ public class ADTaskProfileTests extends OpenSearchSingleNodeTestCase {
 
         ADTaskProfileResponse response2 = new ADTaskProfileResponse(input2);
         assertEquals(1, response2.getNodes().size());
-        assertEquals(profile, response2.getNodes().get(0).getAdTaskProfile());
+        assertEquals(profile, response2.getNodes().get(0).getAdTaskProfiles().get(0));
     }
 }

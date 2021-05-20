@@ -53,7 +53,9 @@ import org.opensearch.common.xcontent.XContentParser;
 import org.opensearch.rest.RestStatus;
 
 import com.amazon.opendistroforelasticsearch.ad.indices.AnomalyDetectionIndices;
+import com.amazon.opendistroforelasticsearch.ad.model.ADTask;
 import com.amazon.opendistroforelasticsearch.ad.model.ADTaskState;
+import com.amazon.opendistroforelasticsearch.ad.model.ADTaskType;
 import com.amazon.opendistroforelasticsearch.ad.model.AnomalyDetector;
 import com.amazon.opendistroforelasticsearch.ad.model.AnomalyDetectorJob;
 import com.amazon.opendistroforelasticsearch.ad.model.IntervalTimeConfiguration;
@@ -65,6 +67,7 @@ import com.amazon.opendistroforelasticsearch.ad.transport.StopDetectorResponse;
 import com.amazon.opendistroforelasticsearch.ad.util.RestHandlerUtils;
 import com.amazon.opendistroforelasticsearch.jobscheduler.spi.schedule.IntervalSchedule;
 import com.amazon.opendistroforelasticsearch.jobscheduler.spi.schedule.Schedule;
+import com.google.common.collect.ImmutableMap;
 
 /**
  * Anomaly detector job REST action handler to process POST/PUT request.
@@ -215,7 +218,7 @@ public class IndexAnomalyDetectorJobActionHandler {
                 listener.onFailure(new OpenSearchStatusException(message, RestStatus.INTERNAL_SERVER_ERROR));
             }
         } else {
-            indexAnomalyDetectorJob(job, () -> { adTaskManager.startDetector(detector, null, job.getUser(), null, listener); });
+            indexAnomalyDetectorJob(job, () -> { adTaskManager.startHistoricalAnalysisTask(detector, null, job.getUser(), null, listener); });
         }
     }
 
@@ -274,7 +277,11 @@ public class IndexAnomalyDetectorJobActionHandler {
                     ensureExpectedToken(XContentParser.Token.START_OBJECT, parser.nextToken(), parser);
                     AnomalyDetectorJob job = AnomalyDetectorJob.parse(parser);
                     if (!job.isEnabled()) {
-                        adTaskManager.updateLatestRealtimeTask(detectorId, ADTaskState.STOPPED, null, listener);
+                        listener
+                            .onFailure(
+                                new OpenSearchStatusException("Anomaly detector job is already stopped: " + detectorId, RestStatus.OK)
+                            );
+                        return;
                     } else {
                         AnomalyDetectorJob newJob = new AnomalyDetectorJob(
                             job.getName(),
@@ -314,15 +321,50 @@ public class IndexAnomalyDetectorJobActionHandler {
             public void onResponse(StopDetectorResponse stopDetectorResponse) {
                 if (stopDetectorResponse.success()) {
                     logger.info("AD model deleted successfully for detector {}", detectorId);
-                    adTaskManager.updateLatestRealtimeTask(detectorId, ADTaskState.STOPPED, null, listener);
+                    AnomalyDetectorJobResponse anomalyDetectorJobResponse = new AnomalyDetectorJobResponse(
+                        detectorId,
+                        0,
+                        0,
+                        0,
+                        RestStatus.OK
+                    );
+                    listener.onResponse(anomalyDetectorJobResponse);
+                    adTaskManager
+                        .updateLatestADTask(
+                            detectorId,
+                            ADTaskType.getRealtimeTaskTypes(),
+                            ImmutableMap.of(ADTask.STATE_FIELD, ADTaskState.STOPPED.name())
+                        );
+                    // adTaskManager.updateLatestADTask(detectorId, ImmutableList.of(ADTaskType.REALTIME_HC_DETECTOR,
+                    // ADTaskType.REALTIME_SINGLE_ENTITY),
+                    // ImmutableMap.of(ADTask.STATE_FIELD, ADTaskState.STOPPED.name()),
+                    // ActionListener.wrap(r -> {
+                    // AnomalyDetectorJobResponse anomalyDetectorJobResponse = new AnomalyDetectorJobResponse(
+                    // detectorId,
+                    // 0,
+                    // 0,
+                    // 0,
+                    // RestStatus.OK
+                    // );
+                    // listener.onResponse(anomalyDetectorJobResponse);
+                    // }, e -> listener.onFailure(new ElasticsearchStatusException("Failed to delete AD model",
+                    // RestStatus.INTERNAL_SERVER_ERROR))));
                 } else {
                     logger.error("Failed to delete AD model for detector {}", detectorId);
+                    // adTaskManager.updateLatestADTask(detectorId, ImmutableList.of(ADTaskType.REALTIME_HC_DETECTOR,
+                    // ADTaskType.REALTIME_SINGLE_ENTITY),
+                    // ImmutableMap.of(ADTask.STATE_FIELD, ADTaskState.FAILED.name(),
+                    // ADTask.ERROR_FIELD, "Failed to delete AD model"),
+                    // ActionListener.wrap(r -> {listener.onFailure(new ElasticsearchStatusException("Failed to delete AD model",
+                    // RestStatus.INTERNAL_SERVER_ERROR));},
+                    // e -> {listener.onFailure(new ElasticsearchStatusException("Failed to delete AD model",
+                    // RestStatus.INTERNAL_SERVER_ERROR));}));
+                    listener.onFailure(new OpenSearchStatusException("Failed to delete AD model", RestStatus.INTERNAL_SERVER_ERROR));
                     adTaskManager
-                        .updateLatestRealtimeTask(
+                        .updateLatestADTask(
                             detectorId,
-                            ADTaskState.FAILED,
-                            new OpenSearchStatusException("Failed to delete AD model", RestStatus.INTERNAL_SERVER_ERROR),
-                            listener
+                            ADTaskType.getRealtimeTaskTypes(),
+                            ImmutableMap.of(ADTask.STATE_FIELD, ADTaskState.STOPPED.name())
                         );
                 }
             }
@@ -330,13 +372,8 @@ public class IndexAnomalyDetectorJobActionHandler {
             @Override
             public void onFailure(Exception e) {
                 logger.error("Failed to delete AD model for detector " + detectorId, e);
-                adTaskManager
-                    .updateLatestRealtimeTask(
-                        detectorId,
-                        ADTaskState.FAILED,
-                        new OpenSearchStatusException("Failed to execute stop detector action", RestStatus.INTERNAL_SERVER_ERROR),
-                        listener
-                    );
+                listener
+                    .onFailure(new OpenSearchStatusException("Failed to execute stop detector action", RestStatus.INTERNAL_SERVER_ERROR));
             }
         };
     }

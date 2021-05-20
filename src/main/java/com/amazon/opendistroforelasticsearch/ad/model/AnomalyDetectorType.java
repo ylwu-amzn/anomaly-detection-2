@@ -28,8 +28,5 @@ package com.amazon.opendistroforelasticsearch.ad.model;
 
 public enum AnomalyDetectorType {
     SINGLE_ENTITY,
-    MULTI_ENTITY,
-    // TODO: remove HISTORICAL_SINGLE_ENTITY and HISTORICAL_MULTI_ENTITY
-    HISTORICAL_SINGLE_ENTITY,
-    HISTORICAL_MULTI_ENTITY
+    MULTI_ENTITY
 }

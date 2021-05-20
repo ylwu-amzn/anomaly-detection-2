@@ -82,7 +82,6 @@ import com.amazon.opendistroforelasticsearch.ad.caching.EntityCache;
 import com.amazon.opendistroforelasticsearch.ad.cluster.HashRing;
 import com.amazon.opendistroforelasticsearch.ad.common.exception.AnomalyDetectionException;
 import com.amazon.opendistroforelasticsearch.ad.common.exception.EndRunException;
-import com.amazon.opendistroforelasticsearch.ad.common.exception.InternalFailure;
 import com.amazon.opendistroforelasticsearch.ad.common.exception.LimitExceededException;
 import com.amazon.opendistroforelasticsearch.ad.constant.CommonErrorMessages;
 import com.amazon.opendistroforelasticsearch.ad.feature.FeatureManager;
@@ -98,6 +97,7 @@ import com.amazon.opendistroforelasticsearch.ad.stats.ADStat;
 import com.amazon.opendistroforelasticsearch.ad.stats.ADStats;
 import com.amazon.opendistroforelasticsearch.ad.stats.StatNames;
 import com.amazon.opendistroforelasticsearch.ad.stats.suppliers.CounterSupplier;
+import com.amazon.opendistroforelasticsearch.ad.task.ADTaskManager;
 import com.amazon.opendistroforelasticsearch.ad.transport.handler.MultiEntityResultHandler;
 import com.amazon.opendistroforelasticsearch.ad.util.ClientUtil;
 import com.amazon.opendistroforelasticsearch.ad.util.IndexUtils;
@@ -129,6 +129,7 @@ public class MultientityResultTests extends AbstractADTest {
     private CheckpointDao checkpointDao;
     private CacheProvider provider;
     private AnomalyDetectionIndices indexUtil;
+    private ADTaskManager adTaskManager;
 
     @BeforeClass
     public static void setUpBeforeClass() {
@@ -204,6 +205,7 @@ public class MultientityResultTests extends AbstractADTest {
         adStats = new ADStats(indexUtils, normalModelManager, statsMap);
 
         searchFeatureDao = mock(SearchFeatureDao.class);
+        adTaskManager = mock(ADTaskManager.class);
 
         action = new AnomalyResultTransportAction(
             new ActionFilters(Collections.emptySet()),
@@ -220,7 +222,8 @@ public class MultientityResultTests extends AbstractADTest {
             adCircuitBreakerService,
             adStats,
             mockThreadPool,
-            searchFeatureDao
+            searchFeatureDao,
+            adTaskManager
         );
 
         anomalyResultHandler = mock(MultiEntityResultHandler.class);
@@ -454,7 +457,8 @@ public class MultientityResultTests extends AbstractADTest {
             adCircuitBreakerService,
             adStats,
             threadPool,
-            searchFeatureDao
+            searchFeatureDao,
+            adTaskManager
         );
     }
 
@@ -497,15 +501,15 @@ public class MultientityResultTests extends AbstractADTest {
         assertException(listener, LimitExceededException.class, CommonErrorMessages.MEMORY_CIRCUIT_BROKEN_ERR_MSG);
     }
 
-    public void testNotAck() {
-        setUpTransportInterceptor(this::unackEntityResultHandler);
-        setUpEntityResult();
-
-        PlainActionFuture<AnomalyResultResponse> listener = new PlainActionFuture<>();
-
-        action.doExecute(null, request, listener);
-
-        assertException(listener, InternalFailure.class, AnomalyResultTransportAction.NO_ACK_ERR);
-        verify(stateManager, times(1)).addPressure(anyString());
-    }
+    // public void testNotAck() {
+    // setUpTransportInterceptor(this::unackEntityResultHandler);
+    // setUpEntityResult();
+    //
+    // PlainActionFuture<AnomalyResultResponse> listener = new PlainActionFuture<>();
+    //
+    // action.doExecute(null, request, listener);
+    //
+    // assertException(listener, InternalFailure.class, AnomalyResultTransportAction.NO_ACK_ERR);
+    // verify(stateManager, times(1)).addPressure(anyString());
+    // }
 }
