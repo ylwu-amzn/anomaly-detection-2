@@ -737,7 +737,7 @@ public class ADTaskManager {
             // For example, ES process crashes, then all tasks running on it will stay
             // as running. We can reset the task state when next read happen.
             String taskId = adTask.getTaskId();
-            /*getADTaskProfile(adTask, ActionListener.wrap(taskProfiles -> {
+            getADTaskProfile(adTask, ActionListener.wrap(taskProfiles -> {
                 logger
                     .debug(
                         "++++++++++113355 taskProfiles {}, size: {},  {}, {}",
@@ -751,7 +751,7 @@ public class ADTaskManager {
                     // If no node is running this task, reset it as STOPPED.
                     resetTaskStateAsStopped(adTask, transportService); // TODO: reset realtime task state
                     adTask.setState(ADTaskState.STOPPED.name());
-                } else if (ADTaskType.HISTORICAL_HC_DETECTOR.name().equals(adTask.getTaskType())) {
+                } /*else if (ADTaskType.HISTORICAL_HC_DETECTOR.name().equals(adTask.getTaskType())) {
                     logger.debug("4444444444 check running/pending entities");
                     // Check if any running entity not run on worker node. If yes, we need to remove it
                     // and poll next entity from pending entity queue and run it.
@@ -793,8 +793,8 @@ public class ADTaskManager {
                             );
                         }
                     }
-                }
-            }, e -> { logger.error("Failed to get AD task profile for task " + adTask.getTaskId(), e); }));*/
+                }*/
+            }, e -> { logger.error("Failed to get AD task profile for task " + adTask.getTaskId(), e); }));
         }
     }
 
