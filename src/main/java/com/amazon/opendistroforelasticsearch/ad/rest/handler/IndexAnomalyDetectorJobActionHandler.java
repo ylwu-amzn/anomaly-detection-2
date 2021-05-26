@@ -28,6 +28,7 @@ package com.amazon.opendistroforelasticsearch.ad.rest.handler;
 
 import static com.amazon.opendistroforelasticsearch.ad.model.AnomalyDetector.ANOMALY_DETECTORS_INDEX;
 import static com.amazon.opendistroforelasticsearch.ad.util.ExceptionUtil.getShardsFailure;
+import static com.amazon.opendistroforelasticsearch.ad.util.RestHandlerUtils.createXContentParserFromRegistry;
 import static org.opensearch.action.DocWriteResponse.Result.CREATED;
 import static org.opensearch.action.DocWriteResponse.Result.UPDATED;
 import static org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken;
@@ -186,9 +187,7 @@ public class IndexAnomalyDetectorJobActionHandler {
     private void onGetAnomalyDetectorJobForWrite(GetResponse response, AnomalyDetector detector, AnomalyDetectorJob job)
         throws IOException {
         if (response.isExists()) {
-            try (
-                XContentParser parser = RestHandlerUtils.createXContentParserFromRegistry(xContentRegistry, response.getSourceAsBytesRef())
-            ) {
+            try (XContentParser parser = createXContentParserFromRegistry(xContentRegistry, response.getSourceAsBytesRef())) {
                 ensureExpectedToken(XContentParser.Token.START_OBJECT, parser.nextToken(), parser);
                 AnomalyDetectorJob currentAdJob = AnomalyDetectorJob.parse(parser);
                 if (currentAdJob.isEnabled()) {
@@ -267,10 +266,7 @@ public class IndexAnomalyDetectorJobActionHandler {
 
         client.get(getRequest, ActionListener.wrap(response -> {
             if (response.isExists()) {
-                try (
-                    XContentParser parser = RestHandlerUtils
-                        .createXContentParserFromRegistry(xContentRegistry, response.getSourceAsBytesRef())
-                ) {
+                try (XContentParser parser = createXContentParserFromRegistry(xContentRegistry, response.getSourceAsBytesRef())) {
                     ensureExpectedToken(XContentParser.Token.START_OBJECT, parser.nextToken(), parser);
                     AnomalyDetectorJob job = AnomalyDetectorJob.parse(parser);
                     if (!job.isEnabled()) {
@@ -305,7 +301,7 @@ public class IndexAnomalyDetectorJobActionHandler {
             } else {
                 listener.onFailure(new OpenSearchStatusException("Anomaly detector job not exist: " + detectorId, RestStatus.BAD_REQUEST));
             }
-        }, exception -> listener.onFailure(exception)));
+        }, exception -> { listener.onFailure(exception); }));
     }
 
     private ActionListener<StopDetectorResponse> stopAdDetectorListener(String detectorId) {

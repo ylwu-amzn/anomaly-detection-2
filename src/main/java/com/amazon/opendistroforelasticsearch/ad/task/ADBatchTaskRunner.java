@@ -72,6 +72,7 @@ import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.index.query.BoolQueryBuilder;
 import org.opensearch.index.query.RangeQueryBuilder;
+import org.opensearch.index.query.TermQueryBuilder;
 import org.opensearch.search.aggregations.AggregationBuilder;
 import org.opensearch.search.aggregations.AggregationBuilders;
 import org.opensearch.search.aggregations.bucket.terms.StringTerms;
@@ -220,6 +221,7 @@ public class ADBatchTaskRunner {
     public void run(ADTask adTask, TransportService transportService, ActionListener<ADBatchAnomalyResultResponse> listener) {
         boolean isHCDetector = adTask.getDetector().isMultientityDetector();
         if (isHCDetector && !adTaskCacheManager.topEntityInited(adTask.getDetectorId())) {
+            logger.info("+++++++++++++++++++ 6. init top entity for task {}", adTask.toString());
             // Initialize top entities for HC detector
             adTaskCacheManager.add(adTask);
 
@@ -235,6 +237,7 @@ public class ADBatchTaskRunner {
             listener.onResponse(new ADBatchAnomalyResultResponse(clusterService.localNode().getId(), false));
         } else {
             // Execute AD task for single entity detector or HC detector which top entities initialized
+            logger.info("+++++++++++++++++++ 7. run ad task {}", adTask.toString());
             executeADTask(adTask, transportService, listener);
         }
     }
@@ -667,6 +670,28 @@ public class ADBatchTaskRunner {
         }
     }
 
+//    private ActionListener<String> internalBatchTaskListener(ADTask adTask, TransportService transportService) {
+//        String taskId = adTask.getTaskId();
+//        ActionListener<String> listener = ActionListener.wrap(response -> {
+//            // If batch task finished normally, remove task from cache and decrease executing task count by 1.
+//            adTaskCacheManager.remove(taskId);
+//            adStats.getStat(AD_EXECUTING_BATCH_TASK_COUNT.getName()).decrement();
+//
+//            adTaskManager
+//                .cleanDetectorCache(
+//                    adTask,
+//                    transportService,
+//                    () -> adTaskManager.updateADTask(taskId, ImmutableMap.of(STATE_FIELD, ADTaskState.FINISHED.name()))
+//                );
+//        }, e -> {
+//            // If batch task failed, remove task from cache and decrease executing task count by 1.
+//            adTaskCacheManager.remove(taskId);
+//            adStats.getStat(AD_EXECUTING_BATCH_TASK_COUNT.getName()).decrement();
+//            adTaskManager.cleanDetectorCache(adTask, transportService, () -> handleException(adTask, e));
+//        });
+//        return listener;
+//    }
+
     private ActionListener<String> internalBatchTaskListener(ADTask adTask, TransportService transportService) {
         String taskId = adTask.getTaskId();
         ActionListener<String> listener = ActionListener.wrap(response -> {
@@ -674,19 +699,42 @@ public class ADBatchTaskRunner {
             adTaskCacheManager.remove(taskId);
             adStats.getStat(AD_EXECUTING_BATCH_TASK_COUNT.getName()).decrement();
 
-            adTaskManager
-                .cleanDetectorCache(
-                    adTask,
-                    transportService,
-                    () -> adTaskManager.updateADTask(taskId, ImmutableMap.of(STATE_FIELD, ADTaskState.FINISHED.name()))
-                );
+            if (!adTask.getDetector().isMultientityDetector()) {
+                // TODO: check if it's necessary to set task as FINISHED here
+                adTaskManager
+                        .cleanDetectorCache(
+                                adTask,
+                                transportService,
+                                () -> adTaskManager.updateADTask(taskId, ImmutableMap.of(STATE_FIELD, ADTaskState.FINISHED.name()))
+                        );
+            } else {
+                // TODO: check if it's necessary to set task as FINISHED here
+                adTaskManager.updateADTask(adTask.getTaskId(), ImmutableMap.of(STATE_FIELD, ADTaskState.FINISHED.name()));
+                adTaskManager.entityTaskDone(adTask, null, transportService);
+            }
         }, e -> {
             // If batch task failed, remove task from cache and decrease executing task count by 1.
+            logger.error("ylwudebug7: taskId " + taskId, e);
             adTaskCacheManager.remove(taskId);
             adStats.getStat(AD_EXECUTING_BATCH_TASK_COUNT.getName()).decrement();
-            adTaskManager.cleanDetectorCache(adTask, transportService, () -> handleException(adTask, e));
+            if (!adTask.getDetector().isMultientityDetector()) {
+                adTaskManager.cleanDetectorCache(adTask, transportService, () -> handleException(adTask, e));
+            } else {
+                logger.info("ylwudebug0319-3: thread: {}, {}", Thread.currentThread().getName(), Thread.currentThread().getId());
+                waitBeforeNextEntity(5000);
+                adTaskManager.entityTaskDone(adTask, e, transportService);
+                handleException(adTask, e);
+                // });
+            }
         });
-        return listener;
+        ThreadedActionListener<String> threadedActionListener = new ThreadedActionListener<>(
+                logger,
+                threadPool,
+                AD_BATCH_TASK_THREAD_POOL_NAME,
+                listener,
+                false
+        );
+        return threadedActionListener;
     }
 
     private void handleException(ADTask adTask, Exception e) {
@@ -703,11 +751,11 @@ public class ADBatchTaskRunner {
 
     private void executeADBatchTask(ADTask adTask, ActionListener<String> internalListener) {
         // track AD executing batch task and total batch task execution count
-        adStats.getStat(AD_EXECUTING_BATCH_TASK_COUNT.getName()).increment();
-        adStats.getStat(StatNames.AD_TOTAL_BATCH_TASK_EXECUTION_COUNT.getName()).increment();
+//        adStats.getStat(AD_EXECUTING_BATCH_TASK_COUNT.getName()).increment();
+//        adStats.getStat(StatNames.AD_TOTAL_BATCH_TASK_EXECUTION_COUNT.getName()).increment();
 
         // put AD task into cache
-        adTaskCacheManager.add(adTask);
+//        adTaskCacheManager.add(adTask);
 
         // start to run first piece
         Instant executeStartTime = Instant.now();
@@ -741,96 +789,128 @@ public class ADBatchTaskRunner {
     private void runFirstPiece(ADTask adTask, Instant executeStartTime, ActionListener<String> internalListener) {
         try {
             adTaskManager
-                .updateADTask(
-                    adTask.getTaskId(),
-                    ImmutableMap
-                        .of(
-                            STATE_FIELD,
-                            ADTaskState.INIT.name(),
-                            CURRENT_PIECE_FIELD,
-                            adTask.getDetectionDateRange().getStartTime().toEpochMilli(),
-                            TASK_PROGRESS_FIELD,
-                            0.0f,
-                            INIT_PROGRESS_FIELD,
-                            0.0f,
-                            WORKER_NODE_FIELD,
-                            clusterService.localNode().getId()
-                        ),
-                    ActionListener.wrap(r -> {
-                        try {
-                            checkIfADTaskCancelled(adTask.getTaskId());
-                            getDateRangeOfSourceData(adTask, (minDate, maxDate) -> {
-                                long interval = ((IntervalTimeConfiguration) adTask.getDetector().getDetectionInterval())
-                                    .toDuration()
-                                    .toMillis();
-
-                                DetectionDateRange detectionDateRange = adTask.getDetectionDateRange();
-                                long dataStartTime = detectionDateRange.getStartTime().toEpochMilli();
-                                long dataEndTime = detectionDateRange.getEndTime().toEpochMilli();
-
-                                if (minDate >= dataEndTime || maxDate <= dataStartTime) {
-                                    internalListener
-                                        .onFailure(
-                                            new ResourceNotFoundException(
-                                                adTask.getDetectorId(),
-                                                "There is no data in the detection date range"
-                                            )
+                    .updateADTask(
+                            adTask.getTaskId(),
+                            ImmutableMap
+                                    .of(
+                                            STATE_FIELD,
+                                            ADTaskState.INIT.name(),
+                                            CURRENT_PIECE_FIELD,
+                                            adTask.getDetectionDateRange().getStartTime().toEpochMilli(),
+                                            TASK_PROGRESS_FIELD,
+                                            0.0f,
+                                            INIT_PROGRESS_FIELD,
+                                            0.0f,
+                                            WORKER_NODE_FIELD,
+                                            clusterService.localNode().getId()
+                                    ),
+                            ActionListener.wrap(r -> {
+                                try {
+                                    checkIfADTaskCancelled(adTask.getTaskId());
+                                    getDateRangeOfSourceData(adTask, (dataStartTime, dataEndTime) -> {
+                                        long interval = ((IntervalTimeConfiguration) adTask.getDetector().getDetectionInterval())
+                                                .toDuration()
+                                                .toMillis();
+                                        long expectedPieceEndTime = dataStartTime + pieceSize * interval;
+                                        long firstPieceEndTime = Math.min(expectedPieceEndTime, dataEndTime);
+                                        logger
+                                                .debug(
+                                                        "start first piece from {} to {}, interval {}, dataStartTime {}, dataEndTime {},"
+                                                                + " detectorId {}, taskId {}",
+                                                        dataStartTime,
+                                                        firstPieceEndTime,
+                                                        interval,
+                                                        dataStartTime,
+                                                        dataEndTime,
+                                                        adTask.getDetectorId(),
+                                                        adTask.getTaskId()
+                                                );
+                                        getFeatureData(
+                                                adTask,
+                                                dataStartTime, // first piece start time
+                                                firstPieceEndTime, // first piece end time
+                                                dataStartTime,
+                                                dataEndTime,
+                                                interval,
+                                                executeStartTime,
+                                                internalListener
                                         );
-                                    return;
+                                    }, internalListener);
+                                } catch (Exception e) {
+                                    internalListener.onFailure(e);
                                 }
-                                if (minDate > dataStartTime) {
-                                    dataStartTime = minDate;
-                                }
-                                if (maxDate < dataEndTime) {
-                                    dataEndTime = maxDate;
-                                }
-
-                                // normalize start/end time to make it consistent with feature data agg result
-                                dataStartTime = dataStartTime - dataStartTime % interval;
-                                dataEndTime = dataEndTime - dataEndTime % interval;
-                                if ((dataEndTime - dataStartTime) < THRESHOLD_MODEL_TRAINING_SIZE * interval) {
-                                    internalListener
-                                        .onFailure(
-                                            new AnomalyDetectionException("There is no enough data to train model").countedInStats(false)
-                                        );
-                                    return;
-                                }
-                                long expectedPieceEndTime = dataStartTime + pieceSize * interval;
-                                long firstPieceEndTime = Math.min(expectedPieceEndTime, dataEndTime);
-                                logger
-                                    .debug(
-                                        "start first piece from {} to {}, interval {}, dataStartTime {}, dataEndTime {},"
-                                            + " detectorId {}, taskId {}",
-                                        dataStartTime,
-                                        firstPieceEndTime,
-                                        interval,
-                                        dataStartTime,
-                                        dataEndTime,
-                                        adTask.getDetectorId(),
-                                        adTask.getTaskId()
-                                    );
-                                getFeatureData(
-                                    adTask,
-                                    dataStartTime, // first piece start time
-                                    firstPieceEndTime, // first piece end time
-                                    dataStartTime,
-                                    dataEndTime,
-                                    interval,
-                                    executeStartTime,
-                                    internalListener
-                                );
-                            }, internalListener);
-                        } catch (Exception e) {
-                            internalListener.onFailure(e);
-                        }
-                    }, internalListener::onFailure)
-                );
+                            }, e -> {
+                                logger.error("4444444444 ", e);
+                                internalListener.onFailure(e);
+                            })
+                    );
         } catch (Exception exception) {
             internalListener.onFailure(exception);
         }
     }
 
-    private void getDateRangeOfSourceData(ADTask adTask, BiConsumer<Long, Long> consumer, ActionListener listener) {
+    private void getDateRangeOfSourceData(ADTask adTask, BiConsumer<Long, Long> consumer, ActionListener internalListener) {
+        String taskId = adTask.getTaskId();
+        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder()
+                .aggregation(AggregationBuilders.min(AGG_NAME_MIN_TIME).field(adTask.getDetector().getTimeField()))
+                .aggregation(AggregationBuilders.max(AGG_NAME_MAX_TIME).field(adTask.getDetector().getTimeField()))
+                .size(0);
+        if (adTask.getEntity() != null && adTask.getEntity().size() > 0) {
+            BoolQueryBuilder query = new BoolQueryBuilder();
+            adTask.getEntity().forEach(entity -> query.filter(new TermQueryBuilder(entity.getName(), entity.getValue())));
+            searchSourceBuilder.query(query);
+        }
+        // logger.info("ylwudebug0318: query to get date range: {}, taskId: {}", searchSourceBuilder, taskId);
+
+        SearchRequest request = new SearchRequest()
+                .indices(adTask.getDetector().getIndices().toArray(new String[0]))
+                .source(searchSourceBuilder);
+
+        client.search(request, ActionListener.wrap(r -> {
+            InternalMin minAgg = r.getAggregations().get(AGG_NAME_MIN_TIME);
+            InternalMax maxAgg = r.getAggregations().get(AGG_NAME_MAX_TIME);
+            double minValue = minAgg.getValue();
+            double maxValue = maxAgg.getValue();
+            // If time field not exist or there is no value, will return infinity value
+            if (minValue == Double.POSITIVE_INFINITY) {
+                internalListener.onFailure(new ResourceNotFoundException(adTask.getDetectorId(), "There is no data in the time field"));
+                return;
+            }
+            long interval = ((IntervalTimeConfiguration) adTask.getDetector().getDetectionInterval()).toDuration().toMillis();
+
+            DetectionDateRange detectionDateRange = adTask.getDetectionDateRange();
+            long dataStartTime = detectionDateRange.getStartTime().toEpochMilli();
+            long dataEndTime = detectionDateRange.getEndTime().toEpochMilli();
+            long minDate = (long) minValue;
+            long maxDate = (long) maxValue;
+            // logger.info("ylwudebug: date range: minDate: {}, maxDate: {}, taskId: {}", minDate, maxDate, taskId);
+            // logger.info("ylwudebug: input range: start: {}, end: {}, taskId: {}", dataStartTime, dataEndTime, taskId);
+
+            if (minDate >= dataEndTime || maxDate <= dataStartTime) {
+                internalListener
+                        .onFailure(new ResourceNotFoundException(adTask.getDetectorId(), "There is no data in the detection date range"));
+                return;
+            }
+            if (minDate > dataStartTime) {
+                dataStartTime = minDate;
+            }
+            if (maxDate < dataEndTime) {
+                dataEndTime = maxDate;
+            }
+
+            // normalize start/end time to make it consistent with feature data agg result
+            dataStartTime = dataStartTime - dataStartTime % interval;
+            dataEndTime = dataEndTime - dataEndTime % interval;
+            logger.debug("ylwudebug: adjusted range: start: {}, end: {}, taskId: {}", dataStartTime, dataEndTime, taskId);
+            if ((dataEndTime - dataStartTime) < THRESHOLD_MODEL_TRAINING_SIZE * interval) {
+                internalListener.onFailure(new AnomalyDetectionException("There is no enough data to train model").countedInStats(false));
+                return;
+            }
+            consumer.accept(dataStartTime, dataEndTime);
+        }, e -> { internalListener.onFailure(e); }));
+    }
+
+    /*private void getDateRangeOfSourceData(ADTask adTask, BiConsumer<Long, Long> consumer, ActionListener listener) {
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder()
             .aggregation(AggregationBuilders.min(AGG_NAME_MIN_TIME).field(adTask.getDetector().getTimeField()))
             .aggregation(AggregationBuilders.max(AGG_NAME_MAX_TIME).field(adTask.getDetector().getTimeField()))
@@ -851,7 +931,7 @@ public class ADBatchTaskRunner {
             }
             consumer.accept((long) minValue, (long) maxValue);
         }, e -> { listener.onFailure(e); }));
-    }
+    }*/
 
     private void getFeatureData(
         ADTask adTask,
@@ -1011,16 +1091,17 @@ public class ADBatchTaskRunner {
     }
 
     private void runNextPiece(
-        ADTask adTask,
-        long pieceStartTime,
-        long dataStartTime,
-        long dataEndTime,
-        long interval,
-        ActionListener<String> internalListener
+            ADTask adTask,
+            long pieceStartTime,
+            long dataStartTime,
+            long dataEndTime,
+            long interval,
+            ActionListener<String> internalListener
     ) {
         String taskId = adTask.getTaskId();
         float initProgress = calculateInitProgress(taskId);
         String taskState = initProgress >= 1.0f ? ADTaskState.RUNNING.name() : ADTaskState.INIT.name();
+        logger.debug("Init progress: {}, taskState:{}, task id: {}", initProgress, taskState, taskId);
 
         if (pieceStartTime < dataEndTime) {
             checkClusterState(adTask);
@@ -1031,59 +1112,78 @@ public class ADBatchTaskRunner {
                 // check if task cancelled every second, so frontend can get STOPPED state
                 // in 1 second once task cancelled.
                 checkIfADTaskCancelled(taskId);
-                rateLimiter.acquire(1);
+                adTaskCacheManager.getRateLimiter(adTask.getDetectorId(), adTask.getTaskId()).acquire(1);
                 i++;
             }
-            logger.debug("start next piece start from {} to {}, interval {}", pieceStartTime, pieceEndTime, interval);
-            float taskProgress = (float) (pieceStartTime - dataStartTime) / (dataEndTime - dataStartTime);
-            adTaskManager
-                .updateADTask(
-                    taskId,
-                    ImmutableMap
-                        .of(
-                            STATE_FIELD,
-                            taskState,
-                            CURRENT_PIECE_FIELD,
+            logger
+                    .debug(
+                            "task id: {}, start next piece start from {} to {}, interval {}",
+                            adTask.getTaskId(),
                             pieceStartTime,
-                            TASK_PROGRESS_FIELD,
-                            taskProgress,
-                            INIT_PROGRESS_FIELD,
-                            initProgress
-                        ),
-                    ActionListener
-                        .wrap(
-                            r -> getFeatureData(
-                                adTask,
-                                pieceStartTime,
-                                pieceEndTime,
-                                dataStartTime,
-                                dataEndTime,
-                                interval,
-                                Instant.now(),
-                                internalListener
-                            ),
-                            e -> internalListener.onFailure(e)
-                        )
-                );
+                            pieceEndTime,
+                            interval
+                    );
+            float taskProgress = (float) (pieceStartTime - dataStartTime) / (dataEndTime - dataStartTime);
+            logger.debug("Task progress: {}, task id:{}, detector id:{}", taskProgress, taskId, adTask.getDetectorId());
+            adTaskManager
+                    .updateADTask(
+                            taskId,
+                            ImmutableMap
+                                    .of(
+                                            STATE_FIELD,
+                                            taskState,
+                                            CURRENT_PIECE_FIELD,
+                                            pieceStartTime,
+                                            TASK_PROGRESS_FIELD,
+                                            taskProgress,
+                                            INIT_PROGRESS_FIELD,
+                                            initProgress
+                                    ),
+                            ActionListener.wrap(r -> {
+                                getFeatureData(
+                                        adTask,
+                                        pieceStartTime,
+                                        pieceEndTime,
+                                        dataStartTime,
+                                        dataEndTime,
+                                        interval,
+                                        Instant.now(),
+                                        internalListener
+                                );
+                                // if(adTask.getParentTaskId() != null && taskState.equals(ADTaskState.RUNNING.name())) {
+                                // adTaskManager.updateADTask(adTask.getParentTaskId(), ImmutableMap.of(STATE_FIELD,
+                                // taskState));
+                                // }
+                            }, e -> {
+                                logger.error("55555555555 ", e);
+                                internalListener.onFailure(e);
+                            })
+                    );
         } else {
             logger.info("AD task finished for detector {}, task id: {}", adTask.getDetectorId(), taskId);
+            // adTaskCacheManager.remove(taskId, adTask.getEntity());
             adTaskCacheManager.remove(taskId);
             adTaskManager
-                .updateADTask(
-                    taskId,
-                    ImmutableMap
-                        .of(
-                            CURRENT_PIECE_FIELD,
-                            dataEndTime,
-                            TASK_PROGRESS_FIELD,
-                            1.0f,
-                            EXECUTION_END_TIME_FIELD,
-                            Instant.now().toEpochMilli(),
-                            INIT_PROGRESS_FIELD,
-                            initProgress
-                        ),
-                    ActionListener.wrap(r -> internalListener.onResponse("task execution done"), e -> internalListener.onFailure(e))
-                );
+                    .updateADTask(
+                            taskId,
+                            ImmutableMap
+                                    .of(
+                                            CURRENT_PIECE_FIELD,
+                                            dataEndTime,
+                                            TASK_PROGRESS_FIELD,
+                                            1.0f,
+                                            EXECUTION_END_TIME_FIELD,
+                                            Instant.now().toEpochMilli(),
+                                            INIT_PROGRESS_FIELD,
+                                            initProgress,
+                                            STATE_FIELD,
+                                            ADTaskState.FINISHED
+                                    ),
+                            ActionListener.wrap(r -> internalListener.onResponse("task execution done"), e -> {
+                                logger.error("66666666666 ", e);
+                                internalListener.onFailure(e);
+                            })
+                    );
         }
     }
 
@@ -1093,6 +1193,7 @@ public class ADBatchTaskRunner {
             return 0.0f;
         }
         float initProgress = (float) rcf.getTotalUpdates() / NUM_MIN_SAMPLES;
+        logger.debug("RCF total updates {} for task {}", rcf.getTotalUpdates(), taskId);
         return initProgress > 1.0f ? 1.0f : initProgress;
     }
 

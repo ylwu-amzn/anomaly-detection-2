@@ -59,6 +59,7 @@ public class ForwardADTaskRequest extends ActionRequest {
     public ForwardADTaskRequest(ADTask adTask, ADTaskAction adTaskAction) {
         this.adTask = adTask;
         this.adTaskAction = adTaskAction;
+        this.detector = adTask.getDetector();
     }
 
     public ForwardADTaskRequest(StreamInput in) throws IOException {

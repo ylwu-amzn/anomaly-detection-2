@@ -44,6 +44,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
+import com.google.common.util.concurrent.RateLimiter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.opensearch.cluster.service.ClusterService;
@@ -56,6 +57,7 @@ import com.amazon.opendistroforelasticsearch.ad.common.exception.LimitExceededEx
 import com.amazon.opendistroforelasticsearch.ad.ml.ThresholdingModel;
 import com.amazon.opendistroforelasticsearch.ad.model.ADTask;
 import com.amazon.opendistroforelasticsearch.ad.model.AnomalyDetector;
+import com.amazon.opendistroforelasticsearch.ad.model.Entity;
 import com.amazon.randomcutforest.RandomCutForest;
 import com.google.common.collect.ImmutableList;
 
@@ -507,6 +509,23 @@ public class ADTaskCacheManager {
         return hcTaskCaches.containsKey(detectorId) ? hcTaskCaches.get(detectorId).getPendingEntityCount() : 0;
     }
 
+    public int getRunningEntityCount(String detectorId) {
+        return hcTaskCaches.containsKey(detectorId) ? hcTaskCaches.get(detectorId).getRunningEntityCount() : 0;
+    }
+
+    public Integer getTopEntityCount(String detectorId) {
+        return hcTaskCaches.containsKey(detectorId) ? hcTaskCaches.get(detectorId).getTopEntityCount() : 0;
+    }
+
+    public String[] getRunningEntities(String detectorId) {
+        if (hcTaskCaches.containsKey(detectorId)) {
+            ADHCBatchTaskCache hcTaskCache = getExistingHCTaskCache(detectorId);
+            return hcTaskCache.getRunningEntities();
+        } else {
+            return new String[] {};
+        }
+    }
+
     /**
      * Set max allowed running entities for HC detector.
      *
@@ -644,5 +663,18 @@ public class ADTaskCacheManager {
         if (hcTaskCaches.containsKey(detectorId)) {
             hcTaskCaches.get(detectorId).removeEntity(entity);
         }
+    }
+
+    public List<Entity> getEntity(String taskId) {
+        return getBatchTaskCache(taskId).getEntity();
+    }
+
+    public boolean hasEntity(String detectorId) {
+        return hcTaskCaches.containsKey(detectorId) && hcTaskCaches.get(detectorId).hasEntity();
+    }
+
+    public RateLimiter getRateLimiter(String detectorId, String taskId) {
+        ADHCBatchTaskCache hcTaskCache = getHCTaskCache(detectorId);
+        return hcTaskCache.getRateLimiter(taskId);
     }
 }

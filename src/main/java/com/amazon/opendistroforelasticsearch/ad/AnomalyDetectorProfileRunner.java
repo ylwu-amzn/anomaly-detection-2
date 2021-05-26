@@ -65,6 +65,7 @@ import org.opensearch.transport.TransportService;
 import com.amazon.opendistroforelasticsearch.ad.common.exception.ResourceNotFoundException;
 import com.amazon.opendistroforelasticsearch.ad.constant.CommonErrorMessages;
 import com.amazon.opendistroforelasticsearch.ad.constant.CommonName;
+import com.amazon.opendistroforelasticsearch.ad.model.ADTaskType;
 import com.amazon.opendistroforelasticsearch.ad.model.AnomalyDetector;
 import com.amazon.opendistroforelasticsearch.ad.model.AnomalyDetectorJob;
 import com.amazon.opendistroforelasticsearch.ad.model.AnomalyResult;
@@ -136,11 +137,15 @@ public class AnomalyDetectorProfileRunner extends AbstractProfileRunner {
                 ) {
                     ensureExpectedToken(XContentParser.Token.START_OBJECT, xContentParser.nextToken(), xContentParser);
                     AnomalyDetector detector = AnomalyDetector.parse(xContentParser, detectorId);
-                    // TODO: remove isRealTimeDetector, change profile
-                    if (!detector.isRealTimeDetector() && profilesToCollect.contains(DetectorProfileName.AD_TASK)) {
-                        adTaskManager.getLatestADTaskProfile(detectorId, transportService, listener);
-                        return;
-                    }
+                    // TODO: change realtime detector to read task info
+                    // if (!detector.isRealTimeDetector() && profilesToCollect.contains(DetectorProfileName.AD_TASK)) {
+                    // adTaskManager.getLatestADTaskProfile(detectorId, transportService, listener);
+                    // return;
+                    // }
+                    // if (profilesToCollect.contains(DetectorProfileName.AD_TASK)) {
+                    // adTaskManager.getLatestADTaskProfile(detectorId, transportService, listener);
+                    // return;
+                    // }
                     prepareProfile(detector, listener, profilesToCollect);
                 } catch (Exception e) {
                     listener.onFailure(new RuntimeException(CommonErrorMessages.FAIL_TO_FIND_DETECTOR_MSG + detectorId, e));
@@ -191,6 +196,10 @@ public class AnomalyDetectorProfileRunner extends AbstractProfileRunner {
                             || profilesToCollect.contains(DetectorProfileName.STATE)) {
                             totalResponsesToWait++;
                         }
+                        if (profilesToCollect.contains(DetectorProfileName.AD_TASK)) {
+                            totalResponsesToWait++;
+                        }
+                        // TODO: support HC detector task
                     } else {
                         if (profilesToCollect.contains(DetectorProfileName.STATE)
                             || profilesToCollect.contains(DetectorProfileName.INIT_PROGRESS)) {
@@ -200,6 +209,9 @@ public class AnomalyDetectorProfileRunner extends AbstractProfileRunner {
                             || profilesToCollect.contains(DetectorProfileName.SHINGLE_SIZE)
                             || profilesToCollect.contains(DetectorProfileName.TOTAL_SIZE_IN_BYTES)
                             || profilesToCollect.contains(DetectorProfileName.MODELS)) {
+                            totalResponsesToWait++;
+                        }
+                        if (profilesToCollect.contains(DetectorProfileName.AD_TASK)) {
                             totalResponsesToWait++;
                         }
                     }
@@ -212,8 +224,28 @@ public class AnomalyDetectorProfileRunner extends AbstractProfileRunner {
                             false
                         );
                     if (profilesToCollect.contains(DetectorProfileName.ERROR)) {
-                        GetRequest getStateRequest = new GetRequest(CommonName.DETECTION_STATE_INDEX, detectorId);
-                        client.get(getStateRequest, onGetDetectorState(delegateListener, detectorId, enabledTimeMs));
+
+                        adTaskManager.getLatestADTask(detectorId, ADTaskType.REALTIME_TASK_TYPES, adTask -> {
+                            DetectorProfile.Builder profileBuilder = new DetectorProfile.Builder();
+                            if (adTask.isPresent()) {
+                                long lastUpdateTimeMs = adTask.get().getLastUpdateTime().toEpochMilli();
+
+                                // if state index hasn't been updated, we should not use the error field
+                                // For example, before a detector is enabled, if the error message contains
+                                // the phrase "stopped due to blah", we should not show this when the detector
+                                // is enabled.
+                                if (lastUpdateTimeMs > enabledTimeMs && adTask.get().getError() != null) {
+                                    profileBuilder.error(adTask.get().getError());
+                                }
+                                delegateListener.onResponse(profileBuilder.build());
+                            } else {
+                                // detector state for this detector does not exist
+                                listener.onResponse(profileBuilder.build());
+                            }
+                        }, transportService, delegateListener);
+
+                        // GetRequest getStateRequest = new GetRequest(CommonName.DETECTION_STATE_INDEX, detectorId);
+                        // client.get(getStateRequest, onGetDetectorState(delegateListener, detectorId, enabledTimeMs));
                     }
 
                     // total number of listeners we need to define. Needed by MultiResponsesDelegateActionListener to decide
@@ -229,7 +261,11 @@ public class AnomalyDetectorProfileRunner extends AbstractProfileRunner {
                             || profilesToCollect.contains(DetectorProfileName.ACTIVE_ENTITIES)
                             || profilesToCollect.contains(DetectorProfileName.INIT_PROGRESS)
                             || profilesToCollect.contains(DetectorProfileName.STATE)) {
+                            // TODO: get HC init progress
                             profileModels(detector, profilesToCollect, job, true, delegateListener);
+                        }
+                        if (profilesToCollect.contains(DetectorProfileName.AD_TASK)) {
+                            adTaskManager.getLatestADTaskProfile(detectorId, transportService, null, delegateListener);
                         }
                     } else {
                         if (profilesToCollect.contains(DetectorProfileName.STATE)
@@ -242,6 +278,9 @@ public class AnomalyDetectorProfileRunner extends AbstractProfileRunner {
                             || profilesToCollect.contains(DetectorProfileName.MODELS)) {
                             profileModels(detector, profilesToCollect, job, false, delegateListener);
                         }
+                        if (profilesToCollect.contains(DetectorProfileName.AD_TASK)) {
+                            adTaskManager.getLatestADTaskProfile(detectorId, transportService, null, delegateListener);
+                        }
                     }
 
                 } catch (Exception e) {
@@ -249,12 +288,12 @@ public class AnomalyDetectorProfileRunner extends AbstractProfileRunner {
                     listener.onFailure(e);
                 }
             } else {
-                onGetDetectorForPrepare(listener, profilesToCollect);
+                onGetDetectorForPrepare(detectorId, listener, profilesToCollect);
             }
         }, exception -> {
             if (exception instanceof IndexNotFoundException) {
                 logger.info(exception.getMessage());
-                onGetDetectorForPrepare(listener, profilesToCollect);
+                onGetDetectorForPrepare(detectorId, listener, profilesToCollect);
             } else {
                 logger.error(CommonErrorMessages.FAIL_TO_GET_PROFILE_MSG + detectorId);
                 listener.onFailure(exception);
@@ -287,12 +326,16 @@ public class AnomalyDetectorProfileRunner extends AbstractProfileRunner {
         }
     }
 
-    private void onGetDetectorForPrepare(ActionListener<DetectorProfile> listener, Set<DetectorProfileName> profiles) {
+    private void onGetDetectorForPrepare(String detectorId, ActionListener<DetectorProfile> listener, Set<DetectorProfileName> profiles) {
         DetectorProfile.Builder profileBuilder = new DetectorProfile.Builder();
         if (profiles.contains(DetectorProfileName.STATE)) {
             profileBuilder.state(DetectorState.DISABLED);
         }
-        listener.onResponse(profileBuilder.build());
+        if (profiles.contains(DetectorProfileName.AD_TASK)) {
+            adTaskManager.getLatestADTaskProfile(detectorId, transportService, profileBuilder.build(), listener);
+        } else {
+            listener.onResponse(profileBuilder.build());
+        }
     }
 
     /**
@@ -463,6 +506,7 @@ public class AnomalyDetectorProfileRunner extends AbstractProfileRunner {
         long totalUpdates,
         MultiResponsesDelegateActionListener<DetectorProfile> listener
     ) {
+        // TODO: why need to check initied ever before?
         SearchRequest searchLatestResult = createInittedEverRequest(detector.getDetectorId(), enabledTime);
         client.search(searchLatestResult, onInittedEver(enabledTime, profile, profilesToCollect, detector, totalUpdates, listener));
     }

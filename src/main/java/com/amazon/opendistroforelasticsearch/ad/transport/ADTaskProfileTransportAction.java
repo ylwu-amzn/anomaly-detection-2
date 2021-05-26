@@ -29,6 +29,8 @@ package com.amazon.opendistroforelasticsearch.ad.transport;
 import java.io.IOException;
 import java.util.List;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.opensearch.action.FailedNodeException;
 import org.opensearch.action.support.ActionFilters;
 import org.opensearch.action.support.nodes.TransportNodesAction;
@@ -43,7 +45,7 @@ import com.amazon.opendistroforelasticsearch.ad.task.ADTaskManager;
 
 public class ADTaskProfileTransportAction extends
     TransportNodesAction<ADTaskProfileRequest, ADTaskProfileResponse, ADTaskProfileNodeRequest, ADTaskProfileNodeResponse> {
-
+    private final Logger logger = LogManager.getLogger(ADTaskProfileTransportAction.class);
     private ADTaskManager adTaskManager;
 
     @Inject
@@ -89,7 +91,7 @@ public class ADTaskProfileTransportAction extends
 
     @Override
     protected ADTaskProfileNodeResponse nodeOperation(ADTaskProfileNodeRequest request) {
-        ADTaskProfile adTaskProfile = adTaskManager.getLocalADTaskProfileByDetectorId(request.getDetectorId());
+        List<ADTaskProfile> adTaskProfile = adTaskManager.getLocalADTaskProfilesByDetectorId(request.getDetectorId());
 
         return new ADTaskProfileNodeResponse(clusterService.localNode(), adTaskProfile);
     }
