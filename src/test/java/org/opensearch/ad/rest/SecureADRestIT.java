@@ -35,6 +35,7 @@ import org.apache.http.HttpHost;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.opensearch.ad.AnomalyDetectorRestTestCase;
 import org.opensearch.ad.model.AnomalyDetector;
 import org.opensearch.ad.model.AnomalyDetectorExecutionInput;
@@ -265,6 +266,7 @@ public class SecureADRestIT extends AnomalyDetectorRestTestCase {
             );
     }
 
+    @Ignore
     public void testPreviewAnomalyDetectorWithNoReadPermissionOfIndex() throws IOException {
         // User Alice has AD full access, should be able to create a detector
         AnomalyDetector aliceDetector = createRandomAnomalyDetector(false, false, aliceClient);
