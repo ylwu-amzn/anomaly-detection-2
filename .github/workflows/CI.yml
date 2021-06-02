@@ -7,6 +7,11 @@ on:
     branches:
       - "*"
 
+env:
+  ## TODO: remove these two hard code versions below after GA release
+  DOCKER_TAG: 1.0.0-rc1
+  PLUGIN_VERSION: 1.0.0.0-rc1
+
 jobs:
 
   Build-ad:
@@ -90,31 +95,21 @@ jobs:
           ## plugin=`ls build/distributions/*.zip`
           ## version=`echo $plugin|awk -F- '{print $4}'| cut -d. -f 1-3`
           ## plugin_version=`echo $plugin|awk -F- '{print $4}'| cut -d. -f 1-4`
-          ## TODO: remove these two hard code versions below after GA release
-          version=1.0.0-rc1
-          plugin_version=1.0.0.0-rc1
-          echo $version
+          echo $DOCKER_TAG
           cd ..
-          if docker pull opensearchstaging/opensearch:$version
+          if docker pull opensearchstaging/opensearch:$DOCKER_TAG
           then
             echo "FROM opensearchstaging/opensearch:$version" >> Dockerfile
-            ## The ESRestTest Client uses http by default.
-            ## Need to disable the security plugin to call the rest api over http.
             echo "RUN if [ -d /usr/share/opensearch/plugins/opensearch-anomaly-detection ]; then /usr/share/opensearch/bin/opensearch-plugin remove opensearch-anomaly-detection; fi" >> Dockerfile
-            echo "ADD anomaly-detection/build/distributions/opensearch-anomaly-detection-$plugin_version.zip /tmp/" >> Dockerfile
-            echo "RUN /usr/share/opensearch/bin/opensearch-plugin install --batch file:/tmp/opensearch-anomaly-detection-$plugin_version.zip" >> Dockerfile
+            echo "ADD anomaly-detection/build/distributions/opensearch-anomaly-detection-$PLUGIN_VERSION.zip /tmp/" >> Dockerfile
+            echo "RUN /usr/share/opensearch/bin/opensearch-plugin install --batch file:/tmp/opensearch-anomaly-detection-$PLUGIN_VERSION.zip" >> Dockerfile
             docker build -t opensearch-ad:test .
+            docker run -p 9200:9200 -d -p 9600:9600 -e "discovery.type=single-node" opensearch-ad:test
+            sleep 90
             echo "imagePresent=true" >> $GITHUB_ENV
           else
             echo "imagePresent=false" >> $GITHUB_ENV
           fi
-
-      - name: Run Docker Image
-        if: env.imagePresent == 'true'
-        run: |
-          cd ..
-          docker run -p 9200:9200 -d -p 9600:9600 -e "discovery.type=single-node" opensearch-ad:test
-          sleep 90
 
       - name: Run AD Test
         if: env.imagePresent == 'true'
@@ -124,8 +119,27 @@ jobs:
           then
             echo "Security plugin is available"
             ./gradlew integTest -Dtests.rest.cluster=localhost:9200 -Dtests.cluster=localhost:9200 -Dtests.clustername="docker-cluster" -Dhttps=true -Duser=admin -Dpassword=admin
+            ## Test security disabled
+            echo "securityEnabled=true" >> $GITHUB_ENV
           else
             echo "Security plugin is NOT available"
+            ./gradlew integTest -Dtests.rest.cluster=localhost:9200 -Dtests.cluster=localhost:9200 -Dtests.clustername="docker-cluster"
+            echo "securityEnabled=false" >> $GITHUB_ENV
+          fi
+
+      - name: Pull and Run Docker with security disabled
+        if: env.securityEnabled == 'true'
+        run: |
+          echo $DOCKER_TAG
+          if docker pull opensearchstaging/opensearch:$DOCKER_TAG
+          then
+            echo "FROM opensearchstaging/opensearch:$version" >> Dockerfile-security-disabled
+            echo "RUN sed -n -i '1,/Start OpenSearch Security Demo Configuration/p;/End OpenSearch Security Demo Configuration/,\$p'" >> Dockerfile-security-disabled
+            truncate -s -1 Dockerfile
+            echo -n " /usr/share/opensearch/config/opensearch.yml" >> Dockerfile-security-disabled
+            docker build -t opensearch-ad:test .
+            docker run -p 9200:9200 -d -p 9600:9600 -e "discovery.type=single-node" opensearch-ad:test
+            sleep 90
             ./gradlew integTest -Dtests.rest.cluster=localhost:9200 -Dtests.cluster=localhost:9200 -Dtests.clustername="docker-cluster"
           fi
 
