@@ -142,7 +142,7 @@ jobs:
             echo "RUN sed -n -i '1,/Start OpenSearch Security Demo Configuration/p;/End OpenSearch Security Demo Configuration/,\$p'" >> Dockerfile-security-disabled
             truncate -s -1 Dockerfile-security-disabled
             echo -n " /usr/share/opensearch/config/opensearch.yml" >> Dockerfile-security-disabled
-            docker build -t opensearch-ad:test .
+            docker build -f ./Dockerfile-security-disabled -t opensearch-ad:test .
             docker run -p 9200:9200 -d -p 9600:9600 -e "discovery.type=single-node" opensearch-ad:test
             sleep 90
             ./gradlew integTest -Dtests.rest.cluster=localhost:9200 -Dtests.cluster=localhost:9200 -Dtests.clustername="docker-cluster"
