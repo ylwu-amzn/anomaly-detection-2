@@ -96,12 +96,13 @@ jobs:
           ## version=`echo $plugin|awk -F- '{print $4}'| cut -d. -f 1-3`
           ## plugin_version=`echo $plugin|awk -F- '{print $4}'| cut -d. -f 1-4`
           echo $DOCKER_TAG
+          echo "---------------- start to pull docker image $DOCKER_TAG"
           cd ..
           if docker pull opensearchstaging/opensearch:$DOCKER_TAG
           then
-            echo "FROM opensearchstaging/opensearch:$version" >> Dockerfile
+            echo "FROM opensearchstaging/opensearch:$DOCKER_TAG" >> Dockerfile
             echo "RUN if [ -d /usr/share/opensearch/plugins/opensearch-anomaly-detection ]; then /usr/share/opensearch/bin/opensearch-plugin remove opensearch-anomaly-detection; fi" >> Dockerfile
-            echo "ADD anomaly-detection/build/distributions/opensearch-anomaly-detection-$PLUGIN_VERSION.zip /tmp/" >> Dockerfile
+            echo "ADD anomaly-detection-2/build/distributions/opensearch-anomaly-detection-$PLUGIN_VERSION.zip /tmp/" >> Dockerfile
             echo "RUN /usr/share/opensearch/bin/opensearch-plugin install --batch file:/tmp/opensearch-anomaly-detection-$PLUGIN_VERSION.zip" >> Dockerfile
             docker build -t opensearch-ad:test .
             docker run -p 9200:9200 -d -p 9600:9600 -e "discovery.type=single-node" opensearch-ad:test
