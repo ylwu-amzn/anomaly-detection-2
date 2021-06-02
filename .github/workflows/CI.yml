@@ -131,12 +131,16 @@ jobs:
       - name: Pull and Run Docker with security disabled
         if: env.securityEnabled == 'true'
         run: |
-          echo $DOCKER_TAG
+          echo "Run docker with security disabled"
           if docker pull opensearchstaging/opensearch:$DOCKER_TAG
           then
             echo "FROM opensearchstaging/opensearch:$version" >> Dockerfile-security-disabled
+            echo "RUN if [ -d /usr/share/opensearch/plugins/opensearch-anomaly-detection ]; then /usr/share/opensearch/bin/opensearch-plugin remove opensearch-anomaly-detection; fi" >> Dockerfile-security-disabled
+            echo "ADD anomaly-detection-2/build/distributions/opensearch-anomaly-detection-$PLUGIN_VERSION.zip /tmp/" >> Dockerfile-security-disabled
+            echo "RUN /usr/share/opensearch/bin/opensearch-plugin install --batch file:/tmp/opensearch-anomaly-detection-$PLUGIN_VERSION.zip" >> Dockerfile-security-disabled
+            echo "RUN if [ -d /usr/share/opensearch/plugins/opensearch-security ]; then /usr/share/opensearch/bin/opensearch-plugin remove opensearch-security; fi" >> Dockerfile-security-disabled
             echo "RUN sed -n -i '1,/Start OpenSearch Security Demo Configuration/p;/End OpenSearch Security Demo Configuration/,\$p'" >> Dockerfile-security-disabled
-            truncate -s -1 Dockerfile
+            truncate -s -1 Dockerfile-security-disabled
             echo -n " /usr/share/opensearch/config/opensearch.yml" >> Dockerfile-security-disabled
             docker build -t opensearch-ad:test .
             docker run -p 9200:9200 -d -p 9600:9600 -e "discovery.type=single-node" opensearch-ad:test
