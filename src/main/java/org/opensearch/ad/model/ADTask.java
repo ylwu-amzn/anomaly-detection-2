@@ -602,7 +602,7 @@ public class ADTask implements ToXContentObject, Writeable {
             .coordinatingNode(coordinatingNode)
             .workerNode(workerNode)
             .detector(anomalyDetector)
-            .detectiCommonErrorMessages.javaonDateRange(detectionDateRange)
+            .detectionDateRange(detectionDateRange)
             .entity(entityList)
             .parentTaskId(parentTaskId)
             .estimatedMinutesLeft(estimatedMinutesLeft)
