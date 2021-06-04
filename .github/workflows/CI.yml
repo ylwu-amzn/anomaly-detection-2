@@ -99,7 +99,7 @@ jobs:
           then
             echo "FROM opensearchstaging/opensearch:$version" >> Dockerfile
             echo "RUN if [ -d /usr/share/opensearch/plugins/opensearch-anomaly-detection ]; then /usr/share/opensearch/bin/opensearch-plugin remove opensearch-anomaly-detection; fi" >> Dockerfile
-            echo "ADD anomaly-detection/build/distributions/opensearch-anomaly-detection-$plugin_version.zip /tmp/" >> Dockerfile
+            echo "ADD anomaly-detection-2/build/distributions/opensearch-anomaly-detection-$plugin_version.zip /tmp/" >> Dockerfile
             echo "RUN /usr/share/opensearch/bin/opensearch-plugin install --batch file:/tmp/opensearch-anomaly-detection-$plugin_version.zip" >> Dockerfile
             docker build -t opensearch-ad:test .
             echo "imagePresent=true" >> $GITHUB_ENV
