@@ -647,12 +647,12 @@ public class ADBatchTaskRunner {
             // check if cluster is eligible to run AD currently, if not eligible like
             // circuit breaker open, will throw exception.
             checkClusterState(adTask);
-            // track AD executing batch task and total batch task execution count
+            /*// track AD executing batch task and total batch task execution count
             adStats.getStat(AD_EXECUTING_BATCH_TASK_COUNT.getName()).increment();
             adStats.getStat(StatNames.AD_TOTAL_BATCH_TASK_EXECUTION_COUNT.getName()).increment();
-
+            
             // put AD task into cache
-            adTaskCacheManager.add(adTask);
+            adTaskCacheManager.add(adTask);*/
             threadPool.executor(AD_BATCH_TASK_THREAD_POOL_NAME).execute(() -> {
                 ActionListener<String> internalListener = internalBatchTaskListener(adTask, transportService);
                 try {
@@ -723,6 +723,13 @@ public class ADBatchTaskRunner {
     }
 
     private void executeADBatchTask(ADTask adTask, ActionListener<String> internalListener) {
+        // track AD executing batch task and total batch task execution count
+        adStats.getStat(AD_EXECUTING_BATCH_TASK_COUNT.getName()).increment();
+        adStats.getStat(StatNames.AD_TOTAL_BATCH_TASK_EXECUTION_COUNT.getName()).increment();
+
+        // put AD task into cache
+        adTaskCacheManager.add(adTask);
+
         // start to run first piece
         Instant executeStartTime = Instant.now();
         // TODO: refactor to make the workflow more clear
@@ -813,6 +820,7 @@ public class ADBatchTaskRunner {
     }
 
     private void getDateRangeOfSourceData(ADTask adTask, BiConsumer<Long, Long> consumer, ActionListener internalListener) {
+        String taskId = adTask.getTaskId();
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder()
             .aggregation(AggregationBuilders.min(AGG_NAME_MIN_TIME).field(adTask.getDetector().getTimeField()))
             .aggregation(AggregationBuilders.max(AGG_NAME_MAX_TIME).field(adTask.getDetector().getTimeField()))
@@ -860,6 +868,7 @@ public class ADBatchTaskRunner {
             // normalize start/end time to make it consistent with feature data agg result
             dataStartTime = dataStartTime - dataStartTime % interval;
             dataEndTime = dataEndTime - dataEndTime % interval;
+            logger.debug("adjusted date range: start: {}, end: {}, taskId: {}", dataStartTime, dataEndTime, taskId);
             if ((dataEndTime - dataStartTime) < THRESHOLD_MODEL_TRAINING_SIZE * interval) {
                 internalListener.onFailure(new AnomalyDetectionException("There is no enough data to train model").countedInStats(false));
                 return;

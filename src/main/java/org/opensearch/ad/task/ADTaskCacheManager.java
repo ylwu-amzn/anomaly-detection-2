@@ -51,6 +51,7 @@ import org.opensearch.ad.common.exception.DuplicateTaskException;
 import org.opensearch.ad.common.exception.LimitExceededException;
 import org.opensearch.ad.ml.ThresholdingModel;
 import org.opensearch.ad.model.ADTask;
+import org.opensearch.ad.model.ADTaskType;
 import org.opensearch.ad.model.AnomalyDetector;
 import org.opensearch.ad.model.Entity;
 import org.opensearch.cluster.service.ClusterService;
@@ -107,15 +108,17 @@ public class ADTaskCacheManager {
      */
     public synchronized void add(ADTask adTask) {
         String taskId = adTask.getTaskId();
+        String detectorId = adTask.getDetectorId();
         if (contains(taskId)) {
             throw new DuplicateTaskException(DETECTOR_IS_RUNNING);
         }
-        if (containsTaskOfDetector(adTask.getDetectorId())) {
+        // TODO: handle HC detector
+        if (!adTask.isEntityTask() && containsTaskOfDetector(detectorId)) {
             throw new DuplicateTaskException(DETECTOR_IS_RUNNING);
         }
         checkRunningTaskLimit();
         long neededCacheSize = calculateADTaskCacheSize(adTask);
-        if (!memoryTracker.canAllocateReserved(adTask.getDetectorId(), neededCacheSize)) {
+        if (!memoryTracker.canAllocateReserved(detectorId, neededCacheSize)) {
             throw new LimitExceededException("No enough memory to run detector");
         }
         memoryTracker.consumeMemory(neededCacheSize, true, HISTORICAL_SINGLE_ENTITY_DETECTOR);
@@ -128,15 +131,19 @@ public class ADTaskCacheManager {
      * Put detector id in running detector cache.
      *
      * @param detectorId detector id
-     * @throws LimitExceededException throw limit exceed exception when the detector id already in cache
+     * @param taskType task type
+     * @throws DuplicateTaskException throw DuplicateTaskException when the detector id already in cache
      */
-    public synchronized void add(String detectorId) {
+    public synchronized void add(String detectorId, String taskType) {
         if (detectors.contains(detectorId)) {
             logger.debug("detector is already in running detector cache, detectorId: " + detectorId);
             throw new DuplicateTaskException(DETECTOR_IS_RUNNING);
         }
         logger.debug("add detector in running detector cache, detectorId: " + detectorId);
         this.detectors.add(detectorId);
+        if (ADTaskType.HISTORICAL_HC_DETECTOR.name().equals(taskType)) {
+            this.hcTaskCaches.put(detectorId, new ADHCBatchTaskCache());
+        }
     }
 
     /**
