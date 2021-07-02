@@ -50,6 +50,9 @@ import org.opensearch.transport.TransportService;
 
 import com.google.common.collect.ImmutableMap;
 
+import java.util.Arrays;
+import java.util.List;
+
 public class ForwardADTaskTransportAction extends HandledTransportAction<ForwardADTaskRequest, AnomalyDetectorJobResponse> {
     private final Logger logger = LogManager.getLogger(ForwardADTaskTransportAction.class);
     private final TransportService transportService;
@@ -164,6 +167,23 @@ public class ForwardADTaskTransportAction extends HandledTransportAction<Forward
                 } else {
                     listener.onFailure(new IllegalArgumentException("Only support cancel HC now"));
                 }
+                break;
+            case CLEAN_STALE_RUNNING_ENTITY:
+                // Clean stale running entities of HC detector. For example, some worker node crashed or failed to send
+                // entity task done message to coordinating node, then coordinating node can't remove running entity
+                // from cache.
+                List<String> staleRunningEntities = request.getStaleRunningEntities();
+                logger
+                        .debug(
+                                "4444444444 received CLEAN_RUNNING_ENTITY for task {}, staleRunningEntities: {}",
+                                adTask.getTaskId(),
+                                Arrays.toString(staleRunningEntities.toArray(new String[0]))
+                        );
+                for (String entity : staleRunningEntities) {
+                    // TODO: sleep for some time before run next entity?
+                    adTaskManager.removeStaleRunningEntity(adTask, entity, listener);
+                }
+                listener.onResponse(new AnomalyDetectorJobResponse(adTask.getTaskId(), 0, 0, 0, RestStatus.OK));
                 break;
             default:
                 listener.onFailure(new OpenSearchStatusException("Unsupported AD task action " + adTaskAction, RestStatus.BAD_REQUEST));

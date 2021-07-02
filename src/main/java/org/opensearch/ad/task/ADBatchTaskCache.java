@@ -84,29 +84,29 @@ public class ADBatchTaskCache {
         AnomalyDetector detector = adTask.getDetector();
         boolean isHC = detector.isMultientityDetector();
         int numberOfTrees = isHC ? MULTI_ENTITY_NUM_TREES : NUM_TREES;
-        // use hard coded DEFAULT_MULTI_ENTITY_SHINGLE for historical HC as realtime HC is using this
-        int shingleSize = detector.isMultientityDetector() ? DEFAULT_MULTI_ENTITY_SHINGLE : detector.getShingleSize();
-        this.shingle = new ArrayDeque<>(shingleSize);
+
         rcfModel = RandomCutForest
-            .builder()
-            .dimensions(shingleSize * detector.getEnabledFeatureIds().size())
-            .numberOfTrees(numberOfTrees)
-            .lambda(TIME_DECAY)
-            .sampleSize(NUM_SAMPLES_PER_TREE)
-            .outputAfter(NUM_MIN_SAMPLES)
-            .parallelExecutionEnabled(false)
-            .build();
+                .builder()
+                .dimensions(detector.getShingleSize() * detector.getEnabledFeatureIds().size())
+                .numberOfTrees(numberOfTrees)
+                .lambda(TIME_DECAY)
+                .sampleSize(NUM_SAMPLES_PER_TREE)
+                .outputAfter(NUM_MIN_SAMPLES)
+                .parallelExecutionEnabled(false)
+                .build();
 
         this.thresholdModel = new HybridThresholdingModel(
-            AnomalyDetectorSettings.THRESHOLD_MIN_PVALUE,
-            AnomalyDetectorSettings.THRESHOLD_MAX_RANK_ERROR,
-            AnomalyDetectorSettings.THRESHOLD_MAX_SCORE,
-            AnomalyDetectorSettings.THRESHOLD_NUM_LOGNORMAL_QUANTILES,
-            AnomalyDetectorSettings.THRESHOLD_DOWNSAMPLES,
-            AnomalyDetectorSettings.THRESHOLD_MAX_SAMPLES
+                AnomalyDetectorSettings.THRESHOLD_MIN_PVALUE,
+                AnomalyDetectorSettings.THRESHOLD_MAX_RANK_ERROR,
+                AnomalyDetectorSettings.THRESHOLD_MAX_SCORE,
+                AnomalyDetectorSettings.THRESHOLD_NUM_LOGNORMAL_QUANTILES,
+                AnomalyDetectorSettings.THRESHOLD_DOWNSAMPLES,
+                AnomalyDetectorSettings.THRESHOLD_MAX_SAMPLES
         );
         this.thresholdModelTrainingData = new double[THRESHOLD_MODEL_TRAINING_SIZE];
         this.thresholdModelTrained = false;
+        // TODO: realtime HC shingle size is hard code 1
+        this.shingle = new ArrayDeque<>(detector.getShingleSize());
     }
 
     protected String getDetectorId() {

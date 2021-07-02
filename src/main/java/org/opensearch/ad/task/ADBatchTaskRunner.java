@@ -104,6 +104,7 @@ import org.opensearch.client.Client;
 import org.opensearch.cluster.node.DiscoveryNode;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.settings.Settings;
+import org.opensearch.common.unit.TimeValue;
 import org.opensearch.index.query.BoolQueryBuilder;
 import org.opensearch.index.query.RangeQueryBuilder;
 import org.opensearch.index.query.TermQueryBuilder;
@@ -122,12 +123,9 @@ import com.amazon.randomcutforest.RandomCutForest;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.util.concurrent.RateLimiter;
 
 public class ADBatchTaskRunner {
     private final Logger logger = LogManager.getLogger(ADBatchTaskRunner.class);
-
-    private final RateLimiter rateLimiter = RateLimiter.create(1);
 
     private final ThreadPool threadPool;
     private final Client client;
@@ -798,7 +796,7 @@ public class ADBatchTaskRunner {
                                 long expectedPieceEndTime = dataStartTime + pieceSize * interval;
                                 long firstPieceEndTime = Math.min(expectedPieceEndTime, dataEndTime);
                                 logger
-                                    .debug(
+                                    .info(
                                         "start first piece from {} to {}, interval {}, dataStartTime {}, dataEndTime {},"
                                             + " detectorId {}, taskId {}",
                                         dataStartTime,
@@ -1059,56 +1057,50 @@ public class ADBatchTaskRunner {
         logger.debug("Init progress: {}, taskState:{}, task id: {}", initProgress, taskState, taskId);
 
         if (pieceStartTime < dataEndTime) {
-            checkClusterState(adTask);
-            long expectedPieceEndTime = pieceStartTime + pieceSize * interval;
-            long pieceEndTime = expectedPieceEndTime > dataEndTime ? dataEndTime : expectedPieceEndTime;
-            int i = 0;
-            while (i < pieceIntervalSeconds) {
-                // check if task cancelled every second, so frontend can get STOPPED state
-                // in 1 second once task cancelled.
-                checkIfADTaskCancelled(taskId);
-                adTaskCacheManager.getRateLimiter(adTask.getDetectorId(), adTask.getTaskId()).acquire(1);
-                i++;
-            }
-            logger
-                .debug(
-                    "task id: {}, start next piece start from {} to {}, interval {}",
-                    adTask.getTaskId(),
-                    pieceStartTime,
-                    pieceEndTime,
-                    interval
-                );
-            float taskProgress = (float) (pieceStartTime - dataStartTime) / (dataEndTime - dataStartTime);
-            logger.debug("Task progress: {}, task id:{}, detector id:{}", taskProgress, taskId, adTask.getDetectorId());
-            adTaskManager
-                .updateADTask(
-                    taskId,
-                    ImmutableMap
-                        .of(
-                            STATE_FIELD,
-                            taskState,
-                            CURRENT_PIECE_FIELD,
-                            pieceStartTime,
-                            TASK_PROGRESS_FIELD,
-                            taskProgress,
-                            INIT_PROGRESS_FIELD,
-                            initProgress
-                        ),
-                    ActionListener
-                        .wrap(
-                            r -> getFeatureData(
-                                adTask,
+            threadPool.schedule(() -> {
+                checkClusterState(adTask);
+                long expectedPieceEndTime = pieceStartTime + pieceSize * interval;
+                long pieceEndTime = expectedPieceEndTime > dataEndTime ? dataEndTime : expectedPieceEndTime;
+                logger
+                    .info(
+                        "task id: {}, start next piece start from {} to {}, interval {}",
+                        adTask.getTaskId(),
+                        pieceStartTime,
+                        pieceEndTime,
+                        interval
+                    );
+                float taskProgress = (float) (pieceStartTime - dataStartTime) / (dataEndTime - dataStartTime);
+                logger.debug("Task progress: {}, task id:{}, detector id:{}", taskProgress, taskId, adTask.getDetectorId());
+                adTaskManager
+                    .updateADTask(
+                        taskId,
+                        ImmutableMap
+                            .of(
+                                STATE_FIELD,
+                                taskState,
+                                CURRENT_PIECE_FIELD,
                                 pieceStartTime,
-                                pieceEndTime,
-                                dataStartTime,
-                                dataEndTime,
-                                interval,
-                                Instant.now(),
-                                internalListener
+                                TASK_PROGRESS_FIELD,
+                                taskProgress,
+                                INIT_PROGRESS_FIELD,
+                                initProgress
                             ),
-                            e -> internalListener.onFailure(e)
-                        )
-                );
+                        ActionListener
+                            .wrap(
+                                r -> getFeatureData(
+                                    adTask,
+                                    pieceStartTime,
+                                    pieceEndTime,
+                                    dataStartTime,
+                                    dataEndTime,
+                                    interval,
+                                    Instant.now(),
+                                    internalListener
+                                ),
+                                e -> internalListener.onFailure(e)
+                            )
+                    );
+            }, TimeValue.timeValueSeconds(pieceIntervalSeconds), AD_BATCH_TASK_THREAD_POOL_NAME);
         } else {
             logger.info("AD task finished for detector {}, task id: {}", adTask.getDetectorId(), taskId);
             adTaskCacheManager.remove(taskId);
