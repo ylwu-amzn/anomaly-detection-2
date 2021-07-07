@@ -29,8 +29,6 @@ package org.opensearch.ad.transport;
 import java.io.IOException;
 import java.util.List;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.opensearch.action.FailedNodeException;
 import org.opensearch.action.support.ActionFilters;
 import org.opensearch.action.support.nodes.TransportNodesAction;
@@ -43,37 +41,37 @@ import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.TransportService;
 
 public class ADTaskProfileTransportAction extends
-        TransportNodesAction<ADTaskProfileRequest, ADTaskProfileResponse, ADTaskProfileNodeRequest, ADTaskProfileNodeResponse> {
-    private final Logger logger = LogManager.getLogger(ADTaskProfileTransportAction.class);
+    TransportNodesAction<ADTaskProfileRequest, ADTaskProfileResponse, ADTaskProfileNodeRequest, ADTaskProfileNodeResponse> {
+
     private ADTaskManager adTaskManager;
 
     @Inject
     public ADTaskProfileTransportAction(
-            ThreadPool threadPool,
-            ClusterService clusterService,
-            TransportService transportService,
-            ActionFilters actionFilters,
-            ADTaskManager adTaskManager
+        ThreadPool threadPool,
+        ClusterService clusterService,
+        TransportService transportService,
+        ActionFilters actionFilters,
+        ADTaskManager adTaskManager
     ) {
         super(
-                ADTaskProfileAction.NAME,
-                threadPool,
-                clusterService,
-                transportService,
-                actionFilters,
-                ADTaskProfileRequest::new,
-                ADTaskProfileNodeRequest::new,
-                ThreadPool.Names.MANAGEMENT,
-                ADTaskProfileNodeResponse.class
+            ADTaskProfileAction.NAME,
+            threadPool,
+            clusterService,
+            transportService,
+            actionFilters,
+            ADTaskProfileRequest::new,
+            ADTaskProfileNodeRequest::new,
+            ThreadPool.Names.MANAGEMENT,
+            ADTaskProfileNodeResponse.class
         );
         this.adTaskManager = adTaskManager;
     }
 
     @Override
     protected ADTaskProfileResponse newResponse(
-            ADTaskProfileRequest request,
-            List<ADTaskProfileNodeResponse> responses,
-            List<FailedNodeException> failures
+        ADTaskProfileRequest request,
+        List<ADTaskProfileNodeResponse> responses,
+        List<FailedNodeException> failures
     ) {
         return new ADTaskProfileResponse(clusterService.getClusterName(), responses, failures);
     }

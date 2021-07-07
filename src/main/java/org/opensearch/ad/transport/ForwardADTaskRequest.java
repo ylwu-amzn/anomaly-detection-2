@@ -61,7 +61,7 @@ public class ForwardADTaskRequest extends ActionRequest {
         this(adTask, adTaskAction, null);
     }
 
-    public ForwardADTaskRequest(ADTask adTask, ADTaskAction adTaskAction, List<String> staleRunningEntity) {
+    public ForwardADTaskRequest(ADTask adTask, ADTaskAction adTaskAction, List<String> staleRunningEntities) {
         this.adTask = adTask;
         this.adTaskAction = adTaskAction;
         if (adTask != null) {
@@ -124,7 +124,7 @@ public class ForwardADTaskRequest extends ActionRequest {
         if (adTaskAction == null) {
             validationException = addValidationError(CommonErrorMessages.AD_TASK_ACTION_MISSING, validationException);
         }
-        if (adTaskAction == ADTaskAction.CLEAN_STALE_RUNNING_ENTITY && (staleRunningEntities == null || staleRunningEntities.isEmpty())) {
+        if (adTaskAction == ADTaskAction.CLEAN_STALE_RUNNING_ENTITIES && (staleRunningEntities == null || staleRunningEntities.isEmpty())) {
             validationException = addValidationError(CommonErrorMessages.EMPTY_STALE_RUNNING_ENTITIES, validationException);
         }
         return validationException;

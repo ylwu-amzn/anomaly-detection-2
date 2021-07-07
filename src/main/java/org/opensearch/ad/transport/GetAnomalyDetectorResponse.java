@@ -99,20 +99,20 @@ public class GetAnomalyDetectorResponse extends ActionResponse implements ToXCon
     }
 
     public GetAnomalyDetectorResponse(
-            long version,
-            String id,
-            long primaryTerm,
-            long seqNo,
-            AnomalyDetector detector,
-            AnomalyDetectorJob adJob,
-            boolean returnJob,
-            ADTask realtimeAdTask,
-            ADTask historicalAdTask,
-            boolean returnTask,
-            RestStatus restStatus,
-            DetectorProfile detectorProfile,
-            EntityProfile entityProfile,
-            boolean profileResponse
+        long version,
+        String id,
+        long primaryTerm,
+        long seqNo,
+        AnomalyDetector detector,
+        AnomalyDetectorJob adJob,
+        boolean returnJob,
+        ADTask realtimeAdTask,
+        ADTask historicalAdTask,
+        boolean returnTask,
+        RestStatus restStatus,
+        DetectorProfile detectorProfile,
+        EntityProfile entityProfile,
+        boolean profileResponse
     ) {
         this.version = version;
         this.id = id;

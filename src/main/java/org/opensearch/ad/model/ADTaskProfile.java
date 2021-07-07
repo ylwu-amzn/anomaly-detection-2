@@ -75,79 +75,79 @@ public class ADTaskProfile implements ToXContentObject, Writeable, Writeable.Wri
     private String adTaskType;
     private Integer totalEntitiesCount;
     private Integer pendingEntitiesCount;
-    private Integer runningEntitiesCount; // TODO: running entities may be not equals to task in cache
+    private Integer runningEntitiesCount;
     private String[] runningEntities;
 
     public ADTaskProfile(
-            Integer shingleSize,
-            Long rcfTotalUpdates,
-            Boolean thresholdModelTrained,
-            Integer thresholdModelTrainingDataSize,
-            Long modelSizeInBytes,
-            String nodeId
+        Integer shingleSize,
+        Long rcfTotalUpdates,
+        Boolean thresholdModelTrained,
+        Integer thresholdModelTrainingDataSize,
+        Long modelSizeInBytes,
+        String nodeId
     ) {
         this(null, shingleSize, rcfTotalUpdates, thresholdModelTrained, thresholdModelTrainingDataSize, modelSizeInBytes, nodeId);
     }
 
     public ADTaskProfile(
-            String nodeId,
-            Integer totalEntitiesCount,
-            Integer pendingEntitiesCount,
-            Integer runningEntitiesCount,
-            String[] runningEntities
+        String nodeId,
+        Integer totalEntitiesCount,
+        Integer pendingEntitiesCount,
+        Integer runningEntitiesCount,
+        String[] runningEntities
     ) {
         this(
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                nodeId,
-                null,
-                null,
-                totalEntitiesCount,
-                pendingEntitiesCount,
-                runningEntitiesCount,
-                runningEntities
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            nodeId,
+            null,
+            null,
+            totalEntitiesCount,
+            pendingEntitiesCount,
+            runningEntitiesCount,
+            runningEntities
         );
     }
 
     public ADTaskProfile(
-            Integer shingleSize,
-            Long rcfTotalUpdates,
-            Boolean thresholdModelTrained,
-            Integer thresholdModelTrainingDataSize,
-            Long modelSizeInBytes,
-            String nodeId,
-            List<Entity> entity,
-            String taskId
+        Integer shingleSize,
+        Long rcfTotalUpdates,
+        Boolean thresholdModelTrained,
+        Integer thresholdModelTrainingDataSize,
+        Long modelSizeInBytes,
+        String nodeId,
+        List<Entity> entity,
+        String taskId
     ) {
         this(
-                null,
-                shingleSize,
-                rcfTotalUpdates,
-                thresholdModelTrained,
-                thresholdModelTrainingDataSize,
-                modelSizeInBytes,
-                nodeId,
-                entity,
-                taskId,
-                null,
-                null,
-                null,
-                null
+            null,
+            shingleSize,
+            rcfTotalUpdates,
+            thresholdModelTrained,
+            thresholdModelTrainingDataSize,
+            modelSizeInBytes,
+            nodeId,
+            entity,
+            taskId,
+            null,
+            null,
+            null,
+            null
         );
     }
 
     public ADTaskProfile(
-            ADTask adTask,
-            Integer shingleSize,
-            Long rcfTotalUpdates,
-            Boolean thresholdModelTrained,
-            Integer thresholdModelTrainingDataSize,
-            Long modelSizeInBytes,
-            String nodeId
+        ADTask adTask,
+        Integer shingleSize,
+        Long rcfTotalUpdates,
+        Boolean thresholdModelTrained,
+        Integer thresholdModelTrainingDataSize,
+        Long modelSizeInBytes,
+        String nodeId
     ) {
         this.adTask = adTask;
         this.shingleSize = shingleSize;
@@ -159,19 +159,19 @@ public class ADTaskProfile implements ToXContentObject, Writeable, Writeable.Wri
     }
 
     public ADTaskProfile(
-            ADTask adTask,
-            Integer shingleSize,
-            Long rcfTotalUpdates,
-            Boolean thresholdModelTrained,
-            Integer thresholdModelTrainingDataSize,
-            Long modelSizeInBytes,
-            String nodeId,
-            List<Entity> entity,
-            String taskId,
-            Integer totalEntitiesCount,
-            Integer pendingEntitiesCount,
-            Integer runningEntitiesCount,
-            String[] runningEntities
+        ADTask adTask,
+        Integer shingleSize,
+        Long rcfTotalUpdates,
+        Boolean thresholdModelTrained,
+        Integer thresholdModelTrainingDataSize,
+        Long modelSizeInBytes,
+        String nodeId,
+        List<Entity> entity,
+        String taskId,
+        Integer totalEntitiesCount,
+        Integer pendingEntitiesCount,
+        Integer runningEntitiesCount,
+        String[] runningEntities
     ) {
         this.adTask = adTask;
         this.shingleSize = shingleSize;
@@ -191,9 +191,6 @@ public class ADTaskProfile implements ToXContentObject, Writeable, Writeable.Wri
         } else if (this.pendingEntitiesCount != null || runningEntities != null) {
             setAdTaskType(ADTaskType.HISTORICAL_HC_DETECTOR.name());
         }
-        // if(adTask != null) {
-        // setAdTaskType(adTask.getTaskType());
-        // }
     }
 
     public String getAdTaskType() {
@@ -309,7 +306,6 @@ public class ADTaskProfile implements ToXContentObject, Writeable, Writeable.Wri
         String nodeId = null;
         List<Entity> entity = null;
         String taskId = null;
-        String adTaskType = null;
         Integer totalEntitiesCount = null;
         Integer pendingEntitiesCount = null;
         Integer runningEntitiesCount = null;
@@ -352,9 +348,6 @@ public class ADTaskProfile implements ToXContentObject, Writeable, Writeable.Wri
                 case TASK_ID_FIELD:
                     taskId = parser.text();
                     break;
-                case AD_TASK_TYPE_FIELD:
-                    adTaskType = parser.text();
-                    break;
                 case TOTAL_ENTITIES_COUNT_FIELD:
                     totalEntitiesCount = parser.intValue();
                     break;
@@ -377,19 +370,19 @@ public class ADTaskProfile implements ToXContentObject, Writeable, Writeable.Wri
             }
         }
         return new ADTaskProfile(
-                adTask,
-                shingleSize,
-                rcfTotalUpdates,
-                thresholdModelTrained,
-                thresholdNodelTrainingDataSize,
-                modelSizeInBytes,
-                nodeId,
-                entity,
-                taskId,
-                totalEntitiesCount,
-                pendingEntitiesCount,
-                runningEntitiesCount,
-                runningEntities == null ? null : runningEntities.toArray(new String[0])
+            adTask,
+            shingleSize,
+            rcfTotalUpdates,
+            thresholdModelTrained,
+            thresholdNodelTrainingDataSize,
+            modelSizeInBytes,
+            nodeId,
+            entity,
+            taskId,
+            totalEntitiesCount,
+            pendingEntitiesCount,
+            runningEntitiesCount,
+            runningEntities == null ? null : runningEntities.toArray(new String[0])
         );
     }
 
@@ -402,27 +395,27 @@ public class ADTaskProfile implements ToXContentObject, Writeable, Writeable.Wri
             return false;
         ADTaskProfile that = (ADTaskProfile) o;
         return Objects.equal(getAdTask(), that.getAdTask())
-                && Objects.equal(getShingleSize(), that.getShingleSize())
-                && Objects.equal(getRcfTotalUpdates(), that.getRcfTotalUpdates())
-                && Objects.equal(getThresholdModelTrained(), that.getThresholdModelTrained())
-                && Objects.equal(getModelSizeInBytes(), that.getModelSizeInBytes())
-                && Objects.equal(getNodeId(), that.getNodeId())
-                && Objects.equal(getThresholdModelTrainingDataSize(), that.getThresholdModelTrainingDataSize());
+            && Objects.equal(getShingleSize(), that.getShingleSize())
+            && Objects.equal(getRcfTotalUpdates(), that.getRcfTotalUpdates())
+            && Objects.equal(getThresholdModelTrained(), that.getThresholdModelTrained())
+            && Objects.equal(getModelSizeInBytes(), that.getModelSizeInBytes())
+            && Objects.equal(getNodeId(), that.getNodeId())
+            && Objects.equal(getThresholdModelTrainingDataSize(), that.getThresholdModelTrainingDataSize());
     }
 
     @Generated
     @Override
     public int hashCode() {
         return Objects
-                .hashCode(
-                        adTask,
-                        shingleSize,
-                        rcfTotalUpdates,
-                        thresholdModelTrained,
-                        thresholdModelTrainingDataSize,
-                        modelSizeInBytes,
-                        nodeId
-                );
+            .hashCode(
+                adTask,
+                shingleSize,
+                rcfTotalUpdates,
+                thresholdModelTrained,
+                thresholdModelTrainingDataSize,
+                modelSizeInBytes,
+                nodeId
+            );
     }
 
     public ADTask getAdTask() {
@@ -516,38 +509,38 @@ public class ADTaskProfile implements ToXContentObject, Writeable, Writeable.Wri
     @Override
     public String toString() {
         return "ADTaskProfile{"
-                + "adTask="
-                + adTask
-                + ", shingleSize="
-                + shingleSize
-                + ", rcfTotalUpdates="
-                + rcfTotalUpdates
-                + ", thresholdModelTrained="
-                + thresholdModelTrained
-                + ", thresholdModelTrainingDataSize="
-                + thresholdModelTrainingDataSize
-                + ", modelSizeInBytes="
-                + modelSizeInBytes
-                + ", nodeId='"
-                + nodeId
-                + '\''
-                + ", entity="
-                + entity
-                + ", taskId='"
-                + taskId
-                + '\''
-                + ", adTaskType='"
-                + adTaskType
-                + '\''
-                + ", totalEntitiesCount="
-                + totalEntitiesCount
-                + ", pendingEntitiesCount="
-                + pendingEntitiesCount
-                + ", runningEntitiesCount="
-                + runningEntitiesCount
-                + ", runningEntities="
-                + Arrays.toString(runningEntities)
-                + '}';
+            + "adTask="
+            + adTask
+            + ", shingleSize="
+            + shingleSize
+            + ", rcfTotalUpdates="
+            + rcfTotalUpdates
+            + ", thresholdModelTrained="
+            + thresholdModelTrained
+            + ", thresholdModelTrainingDataSize="
+            + thresholdModelTrainingDataSize
+            + ", modelSizeInBytes="
+            + modelSizeInBytes
+            + ", nodeId='"
+            + nodeId
+            + '\''
+            + ", entity="
+            + entity
+            + ", taskId='"
+            + taskId
+            + '\''
+            + ", adTaskType='"
+            + adTaskType
+            + '\''
+            + ", totalEntitiesCount="
+            + totalEntitiesCount
+            + ", pendingEntitiesCount="
+            + pendingEntitiesCount
+            + ", runningEntitiesCount="
+            + runningEntitiesCount
+            + ", runningEntities="
+            + Arrays.toString(runningEntities)
+            + '}';
     }
 
     @Override
@@ -562,4 +555,3 @@ public class ADTaskProfile implements ToXContentObject, Writeable, Writeable.Wri
         }
     }
 }
-

@@ -397,17 +397,17 @@ public class DetectorProfile implements Writeable, ToXContentObject, Mergeable {
     @Override
     public int hashCode() {
         return new HashCodeBuilder()
-                .append(state)
-                .append(error)
-                .append(modelProfile)
-                .append(shingleSize)
-                .append(coordinatingNode)
-                .append(totalSizeInBytes)
-                .append(initProgress)
-                .append(totalEntities)
-                .append(activeEntities)
-                .append(adTaskProfiles)
-                .toHashCode();
+            .append(state)
+            .append(error)
+            .append(modelProfile)
+            .append(shingleSize)
+            .append(coordinatingNode)
+            .append(totalSizeInBytes)
+            .append(initProgress)
+            .append(totalEntities)
+            .append(activeEntities)
+            .append(adTaskProfiles)
+            .toHashCode();
     }
 
     @Override

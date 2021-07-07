@@ -30,6 +30,9 @@ import static org.opensearch.ad.model.ADTask.ERROR_FIELD;
 import static org.opensearch.ad.model.ADTask.STATE_FIELD;
 import static org.opensearch.ad.model.ADTask.TASK_PROGRESS_FIELD;
 
+import java.util.Arrays;
+import java.util.List;
+
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.opensearch.OpenSearchStatusException;
@@ -49,9 +52,6 @@ import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
 
 import com.google.common.collect.ImmutableMap;
-
-import java.util.Arrays;
-import java.util.List;
 
 public class ForwardADTaskTransportAction extends HandledTransportAction<ForwardADTaskRequest, AnomalyDetectorJobResponse> {
     private final Logger logger = LogManager.getLogger(ForwardADTaskTransportAction.class);
@@ -168,19 +168,19 @@ public class ForwardADTaskTransportAction extends HandledTransportAction<Forward
                     listener.onFailure(new IllegalArgumentException("Only support cancel HC now"));
                 }
                 break;
-            case CLEAN_STALE_RUNNING_ENTITY:
+            case CLEAN_STALE_RUNNING_ENTITIES:
                 // Clean stale running entities of HC detector. For example, some worker node crashed or failed to send
                 // entity task done message to coordinating node, then coordinating node can't remove running entity
-                // from cache.
+                // from cache. We will check task profile when get task. If some entities exist in coordinating cache but
+                // doesn't exist in worker node's cache, we will clean up these stale running entities on coordinating node.
                 List<String> staleRunningEntities = request.getStaleRunningEntities();
                 logger
-                        .debug(
-                                "4444444444 received CLEAN_RUNNING_ENTITY for task {}, staleRunningEntities: {}",
-                                adTask.getTaskId(),
-                                Arrays.toString(staleRunningEntities.toArray(new String[0]))
-                        );
+                    .debug(
+                        "Clean stale running entities of task {}, staleRunningEntities: {}",
+                        adTask.getTaskId(),
+                        Arrays.toString(staleRunningEntities.toArray(new String[0]))
+                    );
                 for (String entity : staleRunningEntities) {
-                    // TODO: sleep for some time before run next entity?
                     adTaskManager.removeStaleRunningEntity(adTask, entity, listener);
                 }
                 listener.onResponse(new AnomalyDetectorJobResponse(adTask.getTaskId(), 0, 0, 0, RestStatus.OK));

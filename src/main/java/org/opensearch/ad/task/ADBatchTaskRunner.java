@@ -380,14 +380,14 @@ public class ADBatchTaskRunner {
                 // remove HC detector level task from cache
                 adTaskCacheManager.remove(adTask.getTaskId());
                 List<String> topNEntities = priorityTracker.getTopNEntities(maxTopEntitiesPerHcDetector);
-                adTaskCacheManager.addPendingEntities(adTask.getDetectorId(), topNEntities);
-                adTaskCacheManager.setTopEntityCount(adTask.getDetectorId(), topNEntities.size());
-                if (adTaskCacheManager.getPendingEntityCount(adTask.getDetectorId()) == 0) {
+                if (topNEntities.size() == 0) {
                     logger.error("There is no entity found for detector " + adTask.getDetectorId());
                     internalHCListener.onFailure(new ResourceNotFoundException(adTask.getDetectorId(), "No entity found"));
-                } else {
-                    internalHCListener.onResponse("Get top entities done");
+                    return;
                 }
+                adTaskCacheManager.addPendingEntities(adTask.getDetectorId(), topNEntities);
+                adTaskCacheManager.setTopEntityCount(adTask.getDetectorId(), topNEntities.size());
+                internalHCListener.onResponse("Get top entities done");
             }
         }, e -> {
             logger.error("Failed to get top entities for detector " + adTask.getDetectorId(), e);
@@ -796,7 +796,7 @@ public class ADBatchTaskRunner {
                                 long expectedPieceEndTime = dataStartTime + pieceSize * interval;
                                 long firstPieceEndTime = Math.min(expectedPieceEndTime, dataEndTime);
                                 logger
-                                    .info(
+                                    .debug(
                                         "start first piece from {} to {}, interval {}, dataStartTime {}, dataEndTime {},"
                                             + " detectorId {}, taskId {}",
                                         dataStartTime,
@@ -1057,12 +1057,13 @@ public class ADBatchTaskRunner {
         logger.debug("Init progress: {}, taskState:{}, task id: {}", initProgress, taskState, taskId);
 
         if (pieceStartTime < dataEndTime) {
+            checkIfADTaskCancelled(adTask.getTaskId());
             threadPool.schedule(() -> {
                 checkClusterState(adTask);
                 long expectedPieceEndTime = pieceStartTime + pieceSize * interval;
                 long pieceEndTime = expectedPieceEndTime > dataEndTime ? dataEndTime : expectedPieceEndTime;
                 logger
-                    .info(
+                    .debug(
                         "task id: {}, start next piece start from {} to {}, interval {}",
                         adTask.getTaskId(),
                         pieceStartTime,
@@ -1137,6 +1138,7 @@ public class ADBatchTaskRunner {
 
     private void checkIfADTaskCancelled(String taskId) {
         if (adTaskCacheManager.contains(taskId) && adTaskCacheManager.isCancelled(taskId)) {
+            logger.debug("AD task cancelled, stop running task {}", taskId);
             throw new ADTaskCancelledException(adTaskCacheManager.getCancelReason(taskId), adTaskCacheManager.getCancelledBy(taskId));
         }
     }

@@ -44,10 +44,10 @@ public enum ADTaskType {
     public static List<ADTaskType> REALTIME_TASK_TYPES = ImmutableList
         .of(ADTaskType.REALTIME_SINGLE_ENTITY, ADTaskType.REALTIME_HC_DETECTOR);
     public static List<ADTaskType> ALL_DETECTOR_TASK_TYPES = ImmutableList
-            .of(
-                    ADTaskType.REALTIME_SINGLE_ENTITY,
-                    ADTaskType.REALTIME_HC_DETECTOR,
-                    ADTaskType.HISTORICAL_SINGLE_ENTITY,
-                    ADTaskType.HISTORICAL_HC_DETECTOR
-            );
+        .of(
+            ADTaskType.REALTIME_SINGLE_ENTITY,
+            ADTaskType.REALTIME_HC_DETECTOR,
+            ADTaskType.HISTORICAL_SINGLE_ENTITY,
+            ADTaskType.HISTORICAL_HC_DETECTOR
+        );
 }
