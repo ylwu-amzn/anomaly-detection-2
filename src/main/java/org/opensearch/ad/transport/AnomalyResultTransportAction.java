@@ -27,9 +27,11 @@
 package org.opensearch.ad.transport;
 
 import static org.opensearch.ad.constant.CommonErrorMessages.INVALID_SEARCH_QUERY_MSG;
+import static org.opensearch.ad.util.ExceptionUtil.getErrorMessage;
 
 import java.net.ConnectException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -37,6 +39,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
@@ -56,7 +59,6 @@ import org.opensearch.action.support.ActionFilters;
 import org.opensearch.action.support.HandledTransportAction;
 import org.opensearch.action.support.IndicesOptions;
 import org.opensearch.action.support.ThreadedActionListener;
-import org.opensearch.action.support.master.AcknowledgedResponse;
 import org.opensearch.ad.AnomalyDetectorPlugin;
 import org.opensearch.ad.NodeStateManager;
 import org.opensearch.ad.breaker.ADCircuitBreakerService;
@@ -76,6 +78,9 @@ import org.opensearch.ad.ml.ModelManager;
 import org.opensearch.ad.ml.ModelPartitioner;
 import org.opensearch.ad.ml.RcfResult;
 import org.opensearch.ad.ml.rcf.CombinedRcfResult;
+import org.opensearch.ad.model.ADTask;
+import org.opensearch.ad.model.ADTaskState;
+import org.opensearch.ad.model.ADTaskType;
 import org.opensearch.ad.model.AnomalyDetector;
 import org.opensearch.ad.model.FeatureData;
 import org.opensearch.ad.model.IntervalTimeConfiguration;
@@ -83,6 +88,7 @@ import org.opensearch.ad.settings.AnomalyDetectorSettings;
 import org.opensearch.ad.settings.EnabledSetting;
 import org.opensearch.ad.stats.ADStats;
 import org.opensearch.ad.stats.StatNames;
+import org.opensearch.ad.task.ADTaskManager;
 import org.opensearch.ad.util.ExceptionUtil;
 import org.opensearch.ad.util.ParseUtils;
 import org.opensearch.client.Client;
@@ -107,6 +113,8 @@ import org.opensearch.transport.NodeNotConnectedException;
 import org.opensearch.transport.ReceiveTimeoutTransportException;
 import org.opensearch.transport.TransportRequestOptions;
 import org.opensearch.transport.TransportService;
+
+import com.google.common.collect.ImmutableMap;
 
 public class AnomalyResultTransportAction extends HandledTransportAction<ActionRequest, AnomalyResultResponse> {
 
@@ -140,6 +148,7 @@ public class AnomalyResultTransportAction extends HandledTransportAction<ActionR
     private final ThreadPool threadPool;
     private final Client client;
     private final SearchFeatureDao searchFeatureDao;
+    private final ADTaskManager adTaskManager;
 
     // cache HC detector id
     private final Set<String> hcDetectors;
@@ -160,7 +169,8 @@ public class AnomalyResultTransportAction extends HandledTransportAction<ActionR
         ADCircuitBreakerService adCircuitBreakerService,
         ADStats adStats,
         ThreadPool threadPool,
-        SearchFeatureDao searchFeatureDao
+        SearchFeatureDao searchFeatureDao,
+        ADTaskManager adTaskManager
     ) {
         super(AnomalyResultAction.NAME, transportService, actionFilters, AnomalyResultRequest::new);
         this.transportService = transportService;
@@ -182,6 +192,7 @@ public class AnomalyResultTransportAction extends HandledTransportAction<ActionR
         this.threadPool = threadPool;
         this.searchFeatureDao = searchFeatureDao;
         this.hcDetectors = new HashSet<>();
+        this.adTaskManager = adTaskManager;
     }
 
     /**
@@ -350,6 +361,7 @@ public class AnomalyResultTransportAction extends HandledTransportAction<ActionR
                         AtomicInteger responseCount = new AtomicInteger();
 
                         final AtomicReference<AnomalyDetectionException> failure = new AtomicReference<>();
+                        final ConcurrentLinkedQueue entityResultResponses = new ConcurrentLinkedQueue();
                         node2Entities.stream().forEach(nodeEntity -> {
                             DiscoveryNode node = nodeEntity.getKey();
                             transportService
@@ -359,8 +371,17 @@ public class AnomalyResultTransportAction extends HandledTransportAction<ActionR
                                     new EntityResultRequest(adID, nodeEntity.getValue(), dataStartTime, dataEndTime),
                                     this.option,
                                     new ActionListenerResponseHandler<>(
-                                        new EntityResultListener(node.getId(), adID, responseCount, nodeCount, failure, listener),
-                                        AcknowledgedResponse::new,
+                                        // TODO: when will return response to listener
+                                        new EntityResultListener(
+                                            node.getId(),
+                                            adID,
+                                            responseCount,
+                                            nodeCount,
+                                            failure,
+                                            entityResultResponses,
+                                            listener
+                                        ),
+                                        EntityResultResponse::new,
                                         ThreadPool.Names.SAME
                                     )
                                 );
@@ -736,6 +757,25 @@ public class AnomalyResultTransportAction extends HandledTransportAction<ActionR
                     listener.onFailure(new InternalFailure(adID, NO_MODEL_ERR_MSG));
                     return;
                 }
+                try {
+                    long totalUpdates = rcfResults.get(0).getTotalUpdates();
+                    String state = ADTaskState.INIT.name();
+                    float initProgress;
+                    if (totalUpdates <= AnomalyDetectorSettings.NUM_MIN_SAMPLES) {
+                        initProgress = (float) totalUpdates / AnomalyDetectorSettings.NUM_MIN_SAMPLES;
+                    } else {
+                        state = ADTaskState.RUNNING.name();
+                        initProgress = 1.0f;
+                    }
+                    adTaskManager
+                        .updateLatestADTask(
+                            detector.getDetectorId(),
+                            ADTaskType.REALTIME_TASK_TYPES,
+                            ImmutableMap.of(ADTask.INIT_PROGRESS_FIELD, initProgress, ADTask.STATE_FIELD, state)
+                        );
+                } catch (Exception e) {
+                    LOG.warn("Failed to update init progress of detector " + detector.getDetectorId(), e);
+                }
 
                 CombinedRcfResult combinedResult = getCombinedResult(rcfResults, numFeatures);
                 double combinedScore = combinedResult.getScore();
@@ -1078,13 +1118,13 @@ public class AnomalyResultTransportAction extends HandledTransportAction<ActionR
         return previousException;
     }
 
-    class EntityResultListener implements ActionListener<AcknowledgedResponse> {
+    class EntityResultListener implements ActionListener<EntityResultResponse> {
         private String nodeId;
         private final String adID;
         private AtomicInteger responseCount;
         private int nodeCount;
         private ActionListener<AnomalyResultResponse> listener;
-        private List<AcknowledgedResponse> ackResponses;
+        private ConcurrentLinkedQueue<EntityResultResponse> entityResultResponses;
         private AtomicReference<AnomalyDetectionException> failure;
 
         EntityResultListener(
@@ -1093,6 +1133,7 @@ public class AnomalyResultTransportAction extends HandledTransportAction<ActionR
             AtomicInteger responseCount,
             int nodeCount,
             AtomicReference<AnomalyDetectionException> failure,
+            ConcurrentLinkedQueue<EntityResultResponse> entityResultResponses,
             ActionListener<AnomalyResultResponse> listener
         ) {
             this.nodeId = nodeId;
@@ -1101,19 +1142,20 @@ public class AnomalyResultTransportAction extends HandledTransportAction<ActionR
             this.nodeCount = nodeCount;
             this.failure = failure;
             this.listener = listener;
-            this.ackResponses = new ArrayList<>();
+            this.entityResultResponses = entityResultResponses;
         }
 
         @Override
-        public void onResponse(AcknowledgedResponse response) {
+        public void onResponse(EntityResultResponse response) {
             try {
                 stateManager.resetBackpressureCounter(nodeId);
-                if (response.isAcknowledged() == false) {
-                    LOG.error("Cannot send entities' features to {} for {}", nodeId, adID);
-                    stateManager.addPressure(nodeId);
-                } else {
-                    ackResponses.add(response);
-                }
+                // if (response.isAcknowledged() == false) {
+                // LOG.error("Cannot send entities' features to {} for {}", nodeId, adID);
+                // stateManager.addPressure(nodeId);
+                // } else {
+                // ackResponses.add(response);
+                // }
+                entityResultResponses.add(response);
             } catch (Exception ex) {
                 LOG.error("Unexpected exception: {} for {}", ex, adID);
             } finally {
@@ -1145,11 +1187,28 @@ public class AnomalyResultTransportAction extends HandledTransportAction<ActionR
         private void handleEntityResponses() {
             if (failure.get() != null) {
                 listener.onFailure(failure.get());
-            } else if (ackResponses.isEmpty()) {
+            } else if (entityResultResponses.isEmpty()) {
                 listener.onFailure(new InternalFailure(adID, NO_ACK_ERR));
             } else {
                 listener.onResponse(new AnomalyResultResponse(0, 0, 0, new ArrayList<FeatureData>()));
             }
+            long totalUpdates = 0;
+            while (!entityResultResponses.isEmpty()) {
+                totalUpdates = Math.max(totalUpdates, entityResultResponses.poll().getTotalUpdates());
+            }
+            Map<String, Object> updatedFields = new HashMap<>();
+            float initProgress = 0.0f;
+            if (totalUpdates <= AnomalyDetectorSettings.NUM_MIN_SAMPLES) {
+                initProgress = (float) totalUpdates / AnomalyDetectorSettings.NUM_MIN_SAMPLES;
+            } else {
+                initProgress = 1.0f;
+                updatedFields.put(ADTask.STATE_FIELD, ADTaskState.RUNNING.name());
+            }
+            updatedFields.put(ADTask.INIT_PROGRESS_FIELD, initProgress);
+            if (failure.get() != null) {
+                updatedFields.put(ADTask.ERROR_FIELD, getErrorMessage(failure.get()));
+            }
+            adTaskManager.updateLatestADTask(adID, ADTaskType.REALTIME_TASK_TYPES, updatedFields);
         }
     }
 }
