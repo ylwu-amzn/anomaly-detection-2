@@ -36,6 +36,7 @@ import org.opensearch.ad.NodeStateManager;
 import org.opensearch.ad.caching.CacheProvider;
 import org.opensearch.ad.feature.FeatureManager;
 import org.opensearch.ad.ml.ModelManager;
+import org.opensearch.ad.task.ADTaskManager;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.inject.Inject;
 import org.opensearch.common.io.stream.StreamInput;
@@ -48,6 +49,7 @@ public class CronTransportAction extends TransportNodesAction<CronRequest, CronR
     private ModelManager modelManager;
     private FeatureManager featureManager;
     private CacheProvider cacheProvider;
+    private ADTaskManager adTaskManager;
 
     @Inject
     public CronTransportAction(
@@ -58,7 +60,8 @@ public class CronTransportAction extends TransportNodesAction<CronRequest, CronR
         NodeStateManager tarnsportStatemanager,
         ModelManager modelManager,
         FeatureManager featureManager,
-        CacheProvider cacheProvider
+        CacheProvider cacheProvider,
+        ADTaskManager adTaskManager
     ) {
         super(
             CronAction.NAME,
@@ -75,6 +78,7 @@ public class CronTransportAction extends TransportNodesAction<CronRequest, CronR
         this.modelManager = modelManager;
         this.featureManager = featureManager;
         this.cacheProvider = cacheProvider;
+        this.adTaskManager = adTaskManager;
     }
 
     @Override
@@ -114,6 +118,12 @@ public class CronTransportAction extends TransportNodesAction<CronRequest, CronR
 
         // delete unused transport state
         transportStateManager.maintenance();
+
+        // maintain running detector
+        adTaskManager.maintainRunningDetector(transportService);
+
+        // clean child tasks and AD results of deleted task
+        adTaskManager.cleanChildTasksAndADResultsOfDeletedTask();
 
         return new CronNodeResponse(clusterService.localNode());
     }

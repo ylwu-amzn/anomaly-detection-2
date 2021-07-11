@@ -31,6 +31,7 @@ import java.time.Clock;
 import org.opensearch.ad.cluster.diskcleanup.IndexCleanup;
 import org.opensearch.ad.cluster.diskcleanup.ModelCheckpointIndexRetention;
 import org.opensearch.ad.settings.AnomalyDetectorSettings;
+import org.opensearch.ad.task.ADTaskManager;
 import org.opensearch.ad.util.ClientUtil;
 import org.opensearch.ad.util.DiscoveryNodeFilterer;
 import org.opensearch.client.Client;
@@ -53,6 +54,7 @@ public class MasterEventListener implements LocalNodeMasterListener {
     private Clock clock;
     private ClientUtil clientUtil;
     private DiscoveryNodeFilterer nodeFilter;
+    private ADTaskManager adTaskManager;
 
     public MasterEventListener(
         ClusterService clusterService,
@@ -60,7 +62,8 @@ public class MasterEventListener implements LocalNodeMasterListener {
         Client client,
         Clock clock,
         ClientUtil clientUtil,
-        DiscoveryNodeFilterer nodeFilter
+        DiscoveryNodeFilterer nodeFilter,
+        ADTaskManager adTaskManager
     ) {
         this.clusterService = clusterService;
         this.threadPool = threadPool;
@@ -69,12 +72,14 @@ public class MasterEventListener implements LocalNodeMasterListener {
         this.clock = clock;
         this.clientUtil = clientUtil;
         this.nodeFilter = nodeFilter;
+        this.adTaskManager = adTaskManager;
     }
 
     @Override
     public void onMaster() {
         if (hourlyCron == null) {
-            hourlyCron = threadPool.scheduleWithFixedDelay(new HourlyCron(client, nodeFilter), TimeValue.timeValueHours(1), executorName());
+            hourlyCron = threadPool
+                .scheduleWithFixedDelay(new HourlyCron(client, nodeFilter), TimeValue.timeValueHours(1), executorName());
             clusterService.addLifecycleListener(new LifecycleListener() {
                 @Override
                 public void beforeStop() {

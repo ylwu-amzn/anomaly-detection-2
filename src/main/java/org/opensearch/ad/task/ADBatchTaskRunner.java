@@ -966,9 +966,10 @@ public class ADBatchTaskRunner {
                 String error = feature.getUnprocessedFeatures().isPresent()
                     ? "No full shingle in current detection window"
                     : "No data in current detection window";
+                String resultTaskId = adTask.getParentTaskId() != null ? adTask.getParentTaskId() : adTask.getTaskId();
                 AnomalyResult anomalyResult = new AnomalyResult(
                     adTask.getDetectorId(),
-                    taskId,
+                    resultTaskId,
                     Double.NaN,
                     Double.NaN,
                     Double.NaN,
@@ -978,7 +979,7 @@ public class ADBatchTaskRunner {
                     executeStartTime,
                     Instant.now(),
                     error,
-                    null,
+                    adTask.getEntity(),
                     adTask.getDetector().getUser(),
                     anomalyDetectionIndices.getSchemaVersion(ADIndex.RESULT)
                 );
@@ -1007,9 +1008,10 @@ public class ADBatchTaskRunner {
                     }
                 }
 
+                String resultTaskId = adTask.getParentTaskId() != null ? adTask.getParentTaskId() : adTask.getTaskId();
                 AnomalyResult anomalyResult = new AnomalyResult(
                     adTask.getDetectorId(),
-                    taskId,
+                    resultTaskId,
                     score,
                     grade,
                     confidence,
@@ -1019,7 +1021,7 @@ public class ADBatchTaskRunner {
                     executeStartTime,
                     Instant.now(),
                     null,
-                    null,
+                    adTask.getEntity(),
                     adTask.getDetector().getUser(),
                     anomalyDetectionIndices.getSchemaVersion(ADIndex.RESULT)
                 );

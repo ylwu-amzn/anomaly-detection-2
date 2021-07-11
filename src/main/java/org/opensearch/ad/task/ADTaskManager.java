@@ -27,9 +27,11 @@
 package org.opensearch.ad.task;
 
 import static org.opensearch.action.DocWriteResponse.Result.CREATED;
+import static org.opensearch.ad.AnomalyDetectorPlugin.AD_BATCH_TASK_THREAD_POOL_NAME;
 import static org.opensearch.ad.constant.CommonErrorMessages.DETECTOR_IS_RUNNING;
 import static org.opensearch.ad.constant.CommonErrorMessages.EXCEED_HISTORICAL_ANALYSIS_LIMIT;
 import static org.opensearch.ad.constant.CommonErrorMessages.NO_ELIGIBLE_NODE_TO_RUN_DETECTOR;
+import static org.opensearch.ad.indices.AnomalyDetectionIndices.ALL_AD_RESULTS_INDEX_PATTERN;
 import static org.opensearch.ad.model.ADTask.DETECTOR_ID_FIELD;
 import static org.opensearch.ad.model.ADTask.ERROR_FIELD;
 import static org.opensearch.ad.model.ADTask.EXECUTION_END_TIME_FIELD;
@@ -45,6 +47,7 @@ import static org.opensearch.ad.model.ADTaskType.ALL_HISTORICAL_TASK_TYPES;
 import static org.opensearch.ad.model.ADTaskType.HISTORICAL_DETECTOR_TASK_TYPES;
 import static org.opensearch.ad.model.ADTaskType.REALTIME_TASK_TYPES;
 import static org.opensearch.ad.model.AnomalyDetector.ANOMALY_DETECTORS_INDEX;
+import static org.opensearch.ad.model.AnomalyResult.TASK_ID_FIELD;
 import static org.opensearch.ad.settings.AnomalyDetectorSettings.BATCH_TASK_PIECE_INTERVAL_SECONDS;
 import static org.opensearch.ad.settings.AnomalyDetectorSettings.MAX_OLD_AD_TASK_DOCS;
 import static org.opensearch.ad.settings.AnomalyDetectorSettings.MAX_OLD_AD_TASK_DOCS_PER_DETECTOR;
@@ -87,6 +90,7 @@ import org.opensearch.action.index.IndexRequest;
 import org.opensearch.action.index.IndexResponse;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
+import org.opensearch.action.support.IndicesOptions;
 import org.opensearch.action.support.WriteRequest;
 import org.opensearch.action.update.UpdateRequest;
 import org.opensearch.action.update.UpdateResponse;
@@ -143,6 +147,7 @@ import org.opensearch.script.Script;
 import org.opensearch.search.SearchHit;
 import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.search.sort.SortOrder;
+import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.TransportRequestOptions;
 import org.opensearch.transport.TransportService;
 
@@ -162,6 +167,7 @@ public class ADTaskManager {
     private final AnomalyDetectionIndices detectionIndices;
     private final DiscoveryNodeFilterer nodeFilter;
     private final ADTaskCacheManager adTaskCacheManager;
+    private final ThreadPool threadPool;
 
     private final HashRing hashRing;
     private volatile Integer maxOldAdTaskDocsPerDetector;
@@ -176,7 +182,8 @@ public class ADTaskManager {
         AnomalyDetectionIndices detectionIndices,
         DiscoveryNodeFilterer nodeFilter,
         HashRing hashRing,
-        ADTaskCacheManager adTaskCacheManager
+        ADTaskCacheManager adTaskCacheManager,
+        ThreadPool threadPool
     ) {
         this.client = client;
         this.xContentRegistry = xContentRegistry;
@@ -211,7 +218,7 @@ public class ADTaskManager {
                         .build();
                 }
             );
-
+        this.threadPool = threadPool;
     }
 
     /**
@@ -633,7 +640,12 @@ public class ADTaskManager {
     }
 
     /**
-     * Get latest AD tasks and execute consumer function
+     * Get latest AD tasks and execute consumer function.
+     *
+     * If resetTaskState is true, will collect latest task's profile data from all data nodes. If no data
+     * node running the latest task, will reset the task state as STOPPED; otherwise, check if there is
+     * any stale running entities(entity exists in coordinating node cache but no task running on worker
+     * node) and clean up.
      *
      * @param detectorId detector id
      * @param entityValue entity value
@@ -1254,7 +1266,8 @@ public class ADTaskManager {
                         ensureExpectedToken(XContentParser.Token.START_OBJECT, parser.nextToken(), parser);
                         ADTask adTask = ADTask.parse(parser, searchHit.getId());
                         logger.debug("Delete old task: {} of detector: {}", adTask.getTaskId(), adTask.getDetectorId());
-                        // TODO: add deleted task in cache to delete their AD results in hourly cron job
+                        // add deleted task in cache and delete its child tasks and AD results
+                        adTaskCacheManager.addDeletedTask(adTask.getTaskId(), adTask.getTaskType());
                         bulkRequest.add(new DeleteRequest(CommonName.DETECTION_STATE_INDEX).id(adTask.getTaskId()));
                     } catch (Exception e) {
                         listener.onFailure(e);
@@ -1262,7 +1275,8 @@ public class ADTaskManager {
                 }
                 client.execute(BulkAction.INSTANCE, bulkRequest, ActionListener.wrap(res -> {
                     logger.info("AD tasks deleted for detector {}", detectorId);
-                    // TODO: delete child tasks of HC detector task
+                    // delete child tasks and AD results of this task
+                    cleanChildTasksAndADResultsOfDeletedTask();
                     function.execute();
                 }, e -> {
                     logger.warn("Failed to clean AD tasks for detector " + detectorId, e);
@@ -1280,6 +1294,36 @@ public class ADTaskManager {
         });
 
         client.search(searchRequest, searchListener);
+    }
+
+    /**
+     * Poll one deleted task and delete its child tasks and AD results.
+     * @return true if there is deleted task in cache
+     */
+    public boolean cleanChildTasksAndADResultsOfDeletedTask() {
+        if (adTaskCacheManager.hasDeletedTask()) {
+            threadPool.executor(AD_BATCH_TASK_THREAD_POOL_NAME).execute(() -> {
+                String taskId = adTaskCacheManager.pollDeletedTask();
+                DeleteByQueryRequest deleteADResultsRequest = new DeleteByQueryRequest(ALL_AD_RESULTS_INDEX_PATTERN);
+                deleteADResultsRequest.setQuery(new TermsQueryBuilder(TASK_ID_FIELD, taskId));
+                client.execute(DeleteByQueryAction.INSTANCE, deleteADResultsRequest, ActionListener.wrap(res -> {
+                    logger.debug("Successfully deleted AD results of task " + taskId);
+                    DeleteByQueryRequest deleteChildTasksRequest = new DeleteByQueryRequest(CommonName.DETECTION_STATE_INDEX);
+                    deleteChildTasksRequest
+                        .setQuery(new TermsQueryBuilder(PARENT_TASK_ID_FIELD, taskId))
+                        .setIndicesOptions(IndicesOptions.LENIENT_EXPAND_OPEN_HIDDEN);
+
+                    client.execute(DeleteByQueryAction.INSTANCE, deleteChildTasksRequest, ActionListener.wrap(r -> {
+                        logger.debug("Successfully deleted child tasks of task " + taskId);
+
+                    }, e -> { logger.error("Failed to delete child tasks of task " + taskId, e); }));
+                }, ex -> { logger.error("Failed to delete AD results for task " + taskId, ex); }));
+
+            });
+            return true;
+        } else {
+            return false;
+        }
     }
 
     private void runBatchResultAction(IndexResponse response, ADTask adTask, ActionListener<AnomalyDetectorJobResponse> listener) {
@@ -1900,4 +1944,31 @@ public class ADTaskManager {
         }
     }
 
+    /**
+     * Maintain running detectors. Get latest task and reset its state as STOPPED if it's not running;
+     * otherwise check stale running entities and clean up.
+     * This method is only used in hourly cron.
+     *
+     * @param transportService transport service
+     */
+    public void maintainRunningDetector(TransportService transportService) {
+        logger.debug("Start to maintain running detectors");
+        String[] detectors = adTaskCacheManager.getRunningDetectors();
+        for (String detectorId : detectors) {
+            getLatestADTasks(
+                detectorId,
+                null,
+                HISTORICAL_DETECTOR_TASK_TYPES,
+                adTask -> {},
+                transportService,
+                true,
+                1,
+                ActionListener
+                    .wrap(
+                        r -> { logger.debug("Finished maintaining running detector {}", detectorId); },
+                        e -> { logger.error("Failed maintaining running detector " + detectorId, e); }
+                    )
+            );
+        }
+    }
 }

@@ -547,7 +547,8 @@ public class AnomalyDetectorPlugin extends Plugin implements ActionPlugin, Scrip
             anomalyDetectionIndices,
             nodeFilter,
             hashRing,
-            adTaskCacheManager
+            adTaskCacheManager,
+            threadPool
         );
         AnomalyResultBulkIndexHandler anomalyResultBulkIndexHandler = new AnomalyResultBulkIndexHandler(
             client,
@@ -595,7 +596,7 @@ public class AnomalyDetectorPlugin extends Plugin implements ActionPlugin, Scrip
                 new ADClusterEventListener(clusterService, hashRing, modelManager, nodeFilter),
                 adCircuitBreakerService,
                 adStats,
-                new MasterEventListener(clusterService, threadPool, client, getClock(), clientUtil, nodeFilter),
+                new MasterEventListener(clusterService, threadPool, client, getClock(), clientUtil, nodeFilter, adTaskManager),
                 nodeFilter,
                 detectorStateHandler,
                 multiEntityResultHandler,
@@ -696,7 +697,8 @@ public class AnomalyDetectorPlugin extends Plugin implements ActionPlugin, Scrip
                 AnomalyDetectorSettings.MAX_OLD_AD_TASK_DOCS_PER_DETECTOR,
                 AnomalyDetectorSettings.BATCH_TASK_PIECE_SIZE,
                 AnomalyDetectorSettings.MAX_TOP_ENTITIES_FOR_HISTORICAL_ANALYSIS,
-                AnomalyDetectorSettings.MAX_RUNNING_ENTITIES_PER_DETECTOR_FOR_HISTORICAL_ANALYSIS
+                AnomalyDetectorSettings.MAX_RUNNING_ENTITIES_PER_DETECTOR_FOR_HISTORICAL_ANALYSIS,
+                AnomalyDetectorSettings.MAX_CACHED_DELETED_TASKS
             );
         return unmodifiableList(Stream.concat(enabledSetting.stream(), systemSetting.stream()).collect(Collectors.toList()));
     }
