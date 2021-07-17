@@ -273,6 +273,7 @@ public class AnomalyDetectorPlugin extends Plugin implements ActionPlugin, Scrip
         jobRunner.setDetectionStateHandler(detectorStateHandler);
         jobRunner.setSettings(settings);
         jobRunner.setIndexUtil(anomalyDetectionIndices);
+        jobRunner.setAdTaskManager(adTaskManager);
 
         RestGetAnomalyDetectorAction restGetAnomalyDetectorAction = new RestGetAnomalyDetectorAction();
         RestIndexAnomalyDetectorAction restIndexAnomalyDetectorAction = new RestIndexAnomalyDetectorAction(settings, clusterService);
@@ -628,7 +629,8 @@ public class AnomalyDetectorPlugin extends Plugin implements ActionPlugin, Scrip
                 new ADStat<>(true, new IndexStatusSupplier(indexUtils, CommonName.DETECTION_STATE_INDEX))
             )
             .put(StatNames.DETECTOR_COUNT.getName(), new ADStat<>(true, new SettableSupplier()))
-            .put(StatNames.HISTORICAL_SINGLE_ENTITY_DETECTOR_COUNT.getName(), new ADStat<>(true, new SettableSupplier()))
+            .put(StatNames.SINGLE_ENTITY_DETECTOR_COUNT.getName(), new ADStat<>(true, new SettableSupplier()))
+            .put(StatNames.MULTI_ENTITY_DETECTOR_COUNT.getName(), new ADStat<>(true, new SettableSupplier()))
             .put(StatNames.AD_EXECUTING_BATCH_TASK_COUNT.getName(), new ADStat<>(false, new CounterSupplier()))
             .put(StatNames.AD_CANCELED_BATCH_TASK_COUNT.getName(), new ADStat<>(false, new CounterSupplier()))
             .put(StatNames.AD_TOTAL_BATCH_TASK_EXECUTION_COUNT.getName(), new ADStat<>(false, new CounterSupplier()))
@@ -678,7 +680,6 @@ public class AnomalyDetectorPlugin extends Plugin implements ActionPlugin, Scrip
             clusterService,
             client,
             nodeFilter,
-            indexNameExpressionResolver,
             adCircuitBreakerService,
             featureManager,
             adTaskManager,
@@ -724,7 +725,9 @@ public class AnomalyDetectorPlugin extends Plugin implements ActionPlugin, Scrip
                 checkpointWriteQueue,
                 coldEntityQueue,
                 entityColdStarter,
-                new ScriptMaker()
+                new ScriptMaker(),
+                adTaskCacheManager,
+                adSearchHandler
             );
     }
 
@@ -840,7 +843,9 @@ public class AnomalyDetectorPlugin extends Plugin implements ActionPlugin, Scrip
                 LegacyOpenDistroAnomalyDetectorSettings.MAX_ENTITIES_FOR_PREVIEW,
                 AnomalyDetectorSettings.MAX_ENTITIES_PER_QUERY,
                 AnomalyDetectorSettings.MAX_ENTITIES_FOR_PREVIEW,
-                AnomalyDetectorSettings.PAGE_SIZE
+                AnomalyDetectorSettings.PAGE_SIZE,
+                AnomalyDetectorSettings.MAX_TOP_ENTITIES_FOR_HISTORICAL_ANALYSIS,
+                AnomalyDetectorSettings.MAX_RUNNING_ENTITIES_PER_DETECTOR_FOR_HISTORICAL_ANALYSIS
             );
         return unmodifiableList(
             Stream
