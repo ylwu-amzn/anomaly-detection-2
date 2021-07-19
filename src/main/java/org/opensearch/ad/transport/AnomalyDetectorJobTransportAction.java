@@ -105,7 +105,17 @@ public class AnomalyDetectorJobTransportAction extends HandledTransportAction<An
                 detectorId,
                 filterByEnabled,
                 listener,
-                (anomalyDetector) -> executeDetector(listener, detectorId, seqNo, primaryTerm, rawPath, requestTimeout, user),
+                (anomalyDetector) -> executeDetector(
+                    listener,
+                    detectorId,
+                    detectionDateRange,
+                    historical,
+                    seqNo,
+                    primaryTerm,
+                    rawPath,
+                    requestTimeout,
+                    user
+                ),
                 client,
                 clusterService,
                 xContentRegistry

@@ -726,8 +726,7 @@ public class AnomalyDetectorPlugin extends Plugin implements ActionPlugin, Scrip
                 coldEntityQueue,
                 entityColdStarter,
                 new ScriptMaker(),
-                adTaskCacheManager,
-                adSearchHandler
+                adTaskCacheManager
             );
     }
 

@@ -32,6 +32,7 @@ import static org.opensearch.ad.model.ADTask.TASK_PROGRESS_FIELD;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -79,6 +80,8 @@ public class ForwardADTaskTransportAction extends HandledTransportAction<Forward
         DetectionDateRange detectionDateRange = request.getDetectionDateRange();
         String detectorId = detector.getDetectorId();
         ADTask adTask = request.getAdTask();
+        String categoryField = detector.isMultientityDetector() ? detector.getCategoryField().get(0) : null;
+        String entityValue = detector.isMultientityDetector() && adTask != null ? adTask.getEntity().getAttributes().get(categoryField) : null;
 
         switch (adTaskAction) {
             case START:
@@ -94,7 +97,7 @@ public class ForwardADTaskTransportAction extends HandledTransportAction<Forward
                 // Run next entity for HC detector historical analysis.
                 logger.debug("Received task for NEXT_ENTITY action: {}", adTask.getTaskId());
                 if (detector.isMultientityDetector()) { // AD task could be HC detector level task or entity task
-                    adTaskCacheManager.removeRunningEntity(detectorId, adTask.getEntity().get(0).getValue());
+                    adTaskCacheManager.removeRunningEntity(detectorId, entityValue);
                     if (!adTaskCacheManager.hasEntity(detectorId)) {
                         logger.info("Historical HC detector done, will remove from cache, detector id:{}", detectorId);
                         listener.onResponse(new AnomalyDetectorJobResponse(detectorId, 0, 0, 0, RestStatus.OK));
@@ -136,13 +139,13 @@ public class ForwardADTaskTransportAction extends HandledTransportAction<Forward
                         && !adTaskCacheManager.exceedRetryLimit(adTask.getDetectorId(), adTask.getTaskId())) {
                         // If retryable exception happens when run entity task, will push back entity to the end
                         // of pending entities queue, then we can retry it later.
-                        adTaskCacheManager.pushBackEntity(adTask.getTaskId(), adTask.getDetectorId(), adTask.getEntity().get(0).getValue());
+                        adTaskCacheManager.pushBackEntity(adTask.getTaskId(), adTask.getDetectorId(), entityValue);
                     } else {
                         // If exception is not retryable or exceeds retry limit, will remove this entity.
-                        adTaskCacheManager.removeEntity(adTask.getDetectorId(), adTask.getEntity().get(0).getValue());
+                        adTaskCacheManager.removeEntity(adTask.getDetectorId(), entityValue);
                         logger.warn("Entity task failed, task id: {}", adTask.getTaskId());
                     }
-                    adTaskCacheManager.removeRunningEntity(detectorId, adTask.getEntity().get(0).getValue());
+                    adTaskCacheManager.removeRunningEntity(detectorId, entityValue);
                     if (!adTaskCacheManager.hasEntity(detectorId)) {
                         adTaskManager.setHCDetectorTaskDone(adTask, ADTaskState.FINISHED, listener);
                     } else {
@@ -159,7 +162,7 @@ public class ForwardADTaskTransportAction extends HandledTransportAction<Forward
                 // on worker node.
                 if (detector.isMultientityDetector()) {
                     adTaskCacheManager.clearPendingEntities(detectorId);
-                    adTaskCacheManager.removeRunningEntity(detectorId, adTask.getEntity().get(0).getValue());
+                    adTaskCacheManager.removeRunningEntity(detectorId, entityValue);
                     if (!adTaskCacheManager.hasEntity(detectorId) || !adTask.isEntityTask()) {
                         adTaskManager.setHCDetectorTaskDone(adTask, ADTaskState.STOPPED, listener);
                     }

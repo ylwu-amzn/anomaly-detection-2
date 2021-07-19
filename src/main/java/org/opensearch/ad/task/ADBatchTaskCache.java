@@ -36,7 +36,6 @@ import static org.opensearch.ad.settings.AnomalyDetectorSettings.TIME_DECAY;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -51,7 +50,6 @@ import org.opensearch.ad.model.Entity;
 import org.opensearch.ad.settings.AnomalyDetectorSettings;
 
 import com.amazon.randomcutforest.RandomCutForest;
-import com.google.common.collect.ImmutableList;
 
 /**
  * AD batch task cache which will mainly hold these for one task:
@@ -74,12 +72,12 @@ public class ADBatchTaskCache {
     private AtomicLong cacheMemorySize = new AtomicLong(0);
     private String cancelReason;
     private String cancelledBy;
-    private List<Entity> entity;
+    private Entity entity;
 
     protected ADBatchTaskCache(ADTask adTask) {
         this.detectorId = adTask.getDetectorId();
         this.taskId = adTask.getTaskId();
-        this.entity = adTask.getEntity() == null ? null : ImmutableList.copyOf(adTask.getEntity());
+        this.entity = adTask.getEntity();
 
         AnomalyDetector detector = adTask.getDetector();
         boolean isHC = detector.isMultientityDetector();
@@ -166,7 +164,7 @@ public class ADBatchTaskCache {
         return cancelledBy;
     }
 
-    public List<Entity> getEntity() {
+    public Entity getEntity() {
         return entity;
     }
 

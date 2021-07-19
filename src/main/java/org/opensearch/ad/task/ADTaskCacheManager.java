@@ -697,9 +697,9 @@ public class ADTaskCacheManager {
      * TODO: Currently we only support one category field. Need to support multi-category fields.
      *
      * @param taskId AD task id
-     * @return list of entity
+     * @return entity
      */
-    public List<Entity> getEntity(String taskId) {
+    public Entity getEntity(String taskId) {
         return getBatchTaskCache(taskId).getEntity();
     }
 

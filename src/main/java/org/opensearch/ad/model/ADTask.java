@@ -30,8 +30,6 @@ import static org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedT
 
 import java.io.IOException;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
 
 import org.opensearch.ad.annotation.Generated;
 import org.opensearch.ad.util.ParseUtils;
@@ -95,7 +93,7 @@ public class ADTask implements ToXContentObject, Writeable {
     private String coordinatingNode = null;
     private String workerNode = null;
     private DetectionDateRange detectionDateRange = null;
-    private List<Entity> entity = null;
+    private Entity entity = null;
     private String parentTaskId = null;
     private Integer estimatedMinutesLeft = null;
     private User user = null;
@@ -131,11 +129,7 @@ public class ADTask implements ToXContentObject, Writeable {
             this.detectionDateRange = null;
         }
         if (input.readBoolean()) {
-            int entitySize = input.readVInt();
-            this.entity = new ArrayList<>(entitySize);
-            for (int i = 0; i < entitySize; i++) {
-                entity.add(new Entity(input));
-            }
+            this.entity = new Entity(input);
         } else {
             this.entity = null;
         }
@@ -181,10 +175,7 @@ public class ADTask implements ToXContentObject, Writeable {
         }
         if (entity != null) {
             out.writeBoolean(true);
-            out.writeVInt(entity.size());
-            for (Entity entityItem : entity) {
-                entityItem.writeTo(out);
-            }
+            entity.writeTo(out);
         } else {
             out.writeBoolean(false);
         }
@@ -230,7 +221,7 @@ public class ADTask implements ToXContentObject, Writeable {
         private String coordinatingNode = null;
         private String workerNode = null;
         private DetectionDateRange detectionDateRange = null;
-        private List<Entity> entity;
+        private Entity entity = null;
         private String parentTaskId;
         private Integer estimatedMinutesLeft;
         private User user = null;
@@ -332,7 +323,7 @@ public class ADTask implements ToXContentObject, Writeable {
             return this;
         }
 
-        public Builder entity(List<Entity> entity) {
+        public Builder entity(Entity entity) {
             this.entity = entity;
             return this;
         }
@@ -444,7 +435,7 @@ public class ADTask implements ToXContentObject, Writeable {
             xContentBuilder.field(DETECTION_DATE_RANGE_FIELD, detectionDateRange);
         }
         if (entity != null) {
-            xContentBuilder.field(ENTITY_FIELD, entity.toArray());
+            xContentBuilder.field(ENTITY_FIELD, entity);
         }
         if (parentTaskId != null) {
             xContentBuilder.field(PARENT_TASK_ID_FIELD, parentTaskId);
@@ -482,7 +473,7 @@ public class ADTask implements ToXContentObject, Writeable {
         String coordinatingNode = null;
         String workerNode = null;
         DetectionDateRange detectionDateRange = null;
-        List<Entity> entityList = null;
+        Entity entity = null;
         String parentTaskId = null;
         Integer estimatedMinutesLeft = null;
         User user = null;
@@ -551,11 +542,7 @@ public class ADTask implements ToXContentObject, Writeable {
                     detectionDateRange = DetectionDateRange.parse(parser);
                     break;
                 case ENTITY_FIELD:
-                    entityList = new ArrayList<>();
-                    ensureExpectedToken(XContentParser.Token.START_ARRAY, parser.currentToken(), parser);
-                    while (parser.nextToken() != XContentParser.Token.END_ARRAY) {
-                        entityList.add(Entity.parse(parser));
-                    }
+                    entity = Entity.parse(parser);
                     break;
                 case PARENT_TASK_ID_FIELD:
                     parentTaskId = parser.text();
@@ -612,7 +599,7 @@ public class ADTask implements ToXContentObject, Writeable {
             .workerNode(workerNode)
             .detector(anomalyDetector)
             .detectionDateRange(detectionDateRange)
-            .entity(entityList)
+            .entity(entity)
             .parentTaskId(parentTaskId)
             .estimatedMinutesLeft(estimatedMinutesLeft)
             .user(user)
@@ -771,7 +758,7 @@ public class ADTask implements ToXContentObject, Writeable {
         return detectionDateRange;
     }
 
-    public List<Entity> getEntity() {
+    public Entity getEntity() {
         return entity;
     }
 

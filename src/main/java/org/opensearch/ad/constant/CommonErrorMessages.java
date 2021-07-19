@@ -60,6 +60,7 @@ public class CommonErrorMessages {
     public static String getTooManyCategoricalFieldErr(int limit) {
         return String.format(Locale.ROOT, TOO_MANY_CATEGORICAL_FIELD_ERR_MSG_FORMAT, limit);
     }
+
     public static String EMPTY_DETECTOR_NAME = "Detector name should be set";
     public static String NULL_TIME_FIELD = "Time field should be set";
     public static String EMPTY_INDICES = "Indices should be set";

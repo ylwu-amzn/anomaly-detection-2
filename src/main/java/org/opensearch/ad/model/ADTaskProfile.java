@@ -70,7 +70,7 @@ public class ADTaskProfile implements ToXContentObject, Writeable, Writeable.Wri
     private Integer thresholdModelTrainingDataSize;
     private Long modelSizeInBytes;
     private String nodeId;
-    private List<Entity> entity;
+    private Entity entity;
     private String taskId;
     private String adTaskType;
     private Integer totalEntitiesCount;
@@ -120,7 +120,7 @@ public class ADTaskProfile implements ToXContentObject, Writeable, Writeable.Wri
         Integer thresholdModelTrainingDataSize,
         Long modelSizeInBytes,
         String nodeId,
-        List<Entity> entity,
+        Entity entity,
         String taskId
     ) {
         this(
@@ -166,7 +166,7 @@ public class ADTaskProfile implements ToXContentObject, Writeable, Writeable.Wri
         Integer thresholdModelTrainingDataSize,
         Long modelSizeInBytes,
         String nodeId,
-        List<Entity> entity,
+        Entity entity,
         String taskId,
         Integer totalEntitiesCount,
         Integer pendingEntitiesCount,
@@ -186,7 +186,7 @@ public class ADTaskProfile implements ToXContentObject, Writeable, Writeable.Wri
         this.pendingEntitiesCount = pendingEntitiesCount;
         this.runningEntitiesCount = runningEntitiesCount;
         this.runningEntities = runningEntities;
-        if (entity != null && entity.size() > 0) {
+        if (entity != null && entity.getAttributes().size() > 0) {
             setAdTaskType(ADTaskType.HISTORICAL_HC_ENTITY.name());
         } else if (this.pendingEntitiesCount != null || runningEntities != null) {
             setAdTaskType(ADTaskType.HISTORICAL_HC_DETECTOR.name());
@@ -210,7 +210,7 @@ public class ADTaskProfile implements ToXContentObject, Writeable, Writeable.Wri
         this.modelSizeInBytes = input.readOptionalLong();
         this.nodeId = input.readOptionalString();
         if (input.readBoolean()) {
-            this.entity = input.readList(Entity::new);
+            this.entity = new Entity(input);
         } else {
             this.entity = null;
         }
@@ -239,7 +239,7 @@ public class ADTaskProfile implements ToXContentObject, Writeable, Writeable.Wri
         out.writeOptionalString(nodeId);
         if (entity != null) {
             out.writeBoolean(true);
-            out.writeList(entity);
+            entity.writeTo(out);
         } else {
             out.writeBoolean(false);
         }
@@ -275,8 +275,8 @@ public class ADTaskProfile implements ToXContentObject, Writeable, Writeable.Wri
         if (nodeId != null) {
             xContentBuilder.field(NODE_ID_FIELD, nodeId);
         }
-        if (entity != null && entity.size() > 0) {
-            xContentBuilder.field(ENTITY_FIELD, entity.toArray());
+        if (entity != null) {
+            xContentBuilder.field(ENTITY_FIELD, entity);
         }
         if (adTaskType != null) {
             xContentBuilder.field(AD_TASK_TYPE_FIELD, adTaskType);
@@ -304,7 +304,7 @@ public class ADTaskProfile implements ToXContentObject, Writeable, Writeable.Wri
         Integer thresholdNodelTrainingDataSize = null;
         Long modelSizeInBytes = null;
         String nodeId = null;
-        List<Entity> entity = null;
+        Entity entity = null;
         String taskId = null;
         Integer totalEntitiesCount = null;
         Integer pendingEntitiesCount = null;
@@ -339,11 +339,7 @@ public class ADTaskProfile implements ToXContentObject, Writeable, Writeable.Wri
                     nodeId = parser.text();
                     break;
                 case ENTITY_FIELD:
-                    entity = new ArrayList<>();
-                    ensureExpectedToken(XContentParser.Token.START_ARRAY, parser.currentToken(), parser);
-                    while (parser.nextToken() != XContentParser.Token.END_ARRAY) {
-                        entity.add(Entity.parse(parser));
-                    }
+                    entity = Entity.parse(parser);
                     break;
                 case TASK_ID_FIELD:
                     taskId = parser.text();
@@ -486,7 +482,7 @@ public class ADTaskProfile implements ToXContentObject, Writeable, Writeable.Wri
         this.adTaskType = adTaskType;
     }
 
-    public List<Entity> getEntity() {
+    public Entity getEntity() {
         return entity;
     }
 

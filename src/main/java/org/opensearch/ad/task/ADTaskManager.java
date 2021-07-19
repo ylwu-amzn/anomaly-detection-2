@@ -751,7 +751,13 @@ public class ADTaskManager {
                                 .entrySet()
                                 .stream()
                                 .filter(entry -> !taskId.equals(entry.getKey()))
-                                .map(entry -> entry.getValue().getEntity().get(0).getValue())
+                                .map(
+                                    entry -> entry
+                                        .getValue()
+                                        .getEntity()
+                                        .getAttributes()
+                                        .get(adTask.getDetector().getCategoryField().get(0))
+                                )
                                 .collect(Collectors.toList());
                             if (runningTasksInCoordinatingNodeCache.size() > runningTasksOnWorkerNode.size()) {
                                 runningTasksInCoordinatingNodeCache.removeAll(runningTasksOnWorkerNode);

@@ -349,7 +349,7 @@ public class ADBatchTaskRunner {
 
         String topEntitiesAgg = "topEntities";
         AggregationBuilder aggregation = new TermsAggregationBuilder(topEntitiesAgg)
-            .field(adTask.getDetector().getCategoryField().get(0))
+            .field(adTask.getDetector().getCategoryField().get(0)) // support multi category fields
             .size(MAX_TOP_ENTITIES_LIMIT_FOR_HISTORICAL_ANALYSIS);
         sourceBuilder.aggregation(aggregation).size(0);
         SearchRequest searchRequest = new SearchRequest();
@@ -467,7 +467,7 @@ public class ADBatchTaskRunner {
                             .coordinatingNode(clusterService.localNode().getId())
                             .detectionDateRange(adTask.getDetectionDateRange())
                             .user(adTask.getUser())
-                            .entity(ImmutableList.of(new Entity(adTask.getDetector().getCategoryField().get(0), entity)))
+                            .entity(Entity.createSingleAttributeEntity(adTask.getDetectorId(), adTask.getDetector().getCategoryField().get(0), entity))
                             .parentTaskId(parentTaskId)
                             .build();
                         adTaskManager.createADTaskDirectly(adEntityTask, r -> {
@@ -523,7 +523,7 @@ public class ADBatchTaskRunner {
             if (adTask.isEntityTask()) {
                 // When reach this line, the entity task already been put into worker node's cache.
                 // Then it's safe to move entity from temp entities queue to running entities queue.
-                adTaskCacheManager.moveToRunningEntity(adTask.getDetectorId(), adTask.getEntity().get(0).getValue());
+                adTaskCacheManager.moveToRunningEntity(adTask.getDetectorId(), adTask.getEntity().getAttributes().get(adTask.getDetector().getCategoryField().get(0)));
             }
             startNewEntityTaskLane(adTask, transportService);
         }, e -> {
@@ -835,9 +835,9 @@ public class ADBatchTaskRunner {
             .aggregation(AggregationBuilders.min(AGG_NAME_MIN_TIME).field(adTask.getDetector().getTimeField()))
             .aggregation(AggregationBuilders.max(AGG_NAME_MAX_TIME).field(adTask.getDetector().getTimeField()))
             .size(0);
-        if (adTask.getEntity() != null && adTask.getEntity().size() > 0) {
+        if (adTask.getEntity() != null && adTask.getEntity().getAttributes().size() > 0) {
             BoolQueryBuilder query = new BoolQueryBuilder();
-            adTask.getEntity().forEach(entity -> query.filter(new TermQueryBuilder(entity.getName(), entity.getValue())));
+            adTask.getEntity().getAttributes().entrySet().forEach(entity -> query.filter(new TermQueryBuilder(entity.getKey(), entity.getValue())));
             searchSourceBuilder.query(query);
         }
 
