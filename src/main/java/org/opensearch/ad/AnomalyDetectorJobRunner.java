@@ -458,8 +458,6 @@ public class AnomalyDetectorJobRunner implements ScheduledJobRunner {
         String detectorId = jobParameter.getName();
         detectorEndRunExceptionCount.remove(detectorId);
         try {
-            // reset error if different from previously recorded one
-            detectionStateHandler.saveError(response.getError(), detectorId);
             // skipping writing to the result index if not necessary
             // For a single-entity detector, the result is not useful if error is null
             // and rcf score (thus anomaly grade/confidence) is null.

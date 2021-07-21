@@ -467,7 +467,14 @@ public class ADBatchTaskRunner {
                             .coordinatingNode(clusterService.localNode().getId())
                             .detectionDateRange(adTask.getDetectionDateRange())
                             .user(adTask.getUser())
-                            .entity(Entity.createSingleAttributeEntity(adTask.getDetectorId(), adTask.getDetector().getCategoryField().get(0), entity))
+                            .entity(
+                                Entity
+                                    .createSingleAttributeEntity(
+                                        adTask.getDetectorId(),
+                                        adTask.getDetector().getCategoryField().get(0),
+                                        entity
+                                    )
+                            )
                             .parentTaskId(parentTaskId)
                             .build();
                         adTaskManager.createADTaskDirectly(adEntityTask, r -> {
@@ -523,7 +530,11 @@ public class ADBatchTaskRunner {
             if (adTask.isEntityTask()) {
                 // When reach this line, the entity task already been put into worker node's cache.
                 // Then it's safe to move entity from temp entities queue to running entities queue.
-                adTaskCacheManager.moveToRunningEntity(adTask.getDetectorId(), adTask.getEntity().getAttributes().get(adTask.getDetector().getCategoryField().get(0)));
+                adTaskCacheManager
+                    .moveToRunningEntity(
+                        adTask.getDetectorId(),
+                        adTask.getEntity().getAttributes().get(adTask.getDetector().getCategoryField().get(0))
+                    );
             }
             startNewEntityTaskLane(adTask, transportService);
         }, e -> {
@@ -837,7 +848,11 @@ public class ADBatchTaskRunner {
             .size(0);
         if (adTask.getEntity() != null && adTask.getEntity().getAttributes().size() > 0) {
             BoolQueryBuilder query = new BoolQueryBuilder();
-            adTask.getEntity().getAttributes().entrySet().forEach(entity -> query.filter(new TermQueryBuilder(entity.getKey(), entity.getValue())));
+            adTask
+                .getEntity()
+                .getAttributes()
+                .entrySet()
+                .forEach(entity -> query.filter(new TermQueryBuilder(entity.getKey(), entity.getValue())));
             searchSourceBuilder.query(query);
         }
 

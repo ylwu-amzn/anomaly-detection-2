@@ -32,7 +32,6 @@ import static org.opensearch.ad.model.ADTask.TASK_PROGRESS_FIELD;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -81,7 +80,9 @@ public class ForwardADTaskTransportAction extends HandledTransportAction<Forward
         String detectorId = detector.getDetectorId();
         ADTask adTask = request.getAdTask();
         String categoryField = detector.isMultientityDetector() ? detector.getCategoryField().get(0) : null;
-        String entityValue = detector.isMultientityDetector() && adTask != null ? adTask.getEntity().getAttributes().get(categoryField) : null;
+        String entityValue = detector.isMultientityDetector() && adTask != null
+            ? adTask.getEntity().getAttributes().get(categoryField)
+            : null;
 
         switch (adTaskAction) {
             case START:

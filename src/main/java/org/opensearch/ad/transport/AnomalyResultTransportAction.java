@@ -474,7 +474,10 @@ public class AnomalyResultTransportAction extends HandledTransportAction<ActionR
                 if (previousException.isPresent()) {
                     listener.onFailure(previousException.get());
                 } else {
-                    listener.onResponse(new AnomalyResultResponse(Double.NaN, Double.NaN, Double.NaN, new ArrayList<FeatureData>(), null, null));
+                    listener
+                        .onResponse(
+                            new AnomalyResultResponse(Double.NaN, Double.NaN, Double.NaN, new ArrayList<FeatureData>(), null, null)
+                        );
                 }
                 return;
             }
