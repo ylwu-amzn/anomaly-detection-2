@@ -784,7 +784,7 @@ public class ADTaskManager {
                             .entrySet()
                             .stream()
                             .filter(entry -> !taskId.equals(entry.getKey()))
-                            .map(entry -> entry.getValue().getEntity().get(0).getValue())
+                            .map(entry -> entry.getValue().getEntity().getAttributes().get(adTask.getDetector().getCategoryField().get(0)))
                             .collect(Collectors.toList());
                         if (runningTasksInCoordinatingNodeCache.size() > runningTasksOnWorkerNode.size()) {
                             runningTasksInCoordinatingNodeCache.removeAll(runningTasksOnWorkerNode);
@@ -1534,24 +1534,13 @@ public class ADTaskManager {
         adTaskCacheManager.removeDetector(detectorId);
     }
 
-    /**
-     * Update latest AD task of detector.
-     *
-     * @param detectorId detector id
-     * @param taskTypes task types
-     * @param updatedFields updated fields, key: filed name, value: new value
-     */
-    public void updateLatestADTask(String detectorId, List<ADTaskType> taskTypes, Map<String, Object> updatedFields) {
-        updateLatestADTask(
-            detectorId,
-            taskTypes,
-            updatedFields,
-            ActionListener
-                .wrap(
-                    r -> logger.debug("updated latest task of {}", detectorId),
-                    e -> logger.warn("failed to update latest task for detector {}", detectorId)
-                )
-        );
+    public void updateLatestRealtimeADTask(String detectorId, Map<String, Object> updatedFields, String newState, Float newInitProgress, String newError) {
+        updateLatestADTask(detectorId, ADTaskType.REALTIME_TASK_TYPES, updatedFields, ActionListener.wrap(r -> {
+            logger.debug("------ ylwdebug Updated latest realtime AD task successfully for detector {}", detectorId);
+            adTaskCacheManager.updateRealtimeTaskCache(detectorId, newState, newInitProgress, newError);
+        }, e-> {
+            logger.error("Failed to update realtime task for detector " + detectorId, e);
+        }));
     }
 
     /**
@@ -1561,17 +1550,16 @@ public class ADTaskManager {
      * @param taskTypes task types
      * @param updatedFields updated fields, key: filed name, value: new value
      * @param listener action listener
-     * @param <T> action listener response type
      */
-    public <T> void updateLatestADTask(
+    public void updateLatestADTask(
         String detectorId,
         List<ADTaskType> taskTypes,
         Map<String, Object> updatedFields,
-        ActionListener<T> listener
+        ActionListener<UpdateResponse> listener
     ) {
         getAndExecuteOnLatestDetectorLevelTask(detectorId, taskTypes, (adTask) -> {
             if (adTask.isPresent()) {
-                updateADTask(adTask.get().getTaskId(), updatedFields);
+                updateADTask(adTask.get().getTaskId(), updatedFields, listener);
             } else {
                 listener.onFailure(new ResourceNotFoundException(detectorId, "can't find latest task"));
             }
@@ -1653,7 +1641,8 @@ public class ADTaskManager {
         }
 
         error = Optional.ofNullable(error).orElse("");
-        if (!adTaskCacheManager.checkIfRealtimeTaskChangedAndUpdateCache(detectorId, state, initProgress, error)) {
+        if (!adTaskCacheManager.checkIfRealtimeTaskChanged(detectorId, state, initProgress, error)) {
+            logger.debug("------ ylwdebug no update, so no need to update realtime task for {}", detectorId);
             return;
         }
         if (ADTaskState.STOPPED.name().equals(state)) {
@@ -1670,7 +1659,7 @@ public class ADTaskManager {
         if (error != null) {
             updatedFields.put(ERROR_FIELD, error);
         }
-        updateLatestADTask(detectorId, ADTaskType.REALTIME_TASK_TYPES, updatedFields);
+        updateLatestRealtimeADTask(detectorId, updatedFields, state, initProgress, error);
     }
 
     /**

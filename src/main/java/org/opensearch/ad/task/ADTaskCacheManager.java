@@ -788,30 +788,29 @@ public class ADTaskCacheManager {
      * 3. If realtime task cache not found, will consider the realtime task changed
      *    and put new realtime task into cache.
      *
-     * If realtime task changed, put new field value into cache.
      * @param detectorId detector id
      * @param newState new task state
      * @param newInitProgress new init progress
      * @param newError new error
      * @return true if realtime task changed comparing with realtime task cache.
      */
-    public boolean checkIfRealtimeTaskChangedAndUpdateCache(String detectorId, String newState, Float newInitProgress, String newError) {
+    public boolean checkIfRealtimeTaskChanged(String detectorId, String newState, Float newInitProgress, String newError) {
         if (realtimeTaskCaches.containsKey(detectorId)) {
             ADRealtimeTaskCache realtimeTaskCache = realtimeTaskCaches.get(detectorId);
             boolean stateChanged = false;
             if (newState != null && !newState.equals(realtimeTaskCache.getState())) {
                 stateChanged = true;
-                realtimeTaskCache.setState(newState);
+//                realtimeTaskCache.setState(newState);
             }
             boolean initProgressChanged = false;
             if (newInitProgress != null && !newInitProgress.equals(realtimeTaskCache.getInitProgress())) {
                 initProgressChanged = true;
-                realtimeTaskCache.setInitProgress(newInitProgress);
+//                realtimeTaskCache.setInitProgress(newInitProgress);
             }
             boolean errorChanged = false;
             if (newError != null && !newError.equals(realtimeTaskCache.getError())) {
                 errorChanged = true;
-                realtimeTaskCache.setError(newError);
+//                realtimeTaskCache.setError(newError);
             }
             if (stateChanged || initProgressChanged || errorChanged) {
                 return true;
@@ -820,6 +819,22 @@ public class ADTaskCacheManager {
         } else {
             realtimeTaskCaches.put(detectorId, new ADRealtimeTaskCache(newState, newInitProgress, newError));
             return true;
+        }
+    }
+
+    public void updateRealtimeTaskCache(String detectorId, String newState, Float newInitProgress, String newError) {
+        if (realtimeTaskCaches.containsKey(detectorId)) {
+            ADRealtimeTaskCache realtimeTaskCache = realtimeTaskCaches.get(detectorId);
+            if (newState != null) {
+                realtimeTaskCache.setState(newState);
+            }
+            if (newInitProgress != null) {
+                realtimeTaskCache.setInitProgress(newInitProgress);
+            }
+            if (newError != null) {
+                realtimeTaskCache.setError(newError);
+            }
+            logger.debug("------ ylwdebug update realtime task cache successfully");
         }
     }
 
