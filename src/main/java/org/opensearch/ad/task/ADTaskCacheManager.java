@@ -821,4 +821,8 @@ public class ADTaskCacheManager {
             realtimeTaskCaches.remove(detectorId);
         }
     }
+
+    public ADRealtimeTaskCache getRealtimeTaskCache(String detectorId) {
+        return realtimeTaskCaches.get(detectorId);
+    }
 }

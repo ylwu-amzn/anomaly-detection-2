@@ -58,6 +58,16 @@ public class AnomalyResultResponse extends ActionResponse implements ToXContentO
     private List<FeatureData> features;
     private Long rcfTotalUpdates;
     private Long detectorIntervalInMinutes;
+    private Boolean isHCDetector;
+
+    public AnomalyResultResponse(
+            double anomalyGrade,
+            double confidence,
+            double anomalyScore,
+            List<FeatureData> features
+    ) {
+        this(anomalyGrade, confidence, anomalyScore, features, null, null, null, null);
+    }
 
     public AnomalyResultResponse(
         double anomalyGrade,
@@ -67,7 +77,19 @@ public class AnomalyResultResponse extends ActionResponse implements ToXContentO
         Long rcfTotalUpdates,
         Long detectorIntervalInMinutes
     ) {
-        this(anomalyGrade, confidence, anomalyScore, features, null, rcfTotalUpdates, detectorIntervalInMinutes);
+        this(anomalyGrade, confidence, anomalyScore, features, null, rcfTotalUpdates, detectorIntervalInMinutes, null);
+    }
+
+    public AnomalyResultResponse(
+            double anomalyGrade,
+            double confidence,
+            double anomalyScore,
+            List<FeatureData> features,
+            String error,
+            Long rcfTotalUpdates,
+            Long detectorIntervalInMinutes
+    ) {
+        this(anomalyGrade, confidence, anomalyScore, features, error, rcfTotalUpdates, detectorIntervalInMinutes, null);
     }
 
     public AnomalyResultResponse(
@@ -77,7 +99,8 @@ public class AnomalyResultResponse extends ActionResponse implements ToXContentO
         List<FeatureData> features,
         String error,
         Long rcfTotalUpdates,
-        Long detectorIntervalInMinutes
+        Long detectorIntervalInMinutes,
+        Boolean isHCDetector
     ) {
         this.anomalyGrade = anomalyGrade;
         this.confidence = confidence;
@@ -86,6 +109,7 @@ public class AnomalyResultResponse extends ActionResponse implements ToXContentO
         this.error = error;
         this.rcfTotalUpdates = rcfTotalUpdates;
         this.detectorIntervalInMinutes = detectorIntervalInMinutes;
+        this.isHCDetector = isHCDetector;
     }
 
     public AnomalyResultResponse(StreamInput in) throws IOException {
@@ -101,6 +125,7 @@ public class AnomalyResultResponse extends ActionResponse implements ToXContentO
         error = in.readOptionalString();
         rcfTotalUpdates = in.readOptionalLong();
         detectorIntervalInMinutes = in.readOptionalLong();
+        isHCDetector = in.readOptionalBoolean();
     }
 
     public double getAnomalyGrade() {
@@ -131,6 +156,10 @@ public class AnomalyResultResponse extends ActionResponse implements ToXContentO
         return detectorIntervalInMinutes;
     }
 
+    public Boolean isHCDetector() {
+        return isHCDetector;
+    }
+
     @Override
     public void writeTo(StreamOutput out) throws IOException {
         out.writeDouble(anomalyGrade);
@@ -143,6 +172,7 @@ public class AnomalyResultResponse extends ActionResponse implements ToXContentO
         out.writeOptionalString(error);
         out.writeOptionalLong(rcfTotalUpdates);
         out.writeOptionalLong(detectorIntervalInMinutes);
+        out.writeOptionalBoolean(isHCDetector);
     }
 
     @Override

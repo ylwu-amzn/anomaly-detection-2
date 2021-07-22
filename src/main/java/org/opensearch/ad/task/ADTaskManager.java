@@ -66,6 +66,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiConsumer;
@@ -1978,4 +1979,8 @@ public class ADTaskManager {
         }
     }
 
+    public boolean skipUpdateHCRealtimeTask(String detectorId, String error) {
+        ADRealtimeTaskCache realtimeTaskCache = adTaskCacheManager.getRealtimeTaskCache(detectorId);
+        return realtimeTaskCache != null && realtimeTaskCache.getInitProgress() == 1.0 && Objects.equals(error, realtimeTaskCache.getError());
+    }
 }

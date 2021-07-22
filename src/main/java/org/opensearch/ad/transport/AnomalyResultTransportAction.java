@@ -476,7 +476,7 @@ public class AnomalyResultTransportAction extends HandledTransportAction<ActionR
                 } else {
                     listener
                         .onResponse(
-                            new AnomalyResultResponse(Double.NaN, Double.NaN, Double.NaN, new ArrayList<FeatureData>(), null, null)
+                            new AnomalyResultResponse(Double.NaN, Double.NaN, Double.NaN, new ArrayList<FeatureData>(), null, null, anomalyDetector.getDetectorIntervalInMinutes(), true)
                         );
                 }
                 return;
@@ -612,8 +612,7 @@ public class AnomalyResultTransportAction extends HandledTransportAction<ActionR
                     rcfPartitionNum,
                     responseCount,
                     adID,
-                    detector.getEnabledFeatureIds().size(),
-                    detector.getDetectorIntervalInMinutes()
+                    detector.getEnabledFeatureIds().size()
                 );
 
                 transportService
@@ -772,6 +771,7 @@ public class AnomalyResultTransportAction extends HandledTransportAction<ActionR
         return true;
     }
 
+    // For single entity detector
     class RCFActionListener implements ActionListener<RCFResultResponse> {
         private List<RCFResultResponse> rcfResults;
         private String modelID;
@@ -786,7 +786,6 @@ public class AnomalyResultTransportAction extends HandledTransportAction<ActionR
         private final AtomicInteger responseCount;
         private final String adID;
         private int numEnabledFeatures;
-        private long intervalMinutes;
 
         RCFActionListener(
             List<RCFResultResponse> rcfResults,
@@ -801,8 +800,7 @@ public class AnomalyResultTransportAction extends HandledTransportAction<ActionR
             int nodeCount,
             AtomicInteger responseCount,
             String adID,
-            int numEnabledFeatures,
-            long intervalMinutes
+            int numEnabledFeatures
         ) {
             this.rcfResults = rcfResults;
             this.modelID = modelID;
@@ -817,7 +815,6 @@ public class AnomalyResultTransportAction extends HandledTransportAction<ActionR
             this.responseCount = responseCount;
             this.adID = adID;
             this.numEnabledFeatures = numEnabledFeatures;
-            this.intervalMinutes = intervalMinutes;
         }
 
         @Override
@@ -897,6 +894,7 @@ public class AnomalyResultTransportAction extends HandledTransportAction<ActionR
         }
     }
 
+    // For single entity detector
     class ThresholdActionListener implements ActionListener<ThresholdResultResponse> {
         private AtomicReference<AnomalyResultResponse> anomalyResultResponse;
         private List<FeatureData> features;
