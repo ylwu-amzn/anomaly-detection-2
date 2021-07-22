@@ -581,7 +581,7 @@ public class AnomalyDetector implements Writeable, ToXContentObject {
     }
 
     public Integer getShingleSize() {
-        return shingleSize;
+        return isMultientityDetector() ? DEFAULT_MULTI_ENTITY_SHINGLE : shingleSize;
     }
 
     /**

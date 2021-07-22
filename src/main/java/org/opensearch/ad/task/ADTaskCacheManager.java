@@ -834,7 +834,7 @@ public class ADTaskCacheManager {
             if (newError != null) {
                 realtimeTaskCache.setError(newError);
             }
-            logger.debug("------ ylwdebug update realtime task cache successfully");
+            logger.debug("update realtime task cache successfully");
         }
     }
 

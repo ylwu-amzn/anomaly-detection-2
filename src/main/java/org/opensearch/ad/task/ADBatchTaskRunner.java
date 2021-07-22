@@ -1004,7 +1004,13 @@ public class ADBatchTaskRunner {
             } else {
                 double[] point = feature.getProcessedFeatures().get();
                 double score = rcf.getAnomalyScore(point);
-                rcf.update(point);
+                rcf.update(point); // error?
+//                if (point.length == rcf.getDimensions()) {
+//                    rcf.update(point); // error?
+//                    logger.info("---------- ylwdebug score {}", score);
+//                } else {
+//                    logger.info("---------- ylwdebug score {}", score);
+//                }
                 double grade = 0d;
                 double confidence = 0d;
                 if (!adTaskCacheManager.isThresholdModelTrained(taskId)) {

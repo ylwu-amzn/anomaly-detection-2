@@ -83,7 +83,8 @@ public class ADBatchTaskCache {
         boolean isHC = detector.isMultientityDetector();
         int numberOfTrees = isHC ? MULTI_ENTITY_NUM_TREES : NUM_TREES;
         // use hard coded DEFAULT_MULTI_ENTITY_SHINGLE for historical HC as realtime HC is using this
-        int shingleSize = detector.isMultientityDetector() ? DEFAULT_MULTI_ENTITY_SHINGLE : detector.getShingleSize();
+//        int shingleSize = detector.isMultientityDetector() ? DEFAULT_MULTI_ENTITY_SHINGLE : detector.getShingleSize();
+        int shingleSize = detector.getShingleSize();
         this.shingle = new ArrayDeque<>(shingleSize);
         rcfModel = RandomCutForest
             .builder()

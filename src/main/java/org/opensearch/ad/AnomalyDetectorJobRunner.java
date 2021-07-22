@@ -470,7 +470,6 @@ public class AnomalyDetectorJobRunner implements ScheduledJobRunner {
         String detectorId = jobParameter.getName();
         detectorEndRunExceptionCount.remove(detectorId);
         try {
-            log.info("---------- ylwdebug skip or not: {}", (response.getAnomalyScore() <= 0 || Double.isNaN(response.getAnomalyScore())) && response.getError() == null);
             // skipping writing to the result index if not necessary
             // For a single-entity detector, the result is not useful if error is null
             // and rcf score (thus anomaly grade/confidence) is null.
@@ -503,7 +502,6 @@ public class AnomalyDetectorJobRunner implements ScheduledJobRunner {
                 indexUtil.getSchemaVersion(ADIndex.RESULT)
             );
             anomalyResultHandler.index(anomalyResult, detectorId);
-            log.info("----- ylwdebug aaaaaaaa {}, {}", detectorId, response.isHCDetector() != null && response.isHCDetector());
             updateRealtimeTask(response, detectorId);
         } catch (Exception e) {
             log.error("Failed to index anomaly result for " + detectorId, e);
@@ -518,9 +516,8 @@ public class AnomalyDetectorJobRunner implements ScheduledJobRunner {
             Set<DetectorProfileName> profiles = new HashSet<>();
             profiles.add(DetectorProfileName.INIT_PROGRESS);
             ProfileRequest profileRequest = new ProfileRequest(detectorId, profiles, true, dataNodes);
-            log.info("----- ylwdebug Start to get profile of detector {}, total updates: {}", detectorId);
             client.execute(ProfileAction.INSTANCE, profileRequest, ActionListener.wrap(r -> {
-                log.info("----- ylwdebug Start to update latest realtime task for HC detector {}, total updates: {}", detectorId, r.getTotalUpdates());
+                log.debug("Update latest realtime task for HC detector {}, total updates: {}", detectorId, r.getTotalUpdates());
                 adTaskManager
                         .updateLatestRealtimeTask(
                                 detectorId,
@@ -533,7 +530,7 @@ public class AnomalyDetectorJobRunner implements ScheduledJobRunner {
                 log.error("Failed to get init progress profile for " + detectorId, e);
             }));
         } else {
-            log.info("----- ylwdebug Start to update latest realtime task for SINGLE detector {}, total updates: {}", detectorId, response.getRcfTotalUpdates());
+            log.debug("Update latest realtime task for SINGLE detector {}, total updates: {}", detectorId, response.getRcfTotalUpdates());
             adTaskManager
                     .updateLatestRealtimeTask(
                             detectorId,

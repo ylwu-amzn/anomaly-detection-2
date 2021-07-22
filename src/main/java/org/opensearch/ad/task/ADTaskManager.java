@@ -1536,7 +1536,7 @@ public class ADTaskManager {
 
     public void updateLatestRealtimeADTask(String detectorId, Map<String, Object> updatedFields, String newState, Float newInitProgress, String newError) {
         updateLatestADTask(detectorId, ADTaskType.REALTIME_TASK_TYPES, updatedFields, ActionListener.wrap(r -> {
-            logger.debug("------ ylwdebug Updated latest realtime AD task successfully for detector {}", detectorId);
+            logger.debug("Updated latest realtime AD task successfully for detector {}", detectorId);
             adTaskCacheManager.updateRealtimeTaskCache(detectorId, newState, newInitProgress, newError);
         }, e-> {
             logger.error("Failed to update realtime task for detector " + detectorId, e);
@@ -1642,7 +1642,6 @@ public class ADTaskManager {
 
         error = Optional.ofNullable(error).orElse("");
         if (!adTaskCacheManager.checkIfRealtimeTaskChanged(detectorId, state, initProgress, error)) {
-            logger.debug("------ ylwdebug no update, so no need to update realtime task for {}", detectorId);
             return;
         }
         if (ADTaskState.STOPPED.name().equals(state)) {

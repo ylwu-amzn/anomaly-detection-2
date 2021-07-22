@@ -28,6 +28,7 @@ package org.opensearch.ad.feature;
 
 import static java.util.Arrays.copyOfRange;
 import static org.apache.commons.math3.linear.MatrixUtils.createRealMatrix;
+import static org.opensearch.ad.settings.AnomalyDetectorSettings.DEFAULT_MULTI_ENTITY_SHINGLE;
 
 import java.io.IOException;
 import java.time.Clock;
