@@ -985,7 +985,7 @@ public class ADBatchTaskRunner {
                     : "No data in current detection window";
                 AnomalyResult anomalyResult = new AnomalyResult(
                     adTask.getDetectorId(),
-                    taskId,
+                    adTask.getDetectorLevelTaskId(),
                     Double.NaN,
                     Double.NaN,
                     Double.NaN,
@@ -995,7 +995,7 @@ public class ADBatchTaskRunner {
                     executeStartTime,
                     Instant.now(),
                     error,
-                    null,
+                    adTask.getEntity(),
                     adTask.getDetector().getUser(),
                     anomalyDetectionIndices.getSchemaVersion(ADIndex.RESULT),
                     null
@@ -1024,10 +1024,9 @@ public class ADBatchTaskRunner {
                         threshold.update(score);
                     }
                 }
-
                 AnomalyResult anomalyResult = new AnomalyResult(
                     adTask.getDetectorId(),
-                    taskId,
+                    adTask.getDetectorLevelTaskId(),
                     score,
                     grade,
                     confidence,
@@ -1037,7 +1036,7 @@ public class ADBatchTaskRunner {
                     executeStartTime,
                     Instant.now(),
                     null,
-                    null,
+                    adTask.getEntity(),
                     adTask.getDetector().getUser(),
                     anomalyDetectionIndices.getSchemaVersion(ADIndex.RESULT),
                     null
