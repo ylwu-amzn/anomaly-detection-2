@@ -54,8 +54,10 @@ import org.opensearch.ad.cluster.HashRing;
 import org.opensearch.ad.common.exception.DuplicateTaskException;
 import org.opensearch.ad.indices.AnomalyDetectionIndices;
 import org.opensearch.ad.model.ADTask;
+import org.opensearch.ad.model.ADTaskState;
 import org.opensearch.ad.model.AnomalyDetector;
 import org.opensearch.ad.model.DetectionDateRange;
+import org.opensearch.ad.model.Entity;
 import org.opensearch.ad.transport.AnomalyDetectorJobResponse;
 import org.opensearch.ad.util.DiscoveryNodeFilterer;
 import org.opensearch.client.Client;
@@ -68,6 +70,7 @@ import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.TransportService;
 
 import com.google.common.collect.ImmutableList;
+import com.google.gson.Gson;
 
 public class ADTaskManagerTests extends ADUnitTestCase {
 
@@ -121,7 +124,8 @@ public class ADTaskManagerTests extends ADUnitTestCase {
             nodeFilter,
             hashRing,
             adTaskCacheManager,
-            threadPool
+            threadPool,
+            new Gson()
         );
 
         listener = spy(new ActionListener<AnomalyDetectorJobResponse>() {
@@ -182,5 +186,37 @@ public class ADTaskManagerTests extends ADUnitTestCase {
         ADTask adTask = TestHelpers.randomAdTask();
         adTaskManager.handleADTaskException(adTask, new DuplicateTaskException("test"));
         verify(client, times(1)).delete(any(), any());
+    }
+
+    public void testParseEntityForSingleCategoryHC() throws IOException {
+        ADTask adTask = TestHelpers
+            .randomAdTask(
+                randomAlphaOfLength(5),
+                ADTaskState.INIT,
+                Instant.now(),
+                randomAlphaOfLength(5),
+                TestHelpers.randomAnomalyDetectorUsingCategoryFields(randomAlphaOfLength(5), ImmutableList.of(randomAlphaOfLength(5)))
+            );
+        String entityValue = adTaskManager.getEntityValue(adTask);
+        Entity entity = adTaskManager.parseEntityFromValue(entityValue, adTask);
+        assertEquals(entity, adTask.getEntity());
+    }
+
+    public void testParseEntityForMultiCategoryHC() throws IOException {
+        ADTask adTask = TestHelpers
+            .randomAdTask(
+                randomAlphaOfLength(5),
+                ADTaskState.INIT,
+                Instant.now(),
+                randomAlphaOfLength(5),
+                TestHelpers
+                    .randomAnomalyDetectorUsingCategoryFields(
+                        randomAlphaOfLength(5),
+                        ImmutableList.of(randomAlphaOfLength(5), randomAlphaOfLength(5))
+                    )
+            );
+        String entityValue = adTaskManager.getEntityValue(adTask);
+        Entity entity = adTaskManager.parseEntityFromValue(entityValue, adTask);
+        assertEquals(entity, adTask.getEntity());
     }
 }

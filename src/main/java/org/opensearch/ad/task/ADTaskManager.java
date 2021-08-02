@@ -64,6 +64,8 @@ import static org.opensearch.ad.util.RestHandlerUtils.createXContentParserFromRe
 import static org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken;
 
 import java.io.IOException;
+import java.security.AccessController;
+import java.security.PrivilegedAction;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -120,6 +122,7 @@ import org.opensearch.ad.model.AnomalyDetector;
 import org.opensearch.ad.model.AnomalyDetectorJob;
 import org.opensearch.ad.model.DetectionDateRange;
 import org.opensearch.ad.model.DetectorProfile;
+import org.opensearch.ad.model.Entity;
 import org.opensearch.ad.rest.handler.AnomalyDetectorFunction;
 import org.opensearch.ad.rest.handler.IndexAnomalyDetectorJobActionHandler;
 import org.opensearch.ad.transport.ADBatchAnomalyResultAction;
@@ -166,6 +169,7 @@ import org.opensearch.transport.TransportService;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.gson.Gson;
 
 /**
  * Manage AD task.
@@ -180,6 +184,7 @@ public class ADTaskManager {
     private final AnomalyDetectionIndices detectionIndices;
     private final DiscoveryNodeFilterer nodeFilter;
     private final ADTaskCacheManager adTaskCacheManager;
+    private final Gson gson;
 
     private final HashRing hashRing;
     private volatile Integer maxOldAdTaskDocsPerDetector;
@@ -197,7 +202,8 @@ public class ADTaskManager {
         DiscoveryNodeFilterer nodeFilter,
         HashRing hashRing,
         ADTaskCacheManager adTaskCacheManager,
-        ThreadPool threadPool
+        ThreadPool threadPool,
+        Gson gson
     ) {
         this.client = client;
         this.xContentRegistry = xContentRegistry;
@@ -206,6 +212,7 @@ public class ADTaskManager {
         this.clusterService = clusterService;
         this.adTaskCacheManager = adTaskCacheManager;
         this.hashRing = hashRing;
+        this.gson = gson;
 
         this.maxOldAdTaskDocsPerDetector = MAX_OLD_AD_TASK_DOCS_PER_DETECTOR.get(settings);
         clusterService
@@ -786,7 +793,7 @@ public class ADTaskManager {
                             .entrySet()
                             .stream()
                             .filter(entry -> !taskId.equals(entry.getKey()))
-                            .map(entry -> entry.getValue().getEntity().getAttributes().get(adTask.getDetector().getCategoryField().get(0)))
+                            .map(entry -> getEntityValue(entry.getValue().getEntity(), adTask.getDetector()))
                             .collect(Collectors.toList());
                         if (runningTasksInCoordinatingNodeCache.size() > runningTasksOnWorkerNode.size()) {
                             runningTasksInCoordinatingNodeCache.removeAll(runningTasksOnWorkerNode);
@@ -1294,7 +1301,7 @@ public class ADTaskManager {
                     }
                 }
                 client.execute(BulkAction.INSTANCE, bulkRequest, ActionListener.wrap(res -> {
-                    logger.info("AD tasks deleted for detector {}", detectorId);
+                    logger.info("Old AD tasks deleted for detector {}", detectorId);
                     BulkItemResponse[] bulkItemResponses = res.getItems();
                     if (bulkItemResponses != null && bulkItemResponses.length > 0) {
                         for (BulkItemResponse bulkItemResponse : bulkItemResponses) {
@@ -1514,6 +1521,7 @@ public class ADTaskManager {
         client.execute(DeleteByQueryAction.INSTANCE, request, ActionListener.wrap(r -> {
             if (r.getBulkFailures() == null || r.getBulkFailures().size() == 0) {
                 logger.info("AD tasks deleted for detector {}", detectorId);
+                deleteADResultOfDetector(detectorId);
                 function.execute();
             } else {
                 listener.onFailure(new OpenSearchStatusException("Failed to delete all AD tasks", RestStatus.INTERNAL_SERVER_ERROR));
@@ -1525,6 +1533,31 @@ public class ADTaskManager {
                 listener.onFailure(e);
             }
         }));
+    }
+
+    private void deleteADResultOfDetector(String detectorId) {
+        DeleteByQueryRequest deleteADResultsRequest = new DeleteByQueryRequest(ALL_AD_RESULTS_INDEX_PATTERN);
+        deleteADResultsRequest.setQuery(new TermQueryBuilder(DETECTOR_ID_FIELD, detectorId));
+        client
+            .execute(
+                DeleteByQueryAction.INSTANCE,
+                deleteADResultsRequest,
+                ActionListener
+                    .wrap(response -> { logger.debug("Successfully deleted AD results of detector " + detectorId); }, exception -> {
+                        logger.error("Failed to delete AD results for detector " + detectorId, exception);
+                        adTaskCacheManager.addDeletedDetector(detectorId);
+                    })
+            );
+    }
+
+    /**
+     * Clean AD results of deleted detector.
+     */
+    public void cleanADResultOfDeletedDetector() {
+        String detectorId = adTaskCacheManager.pollDeletedDetector();
+        if (detectorId != null) {
+            deleteADResultOfDetector(detectorId);
+        }
     }
 
     /**
@@ -2023,7 +2056,7 @@ public class ADTaskManager {
      * complex as we need to store model checkpoints to resume from last break point and we need to handle kinds
      * of edge cases. Here we just ignore the stale running entity rather than rerun it. We plan to add scheduler
      * on historical analysis, then we will store model checkpoints. Will support resuming failed tasks by then.
-     * //TODO: support resuming failed taks
+     * //TODO: support resuming failed task
      *
      * @param adTask AD task
      * @param entity entity value
@@ -2212,4 +2245,32 @@ public class ADTaskManager {
             );
     }
 
+    public String getEntityValue(ADTask adTask) {
+        if (adTask == null || !adTask.isEntityTask()) {
+            return null;
+        }
+        AnomalyDetector detector = adTask.getDetector();
+        return getEntityValue(adTask.getEntity(), detector);
+    }
+
+    public String getEntityValue(Entity entity, AnomalyDetector detector) {
+        if (detector.isMultiCategoryDetector()) {
+            return AccessController.doPrivileged((PrivilegedAction<String>) () -> gson.toJson(entity));
+        }
+        if (detector.isMultientityDetector()) {
+            String categoryField = detector.getCategoryField().get(0);
+            return entity.getAttributes().get(categoryField);
+        }
+        return null;
+    }
+
+    public Entity parseEntityFromValue(String entityValue, ADTask adTask) {
+        AnomalyDetector detector = adTask.getDetector();
+        if (detector.isMultiCategoryDetector()) {
+            return AccessController.doPrivileged((PrivilegedAction<Entity>) () -> gson.fromJson(entityValue, Entity.class));
+        } else if (detector.isMultientityDetector()) {
+            return Entity.createSingleAttributeEntity(detector.getCategoryField().get(0), entityValue);
+        }
+        throw new IllegalArgumentException("Fail to parse to Entity for single flow detector");
+    }
 }
