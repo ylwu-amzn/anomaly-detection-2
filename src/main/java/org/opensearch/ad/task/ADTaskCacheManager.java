@@ -799,7 +799,7 @@ public class ADTaskCacheManager {
      * @param newError new error
      * @return true if realtime task changed comparing with realtime task cache.
      */
-    public boolean checkIfRealtimeTaskChanged(String detectorId, String newState, Float newInitProgress, String newError) {
+    public boolean isRealtimeTaskChanged(String detectorId, String newState, Float newInitProgress, String newError) {
         if (realtimeTaskCaches.containsKey(detectorId)) {
             ADRealtimeTaskCache realtimeTaskCache = realtimeTaskCaches.get(detectorId);
             boolean stateChanged = false;
@@ -921,5 +921,16 @@ public class ADTaskCacheManager {
      */
     public String pollDeletedDetector() {
         return this.deletedDetectors.poll();
+    }
+
+    public synchronized boolean isDetectorTaskStateChanged(String detectorId, String newState) {
+        if (hcTaskCaches.containsKey(detectorId)) {
+            return !Objects.equals(hcTaskCaches.get(detectorId).getDetectorTaskState(), newState);
+        }
+        return true;
+    }
+
+    public synchronized void updateDetectorTaskState(String detectorId, String newState) {
+        this.getHCTaskCache(detectorId).setDetectorTaskState(newState);
     }
 }

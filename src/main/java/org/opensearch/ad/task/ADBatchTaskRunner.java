@@ -356,9 +356,7 @@ public class ADBatchTaskRunner {
     ) {
         checkIfADTaskCancelled(adTask.getTaskId());
         ActionListener<List<Entity>> topEntitiesListener = ActionListener.wrap(topEntities -> {
-            topEntities.forEach(entity -> priorityTracker.updatePriority(adTaskManager.getEntityValue(entity, adTask.getDetector()))
-            // .updatePriority(AccessController.doPrivileged((PrivilegedAction<String>) () -> gson.toJson(entity)))
-            );
+            topEntities.forEach(entity -> priorityTracker.updatePriority(adTaskManager.getEntityValue(entity, adTask.getDetector())));
 
             if (dataEndTime < detectionEndTime) {
                 searchTopEntitiesForMultiCategoryHC(
@@ -1157,6 +1155,10 @@ public class ADBatchTaskRunner {
         String taskState = initProgress >= 1.0f ? ADTaskState.RUNNING.name() : ADTaskState.INIT.name();
         logger.debug("Init progress: {}, taskState:{}, task id: {}", initProgress, taskState, taskId);
 
+        if (initProgress >= 1.0f && adTask.isEntityTask()) {
+            updateDetectorLevelTaskState(adTask.getDetectorId(), adTask.getParentTaskId(), ADTaskState.RUNNING.name());
+        }
+
         if (pieceStartTime < dataEndTime) {
             checkIfADTaskCancelled(adTask.getTaskId());
             threadPool.schedule(() -> {
@@ -1224,6 +1226,30 @@ public class ADBatchTaskRunner {
                         ),
                     ActionListener.wrap(r -> internalListener.onResponse("task execution done"), e -> internalListener.onFailure(e))
                 );
+        }
+    }
+
+    private void updateDetectorLevelTaskState(String detectorId, String detectorTaskId, String newState) {
+        adTaskManager.getADTask(detectorTaskId, ActionListener.wrap(task -> {
+            if (task.isPresent()) {
+                adTaskCacheManager.updateDetectorTaskState(detectorId, task.get().getState());
+                if (adTaskCacheManager.isDetectorTaskStateChanged(detectorId, newState)) {
+                    adTaskManager
+                        .updateADTask(
+                            detectorTaskId,
+                            ImmutableMap.of(STATE_FIELD, newState),
+                            ActionListener
+                                .wrap(
+                                    r -> { adTaskCacheManager.updateDetectorTaskState(detectorId, newState); },
+                                    e -> { logger.debug("Failed to update detector level task " + detectorTaskId, e); }
+                                )
+                        );
+                }
+            }
+        }, exception -> { logger.error("failed to get detector level task " + detectorTaskId, exception); }));
+
+        if (adTaskCacheManager.isDetectorTaskStateChanged(detectorId, newState)) {
+            adTaskManager.updateADTask(detectorTaskId, ImmutableMap.of(STATE_FIELD, newState), ActionListener.wrap(r -> {}, e -> {}));
         }
     }
 
