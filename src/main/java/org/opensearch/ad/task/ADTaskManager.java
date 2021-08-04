@@ -109,6 +109,7 @@ import org.opensearch.action.update.UpdateRequest;
 import org.opensearch.action.update.UpdateResponse;
 import org.opensearch.ad.cluster.HashRing;
 import org.opensearch.ad.common.exception.ADTaskCancelledException;
+import org.opensearch.ad.common.exception.AnomalyDetectionException;
 import org.opensearch.ad.common.exception.DuplicateTaskException;
 import org.opensearch.ad.common.exception.LimitExceededException;
 import org.opensearch.ad.common.exception.ResourceNotFoundException;
@@ -140,12 +141,16 @@ import org.opensearch.ad.util.RestHandlerUtils;
 import org.opensearch.client.Client;
 import org.opensearch.cluster.node.DiscoveryNode;
 import org.opensearch.cluster.service.ClusterService;
+import org.opensearch.common.bytes.BytesReference;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.unit.TimeValue;
+import org.opensearch.common.xcontent.LoggingDeprecationHandler;
 import org.opensearch.common.xcontent.NamedXContentRegistry;
+import org.opensearch.common.xcontent.ToXContent;
 import org.opensearch.common.xcontent.XContentBuilder;
 import org.opensearch.common.xcontent.XContentFactory;
 import org.opensearch.common.xcontent.XContentParser;
+import org.opensearch.common.xcontent.XContentType;
 import org.opensearch.commons.authuser.User;
 import org.opensearch.index.IndexNotFoundException;
 import org.opensearch.index.query.BoolQueryBuilder;
@@ -2255,7 +2260,14 @@ public class ADTaskManager {
 
     public String getEntityValue(Entity entity, AnomalyDetector detector) {
         if (detector.isMultiCategoryDetector()) {
-            return AccessController.doPrivileged((PrivilegedAction<String>) () -> gson.toJson(entity));
+            try {
+                XContentBuilder builder = entity.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS);
+                return BytesReference.bytes(builder).utf8ToString();
+            } catch (IOException e) {
+                String error = "Failed to parse entity into string";
+                logger.debug(error, e);
+                throw new AnomalyDetectionException(error);
+            }
         }
         if (detector.isMultientityDetector()) {
             String categoryField = detector.getCategoryField().get(0);
@@ -2267,7 +2279,15 @@ public class ADTaskManager {
     public Entity parseEntityFromValue(String entityValue, ADTask adTask) {
         AnomalyDetector detector = adTask.getDetector();
         if (detector.isMultiCategoryDetector()) {
-            return AccessController.doPrivileged((PrivilegedAction<Entity>) () -> gson.fromJson(entityValue, Entity.class));
+            try {
+                XContentParser parser = XContentType.JSON.xContent().createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, entityValue);
+                ensureExpectedToken(XContentParser.Token.START_ARRAY, parser.nextToken(), parser);
+                return Entity.parse(parser);
+            } catch (IOException e) {
+                String error = "Failed to parse string into entity";
+                logger.debug(error, e);
+                throw new AnomalyDetectionException(error);
+            }
         } else if (detector.isMultientityDetector()) {
             return Entity.createSingleAttributeEntity(detector.getCategoryField().get(0), entityValue);
         }

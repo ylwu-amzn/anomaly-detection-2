@@ -449,7 +449,7 @@ public class SearchFeatureDao extends AbstractRetriever {
                         .map(bucket -> Entity.createEntityByReordering(bucket.getKey()))
                         .collect(Collectors.toList());
                     // we only need at most maxEntitiesForPreview
-                    int amountToWrite = maxEntitiesForPreview - topEntities.size();
+                    int amountToWrite = maxEntitiesSize - topEntities.size();
                     for (int i = 0; i < amountToWrite && i < pageResults.size(); i++) {
                         topEntities.add(pageResults.get(i));
                     }
