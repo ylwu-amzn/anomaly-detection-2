@@ -33,6 +33,7 @@ import java.util.List;
 
 import org.opensearch.action.ActionRequest;
 import org.opensearch.action.ActionRequestValidationException;
+import org.opensearch.ad.common.exception.ADVersionConflictException;
 import org.opensearch.ad.constant.CommonErrorMessages;
 import org.opensearch.ad.model.ADTask;
 import org.opensearch.ad.model.ADTaskAction;
@@ -74,15 +75,18 @@ public class ForwardADTaskRequest extends ActionRequest {
         super(in);
         this.detector = new AnomalyDetector(in);
         if (in.readBoolean()) {
+            this.user = new User(in);
+        }
+        this.adTaskAction = in.readEnum(ADTaskAction.class);
+        if (in.available() == 0) {
+            throw new ADVersionConflictException("Can't process ForwardADTaskRequest of old version");
+        }
+        if (in.readBoolean()) {
             this.adTask = new ADTask(in);
         }
         if (in.readBoolean()) {
             this.detectionDateRange = new DetectionDateRange(in);
         }
-        if (in.readBoolean()) {
-            this.user = new User(in);
-        }
-        this.adTaskAction = in.readEnum(ADTaskAction.class);
         this.staleRunningEntities = in.readOptionalStringList();
     }
 
@@ -90,19 +94,6 @@ public class ForwardADTaskRequest extends ActionRequest {
     public void writeTo(StreamOutput out) throws IOException {
         super.writeTo(out);
         detector.writeTo(out);
-        if (adTask != null) {
-            out.writeBoolean(true);
-            adTask.writeTo(out);
-        } else {
-            out.writeBoolean(false);
-        }
-
-        if (detectionDateRange != null) {
-            out.writeBoolean(true);
-            detectionDateRange.writeTo(out);
-        } else {
-            out.writeBoolean(false);
-        }
         if (user != null) {
             out.writeBoolean(true);
             user.writeTo(out);
@@ -110,6 +101,18 @@ public class ForwardADTaskRequest extends ActionRequest {
             out.writeBoolean(false);
         }
         out.writeEnum(adTaskAction);
+        if (adTask != null) {
+            out.writeBoolean(true);
+            adTask.writeTo(out);
+        } else {
+            out.writeBoolean(false);
+        }
+        if (detectionDateRange != null) {
+            out.writeBoolean(true);
+            detectionDateRange.writeTo(out);
+        } else {
+            out.writeBoolean(false);
+        }
         out.writeOptionalStringCollection(staleRunningEntities);
     }
 

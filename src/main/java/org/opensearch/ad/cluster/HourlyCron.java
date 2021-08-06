@@ -37,6 +37,8 @@ import org.opensearch.ad.util.DiscoveryNodeFilterer;
 import org.opensearch.client.Client;
 import org.opensearch.cluster.node.DiscoveryNode;
 
+import java.util.Set;
+
 public class HourlyCron implements Runnable {
     private static final Logger LOG = LogManager.getLogger(HourlyCron.class);
     static final String SUCCEEDS_LOG_MSG = "Hourly maintenance succeeds";
@@ -44,6 +46,7 @@ public class HourlyCron implements Runnable {
     static final String EXCEPTION_LOG_MSG = "Hourly maintenance has exception.";
     private DiscoveryNodeFilterer nodeFilter;
     private Client client;
+    private HashRing hashRing;
 
     public HourlyCron(Client client, DiscoveryNodeFilterer nodeFilter) {
         this.nodeFilter = nodeFilter;
@@ -52,7 +55,8 @@ public class HourlyCron implements Runnable {
 
     @Override
     public void run() {
-        DiscoveryNode[] dataNodes = nodeFilter.getEligibleDataNodes();
+//        DiscoveryNode[] dataNodes = nodeFilter.getEligibleDataNodes();
+        DiscoveryNode[] dataNodes = hashRing.getNodesWithSameLocalAdVersion();
 
         // we also add the cancel query function here based on query text from the negative cache.
 

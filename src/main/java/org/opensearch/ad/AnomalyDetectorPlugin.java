@@ -640,7 +640,7 @@ public class AnomalyDetectorPlugin extends Plugin implements ActionPlugin, Scrip
             stateManager
         );
 
-        HashRing hashRing = new HashRing(nodeFilter, getClock(), settings);
+        HashRing hashRing = new HashRing(nodeFilter, getClock(), settings, client, clusterService, xContentRegistry, anomalyDetectionIndices);
 
         anomalyDetectorRunner = new AnomalyDetectorRunner(modelManager, featureManager, AnomalyDetectorSettings.MAX_PREVIEW_RESULTS);
 

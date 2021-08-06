@@ -42,6 +42,7 @@ import java.util.stream.Collectors;
 
 import org.apache.logging.log4j.util.Strings;
 import org.opensearch.ad.annotation.Generated;
+import org.opensearch.ad.common.exception.ADVersionConflictException;
 import org.opensearch.ad.constant.CommonErrorMessages;
 import org.opensearch.ad.constant.CommonName;
 import org.opensearch.ad.constant.CommonValue;
@@ -267,6 +268,9 @@ public class AnomalyDetector implements Writeable, ToXContentObject {
             this.uiMetadata = input.readMap();
         } else {
             this.uiMetadata = null;
+        }
+        if (input.available() > 0) {
+            throw new ADVersionConflictException("Can't read AnomalyDetector of old AD version");
         }
     }
 

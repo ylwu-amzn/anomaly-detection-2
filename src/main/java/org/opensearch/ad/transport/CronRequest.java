@@ -29,6 +29,7 @@ package org.opensearch.ad.transport;
 import java.io.IOException;
 
 import org.opensearch.action.support.nodes.BaseNodesRequest;
+import org.opensearch.ad.common.exception.ADVersionConflictException;
 import org.opensearch.ad.util.Bwc;
 import org.opensearch.cluster.node.DiscoveryNode;
 import org.opensearch.common.io.stream.StreamInput;
@@ -44,9 +45,10 @@ public class CronRequest extends BaseNodesRequest<CronRequest> {
 
     public CronRequest(StreamInput in) throws IOException {
         super(in);
-        if (Bwc.supportMultiCategoryFields(in.getVersion())) {
-            requestId = in.readString();
+        if (in.available() == 0) {
+            throw new ADVersionConflictException("Can't read CronRequest of old AD version");
         }
+        requestId = in.readString();
     }
 
     public CronRequest(DiscoveryNode... nodes) {

@@ -107,6 +107,7 @@ import org.opensearch.action.update.UpdateRequest;
 import org.opensearch.action.update.UpdateResponse;
 import org.opensearch.ad.cluster.HashRing;
 import org.opensearch.ad.common.exception.ADTaskCancelledException;
+import org.opensearch.ad.common.exception.ADVersionConflictException;
 import org.opensearch.ad.common.exception.AnomalyDetectionException;
 import org.opensearch.ad.common.exception.DuplicateTaskException;
 import org.opensearch.ad.common.exception.LimitExceededException;
@@ -290,7 +291,7 @@ public class ADTaskManager {
         ActionListener<AnomalyDetectorJobResponse> listener
     ) {
         String detectorId = detector.getDetectorId();
-        Optional<DiscoveryNode> owningNode = hashRing.getOwningNode(detectorId);
+        Optional<DiscoveryNode> owningNode = hashRing.getOwningNodeWithSameAdVersion(detectorId, clusterService.localNode().getId());
         if (!owningNode.isPresent()) {
             logger.debug("Can't find eligible node to run as AD task's coordinating node");
             listener.onFailure(new OpenSearchStatusException("No eligible node to run detector", RestStatus.INTERNAL_SERVER_ERROR));
@@ -338,6 +339,12 @@ public class ADTaskManager {
         DiscoveryNode node,
         ActionListener<AnomalyDetectorJobResponse> listener
     ) {
+        validateAdVersion(node.getId());
+//        DiscoveryNode localNode = clusterService.localNode();
+//        hashRing.validateAdVersion(localNode.getId(), node.getId());
+//        if (!hashRing.hasSameAdVersion(localNode.getId(), node.getId())) {
+//            throw new ADVersionConflictException("Different AD version on remote node " + node.getId() + ". Local node AD version: " + hashRing.getAdVersion(localNode.getId()) + ", remote node AD version: " + hashRing.getAdVersion(node.getId()));
+//        }
         transportService
             .sendRequest(
                 node,
@@ -348,6 +355,10 @@ public class ADTaskManager {
             );
     }
 
+    public void validateAdVersion(String remoteNodeId) {
+        DiscoveryNode localNode = clusterService.localNode();
+        hashRing.validateAdVersion(localNode.getId(), remoteNodeId);
+    }
     /**
      * Forward AD task to coordinating node
      *
@@ -1697,6 +1708,64 @@ public class ADTaskManager {
             updatedFields.put(ERROR_FIELD, error);
         }
         updateLatestRealtimeADTask(detectorId, updatedFields, state, initProgress, error);
+    }
+
+    public void updateLatestRealtimeTask(
+            String detectorId,
+            String newState,
+            Long rcfTotalUpdates,
+            Long detectorIntervalInMinutes,
+            String error,
+            ActionListener<UpdateResponse> listener
+    ) {
+        Float initProgress = null;
+        String state = null;
+        // calculate init progress and task state with RCF total updates
+        if (detectorIntervalInMinutes != null && rcfTotalUpdates != null) {
+            state = ADTaskState.INIT.name();
+            if (rcfTotalUpdates < NUM_MIN_SAMPLES) {
+                initProgress = (float) rcfTotalUpdates / NUM_MIN_SAMPLES;
+            } else {
+                state = ADTaskState.RUNNING.name();
+                initProgress = 1.0f;
+            }
+        }
+        // Check if new state is not null and override state calculated with rcf total updates
+        if (newState != null) {
+            state = newState;
+        }
+
+        error = Optional.ofNullable(error).orElse("");
+        if (!adTaskCacheManager.isRealtimeTaskChanged(detectorId, state, initProgress, error)) {
+            return;
+        }
+        if (ADTaskState.STOPPED.name().equals(state)) {
+            adTaskCacheManager.removeRealtimeTaskCache(detectorId);
+        }
+        Map<String, Object> updatedFields = new HashMap<>();
+        if (initProgress != null) {
+            updatedFields.put(INIT_PROGRESS_FIELD, initProgress);
+            updatedFields.put(ESTIMATED_MINUTES_LEFT_FIELD, Math.max(0, NUM_MIN_SAMPLES - rcfTotalUpdates) * detectorIntervalInMinutes);
+        }
+        if (state != null) {
+            updatedFields.put(STATE_FIELD, state);
+        }
+        if (error != null) {
+            updatedFields.put(ERROR_FIELD, error);
+        }
+        Float newInitProgress = initProgress;
+        String newError = error;
+        updateLatestADTask(detectorId, ADTaskType.REALTIME_TASK_TYPES, updatedFields, ActionListener.wrap(r -> {
+            logger.debug("Updated latest realtime AD task successfully for detector {}", detectorId);
+            adTaskCacheManager.updateRealtimeTaskCache(detectorId, newState, newInitProgress, newError);
+            listener.onResponse(r);
+        }, e -> { logger.error("Failed to update realtime task for detector " + detectorId, e); listener.onFailure(e); }));
+    }
+
+    public void createRealtimeTask(AnomalyDetectorJob job) {
+        ConcurrentLinkedQueue<AnomalyDetectorJob> detectorJobs = new ConcurrentLinkedQueue<>();
+        detectorJobs.add(job);
+        hashRing.backfillRealtimeTask(detectorJobs);
     }
 
     /**

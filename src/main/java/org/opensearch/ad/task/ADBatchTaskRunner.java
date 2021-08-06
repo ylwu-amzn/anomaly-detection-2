@@ -654,6 +654,7 @@ public class ADBatchTaskRunner {
                 startADBatchTaskOnWorkerNode(adTask, false, transportService, workerNodeResponseListener);
             } else {
                 // Execute batch task remotely
+                adTaskManager.validateAdVersion(node.getId());
                 transportService
                     .sendRequest(
                         node,
@@ -680,6 +681,7 @@ public class ADBatchTaskRunner {
         ADStatsRequest adStatsRequest = new ADStatsRequest(dataNodes);
         adStatsRequest.addAll(ImmutableSet.of(AD_EXECUTING_BATCH_TASK_COUNT.getName(), JVM_HEAP_USAGE.getName()));
 
+        //TODO: check if stats API can work for mixed cluster
         client.execute(ADStatsNodesAction.INSTANCE, adStatsRequest, ActionListener.wrap(adStatsResponse -> {
             List<ADStatsNodeResponse> candidateNodeResponse = adStatsResponse
                 .getNodes()

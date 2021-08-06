@@ -32,6 +32,7 @@ import java.io.IOException;
 import java.time.Instant;
 
 import org.opensearch.ad.annotation.Generated;
+import org.opensearch.ad.common.exception.ADVersionConflictException;
 import org.opensearch.ad.util.ParseUtils;
 import org.opensearch.common.io.stream.StreamInput;
 import org.opensearch.common.io.stream.StreamOutput;
@@ -124,6 +125,14 @@ public class ADTask implements ToXContentObject, Writeable {
         this.coordinatingNode = input.readOptionalString();
         this.workerNode = input.readOptionalString();
         if (input.readBoolean()) {
+            this.user = new User(input);
+        } else {
+            user = null;
+        }
+        if (input.available() == 0) {
+            throw new ADVersionConflictException("Can't read ADTask of old AD version");
+        }
+        if (input.readBoolean()) {
             this.detectionDateRange = new DetectionDateRange(input);
         } else {
             this.detectionDateRange = null;
@@ -135,11 +144,6 @@ public class ADTask implements ToXContentObject, Writeable {
         }
         this.parentTaskId = input.readOptionalString();
         this.estimatedMinutesLeft = input.readOptionalInt();
-        if (input.readBoolean()) {
-            this.user = new User(input);
-        } else {
-            user = null;
-        }
     }
 
     @Override
@@ -167,6 +171,12 @@ public class ADTask implements ToXContentObject, Writeable {
         out.writeOptionalString(stoppedBy);
         out.writeOptionalString(coordinatingNode);
         out.writeOptionalString(workerNode);
+        if (user != null) {
+            out.writeBoolean(true); // user exists
+            user.writeTo(out);
+        } else {
+            out.writeBoolean(false); // user does not exist
+        }
         if (detectionDateRange != null) {
             out.writeBoolean(true);
             detectionDateRange.writeTo(out);
@@ -181,12 +191,6 @@ public class ADTask implements ToXContentObject, Writeable {
         }
         out.writeOptionalString(parentTaskId);
         out.writeOptionalInt(estimatedMinutesLeft);
-        if (user != null) {
-            out.writeBoolean(true); // user exists
-            user.writeTo(out);
-        } else {
-            out.writeBoolean(false); // user does not exist
-        }
     }
 
     public static Builder builder() {
@@ -764,6 +768,10 @@ public class ADTask implements ToXContentObject, Writeable {
 
     public DetectionDateRange getDetectionDateRange() {
         return detectionDateRange;
+    }
+
+    public void setDetectionDateRange(DetectionDateRange detectionDateRange) {
+        this.detectionDateRange = detectionDateRange;
     }
 
     public Entity getEntity() {
