@@ -48,6 +48,7 @@ import org.opensearch.action.get.GetRequest;
 import org.opensearch.action.get.GetResponse;
 import org.opensearch.action.index.IndexRequest;
 import org.opensearch.action.support.WriteRequest;
+import org.opensearch.ad.cluster.HashRing;
 import org.opensearch.ad.common.exception.AnomalyDetectionException;
 import org.opensearch.ad.common.exception.EndRunException;
 import org.opensearch.ad.common.exception.InternalFailure;
@@ -524,7 +525,9 @@ public class AnomalyDetectorJobRunner implements ScheduledJobRunner {
         if (response.isHCDetector() != null
             && response.isHCDetector()
             && !adTaskManager.skipUpdateHCRealtimeTask(detectorId, response.getError())) {
-            DiscoveryNode[] dataNodes = nodeFilter.getEligibleDataNodes();
+             DiscoveryNode[] dataNodes = nodeFilter.getEligibleDataNodes();
+//            DiscoveryNode[] dataNodes = hashRing.getNodesWithSameLocalAdVersion();
+
             Set<DetectorProfileName> profiles = new HashSet<>();
             profiles.add(DetectorProfileName.INIT_PROGRESS);
             ProfileRequest profileRequest = new ProfileRequest(detectorId, profiles, true, dataNodes);

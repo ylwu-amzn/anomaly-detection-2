@@ -51,6 +51,7 @@ import static org.opensearch.ad.model.ADTaskState.NOT_ENDED_STATES;
 import static org.opensearch.ad.model.ADTaskType.ALL_HISTORICAL_TASK_TYPES;
 import static org.opensearch.ad.model.ADTaskType.HISTORICAL_DETECTOR_TASK_TYPES;
 import static org.opensearch.ad.model.ADTaskType.REALTIME_TASK_TYPES;
+import static org.opensearch.ad.model.ADTaskType.taskTypeToString;
 import static org.opensearch.ad.model.AnomalyDetector.ANOMALY_DETECTORS_INDEX;
 import static org.opensearch.ad.model.AnomalyDetectorJob.ANOMALY_DETECTOR_JOB_INDEX;
 import static org.opensearch.ad.model.AnomalyResult.TASK_ID_FIELD;
@@ -105,6 +106,7 @@ import org.opensearch.action.search.SearchResponse;
 import org.opensearch.action.support.WriteRequest;
 import org.opensearch.action.update.UpdateRequest;
 import org.opensearch.action.update.UpdateResponse;
+import org.opensearch.ad.cluster.ADDataMigrator;
 import org.opensearch.ad.cluster.HashRing;
 import org.opensearch.ad.common.exception.ADTaskCancelledException;
 import org.opensearch.ad.common.exception.ADVersionConflictException;
@@ -187,6 +189,7 @@ public class ADTaskManager {
     private final AnomalyDetectionIndices detectionIndices;
     private final DiscoveryNodeFilterer nodeFilter;
     private final ADTaskCacheManager adTaskCacheManager;
+    private final ADDataMigrator dataMigrator;
 
     private final HashRing hashRing;
     private volatile Integer maxOldAdTaskDocsPerDetector;
@@ -204,7 +207,8 @@ public class ADTaskManager {
         DiscoveryNodeFilterer nodeFilter,
         HashRing hashRing,
         ADTaskCacheManager adTaskCacheManager,
-        ThreadPool threadPool
+        ThreadPool threadPool,
+        ADDataMigrator dataMigrator
     ) {
         this.client = client;
         this.xContentRegistry = xContentRegistry;
@@ -213,6 +217,7 @@ public class ADTaskManager {
         this.clusterService = clusterService;
         this.adTaskCacheManager = adTaskCacheManager;
         this.hashRing = hashRing;
+        this.dataMigrator = dataMigrator;
 
         this.maxOldAdTaskDocsPerDetector = MAX_OLD_AD_TASK_DOCS_PER_DETECTOR.get(settings);
         clusterService
@@ -612,10 +617,6 @@ public class ADTaskManager {
                 listener.onFailure(new OpenSearchStatusException(message, RestStatus.INTERNAL_SERVER_ERROR));
             }
         }, exception -> listener.onFailure(exception)));
-    }
-
-    private List<String> taskTypeToString(List<ADTaskType> adTaskTypes) {
-        return adTaskTypes.stream().map(type -> type.name()).collect(Collectors.toList());
     }
 
     /**
@@ -1765,7 +1766,7 @@ public class ADTaskManager {
     public void createRealtimeTask(AnomalyDetectorJob job) {
         ConcurrentLinkedQueue<AnomalyDetectorJob> detectorJobs = new ConcurrentLinkedQueue<>();
         detectorJobs.add(job);
-        hashRing.backfillRealtimeTask(detectorJobs);
+        dataMigrator.backfillRealtimeTask(detectorJobs);
     }
 
     /**

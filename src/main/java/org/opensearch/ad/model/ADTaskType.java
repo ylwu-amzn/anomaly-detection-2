@@ -27,6 +27,7 @@
 package org.opensearch.ad.model;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 import com.google.common.collect.ImmutableList;
 
@@ -50,4 +51,8 @@ public enum ADTaskType {
             ADTaskType.HISTORICAL_SINGLE_ENTITY,
             ADTaskType.HISTORICAL_HC_DETECTOR
         );
+
+    public static List<String> taskTypeToString(List<ADTaskType> adTaskTypes) {
+        return adTaskTypes.stream().map(type -> type.name()).collect(Collectors.toList());
+    }
 }

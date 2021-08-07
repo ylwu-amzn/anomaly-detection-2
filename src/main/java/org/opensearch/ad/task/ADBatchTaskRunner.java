@@ -68,6 +68,7 @@ import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.support.ThreadedActionListener;
 import org.opensearch.ad.breaker.ADCircuitBreakerService;
 import org.opensearch.ad.caching.PriorityTracker;
+import org.opensearch.ad.cluster.HashRing;
 import org.opensearch.ad.common.exception.ADTaskCancelledException;
 import org.opensearch.ad.common.exception.AnomalyDetectionException;
 import org.opensearch.ad.common.exception.EndRunException;
@@ -144,6 +145,7 @@ public class ADBatchTaskRunner {
 
     private final ADTaskCacheManager adTaskCacheManager;
     private final TransportRequestOptions option;
+    private final HashRing hashRing;
 
     private volatile Integer maxAdBatchTaskPerNode;
     private volatile Integer pieceSize;
@@ -167,7 +169,8 @@ public class ADBatchTaskRunner {
         ADStats adStats,
         AnomalyResultBulkIndexHandler anomalyResultBulkIndexHandler,
         ADTaskCacheManager adTaskCacheManager,
-        SearchFeatureDao searchFeatureDao
+        SearchFeatureDao searchFeatureDao,
+        HashRing hashRing
     ) {
         this.threadPool = threadPool;
         this.clusterService = clusterService;
@@ -188,6 +191,7 @@ public class ADBatchTaskRunner {
 
         this.adTaskCacheManager = adTaskCacheManager;
         this.searchFeatureDao = searchFeatureDao;
+        this.hashRing = hashRing;
 
         this.maxAdBatchTaskPerNode = MAX_BATCH_TASK_PER_NODE.get(settings);
         clusterService.getClusterSettings().addSettingsUpdateConsumer(MAX_BATCH_TASK_PER_NODE, it -> maxAdBatchTaskPerNode = it);
@@ -677,7 +681,8 @@ public class ADBatchTaskRunner {
     }
 
     private void dispatchTask(ADTask adTask, ActionListener<DiscoveryNode> listener) {
-        DiscoveryNode[] dataNodes = nodeFilter.getEligibleDataNodes();
+//        DiscoveryNode[] dataNodes = nodeFilter.getEligibleDataNodes();
+        DiscoveryNode[] dataNodes = hashRing.getNodesWithSameLocalAdVersion();
         ADStatsRequest adStatsRequest = new ADStatsRequest(dataNodes);
         adStatsRequest.addAll(ImmutableSet.of(AD_EXECUTING_BATCH_TASK_COUNT.getName(), JVM_HEAP_USAGE.getName()));
 

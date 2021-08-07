@@ -54,6 +54,7 @@ import org.opensearch.ad.caching.CacheProvider;
 import org.opensearch.ad.caching.EntityCache;
 import org.opensearch.ad.caching.PriorityCache;
 import org.opensearch.ad.cluster.ADClusterEventListener;
+import org.opensearch.ad.cluster.ADDataMigrator;
 import org.opensearch.ad.cluster.HashRing;
 import org.opensearch.ad.cluster.MasterEventListener;
 import org.opensearch.ad.constant.CommonName;
@@ -640,7 +641,8 @@ public class AnomalyDetectorPlugin extends Plugin implements ActionPlugin, Scrip
             stateManager
         );
 
-        HashRing hashRing = new HashRing(nodeFilter, getClock(), settings, client, clusterService, xContentRegistry, anomalyDetectionIndices);
+        ADDataMigrator dataMigrator = new ADDataMigrator(client, clusterService, xContentRegistry, anomalyDetectionIndices);
+        HashRing hashRing = new HashRing(nodeFilter, getClock(), settings, client, clusterService, xContentRegistry, anomalyDetectionIndices, dataMigrator);
 
         anomalyDetectorRunner = new AnomalyDetectorRunner(modelManager, featureManager, AnomalyDetectorSettings.MAX_PREVIEW_RESULTS);
 
@@ -692,7 +694,8 @@ public class AnomalyDetectorPlugin extends Plugin implements ActionPlugin, Scrip
             nodeFilter,
             hashRing,
             adTaskCacheManager,
-            threadPool
+            threadPool,
+            dataMigrator
         );
         AnomalyResultBulkIndexHandler anomalyResultBulkIndexHandler = new AnomalyResultBulkIndexHandler(
             client,
@@ -718,7 +721,8 @@ public class AnomalyDetectorPlugin extends Plugin implements ActionPlugin, Scrip
             adStats,
             anomalyResultBulkIndexHandler,
             adTaskCacheManager,
-            searchFeatureDao
+            searchFeatureDao,
+            hashRing
         );
 
         ADSearchHandler adSearchHandler = new ADSearchHandler(settings, clusterService, client);
