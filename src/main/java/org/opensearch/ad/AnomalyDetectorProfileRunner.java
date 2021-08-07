@@ -47,6 +47,7 @@ import org.opensearch.action.ActionListener;
 import org.opensearch.action.get.GetRequest;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
+import org.opensearch.ad.cluster.HashRing;
 import org.opensearch.ad.common.exception.ResourceNotFoundException;
 import org.opensearch.ad.constant.CommonErrorMessages;
 import org.opensearch.ad.constant.CommonName;
@@ -88,14 +89,14 @@ public class AnomalyDetectorProfileRunner extends AbstractProfileRunner {
     private final Logger logger = LogManager.getLogger(AnomalyDetectorProfileRunner.class);
     private Client client;
     private NamedXContentRegistry xContentRegistry;
-    private DiscoveryNodeFilterer nodeFilter;
+    private final HashRing hashRing;
     private final TransportService transportService;
     private final ADTaskManager adTaskManager;
 
     public AnomalyDetectorProfileRunner(
         Client client,
         NamedXContentRegistry xContentRegistry,
-        DiscoveryNodeFilterer nodeFilter,
+        HashRing hashRing,
         long requiredSamples,
         TransportService transportService,
         ADTaskManager adTaskManager
@@ -103,7 +104,7 @@ public class AnomalyDetectorProfileRunner extends AbstractProfileRunner {
         super(requiredSamples);
         this.client = client;
         this.xContentRegistry = xContentRegistry;
-        this.nodeFilter = nodeFilter;
+        this.hashRing = hashRing;
         if (requiredSamples <= 0) {
             throw new IllegalArgumentException("required samples should be a positive number, but was " + requiredSamples);
         }
@@ -359,7 +360,7 @@ public class AnomalyDetectorProfileRunner extends AbstractProfileRunner {
         boolean forMultiEntityDetector,
         MultiResponsesDelegateActionListener<DetectorProfile> listener
     ) {
-        DiscoveryNode[] dataNodes = nodeFilter.getEligibleDataNodes();
+        DiscoveryNode[] dataNodes = hashRing.getNodesWithSameLocalAdVersion();
         ProfileRequest profileRequest = new ProfileRequest(detector.getDetectorId(), profiles, forMultiEntityDetector, dataNodes);
         client.execute(ProfileAction.INSTANCE, profileRequest, onModelResponse(detector, profiles, job, listener));// get init progress
     }

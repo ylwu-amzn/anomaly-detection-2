@@ -335,7 +335,7 @@ public class AnomalyResultTransportAction extends HandledTransportAction<ActionR
                                 Collectors
                                     .groupingBy(
                                         // from entity name to its node
-                                        e -> hashRing.getOwningNode(e.getKey().toString()).get(),
+                                        e -> hashRing.getOwningNodeWithSameLocalAdVersion(e.getKey().toString()).get(),
                                         Collectors.toMap(Entry::getKey, Entry::getValue)
                                     )
                             )
@@ -511,7 +511,7 @@ public class AnomalyResultTransportAction extends HandledTransportAction<ActionR
 
             // HC logic ends and single entity logic starts here
             String thresholdModelID = modelPartitioner.getThresholdModelId(adID);
-            Optional<DiscoveryNode> asThresholdNode = hashRing.getOwningNode(thresholdModelID);
+            Optional<DiscoveryNode> asThresholdNode = hashRing.getOwningNodeWithSameLocalAdVersion(thresholdModelID);
             if (!asThresholdNode.isPresent()) {
                 listener.onFailure(new InternalFailure(adID, "Threshold model node is not available."));
                 return;
@@ -616,7 +616,7 @@ public class AnomalyResultTransportAction extends HandledTransportAction<ActionR
             for (int i = 0; i < rcfPartitionNum; i++) {
                 String rcfModelID = modelPartitioner.getRcfModelId(adID, i);
 
-                Optional<DiscoveryNode> rcfNode = hashRing.getOwningNode(rcfModelID.toString());
+                Optional<DiscoveryNode> rcfNode = hashRing.getOwningNodeWithSameLocalAdVersion(rcfModelID);
                 if (!rcfNode.isPresent()) {
                     continue;
                 }

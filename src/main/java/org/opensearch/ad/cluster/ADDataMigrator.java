@@ -36,6 +36,7 @@ import org.opensearch.action.get.GetRequest;
 import org.opensearch.action.index.IndexRequest;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.support.WriteRequest;
+import org.opensearch.ad.common.exception.ResourceNotFoundException;
 import org.opensearch.ad.constant.CommonName;
 import org.opensearch.ad.indices.AnomalyDetectionIndices;
 import org.opensearch.ad.model.ADTask;
@@ -66,6 +67,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.opensearch.ad.constant.CommonName.DETECTION_STATE_INDEX;
 import static org.opensearch.ad.model.ADTask.DETECTOR_ID_FIELD;
+import static org.opensearch.ad.model.ADTask.IS_LATEST_FIELD;
 import static org.opensearch.ad.model.ADTask.TASK_TYPE_FIELD;
 import static org.opensearch.ad.model.ADTaskType.taskTypeToString;
 import static org.opensearch.ad.model.AnomalyDetector.ANOMALY_DETECTORS_INDEX;
@@ -184,9 +186,10 @@ public class ADDataMigrator {
     private void checkIfRealtimeTaskExistsAndBackfill(String jobId, AnomalyDetectorFunction function) {
         BoolQueryBuilder query = new BoolQueryBuilder();
         query.filter(new TermQueryBuilder(DETECTOR_ID_FIELD, jobId));
+        // query.filter(new TermQueryBuilder(IS_LATEST_FIELD, true));
         query.filter(new TermsQueryBuilder(TASK_TYPE_FIELD, taskTypeToString(ADTaskType.REALTIME_TASK_TYPES)));
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder()
-                .query(new TermQueryBuilder(DETECTOR_ID_FIELD, jobId))
+                .query(query)
                 .size(1);
         SearchRequest searchRequest = new SearchRequest(DETECTION_STATE_INDEX).source(searchSourceBuilder);
         client.search(searchRequest, ActionListener.wrap(r -> {
@@ -194,8 +197,13 @@ public class ADDataMigrator {
                 logger.info("000000000000000000000000000000000000000000000000000000000000backfilltask task exists, no need to backfill "+jobId);
                 return;
             }
+            logger.info("000000000000000000000000000000000000000000000000000000000000backfilltask task doesn't exists, start to backfill "+jobId);
             function.execute();
         }, e -> {
+            if (e instanceof ResourceNotFoundException) {
+                logger.info("000000000000000000000000000000000000000000000000000000000000backfilltask task +++++++ doesn't exists, start to backfill "+jobId);
+                function.execute();
+            }
             logger.error("Failed to search tasks of detector " + jobId);
         }));
     }

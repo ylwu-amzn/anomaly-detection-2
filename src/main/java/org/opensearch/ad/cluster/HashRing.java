@@ -342,6 +342,10 @@ public class HashRing {
         return Optional.ofNullable(Optional.ofNullable(entry).orElse(circle.firstEntry())).map(x -> x.getValue());
     }
 
+    public Optional<DiscoveryNode> getOwningNodeWithSameLocalAdVersion(String modelId) {
+        return getOwningNodeWithSameAdVersion(modelId, clusterService.localNode().getId());
+    }
+
     public Optional<DiscoveryNode> getOwningNodeWithSameAdVersion(String modelId, String nodeId) {
         build();
 
@@ -390,14 +394,23 @@ public class HashRing {
         return nodeAdVersions.get(nodeId);
     }
 
-    public boolean hasSameAdVersion(String nodeId, String otherNodeId) {
-        return Objects.equals(nodeAdVersions.get(nodeId), nodeAdVersions.get(otherNodeId));
+    public String getLocalAdVersion() {
+        return nodeAdVersions.get(clusterService.localNode().getId());
     }
 
     public void validateAdVersion(String nodeId, String remoteNodeId) {
         if (!hasSameAdVersion(nodeId, remoteNodeId)) {
             throw new ADVersionConflictException("Different AD version on remote node " + remoteNodeId + ". Local node AD version: " + getAdVersion(nodeId) + ", remote node AD version: " + getAdVersion(remoteNodeId));
         }
+    }
+
+    public boolean hasSameAdVersion(String nodeId, String otherNodeId) {
+        return Objects.equals(nodeAdVersions.get(nodeId), nodeAdVersions.get(otherNodeId));
+    }
+
+    public boolean hasSameAdVersion(String nodeId) {
+        logger.info("--------------- yyyyyy, remote node id  {}, local node id : {}", nodeId, clusterService.localNode().getId());
+        return hasSameAdVersion(clusterService.localNode().getId(), nodeId);
     }
 
 }

@@ -60,6 +60,7 @@ import org.opensearch.action.support.HandledTransportAction;
 import org.opensearch.ad.AnomalyDetectorProfileRunner;
 import org.opensearch.ad.EntityProfileRunner;
 import org.opensearch.ad.Name;
+import org.opensearch.ad.cluster.HashRing;
 import org.opensearch.ad.model.ADTask;
 import org.opensearch.ad.model.ADTaskType;
 import org.opensearch.ad.model.AnomalyDetector;
@@ -106,6 +107,7 @@ public class GetAnomalyDetectorTransportAction extends HandledTransportAction<Ge
     private final TransportService transportService;
     private volatile Boolean filterByEnabled;
     private final ADTaskManager adTaskManager;
+    private final HashRing hashRing;
 
     @Inject
     public GetAnomalyDetectorTransportAction(
@@ -116,7 +118,8 @@ public class GetAnomalyDetectorTransportAction extends HandledTransportAction<Ge
         Client client,
         Settings settings,
         NamedXContentRegistry xContentRegistry,
-        ADTaskManager adTaskManager
+        ADTaskManager adTaskManager,
+        HashRing hashRing
     ) {
         super(GetAnomalyDetectorAction.NAME, transportService, actionFilters, GetAnomalyDetectorRequest::new);
         this.clusterService = clusterService;
@@ -140,6 +143,7 @@ public class GetAnomalyDetectorTransportAction extends HandledTransportAction<Ge
         clusterService.getClusterSettings().addSettingsUpdateConsumer(FILTER_BY_BACKEND_ROLES, it -> filterByEnabled = it);
         this.transportService = transportService;
         this.adTaskManager = adTaskManager;
+        this.hashRing = hashRing;
     }
 
     @Override
@@ -218,7 +222,7 @@ public class GetAnomalyDetectorTransportAction extends HandledTransportAction<Ge
                     AnomalyDetectorProfileRunner profileRunner = new AnomalyDetectorProfileRunner(
                         client,
                         xContentRegistry,
-                        nodeFilter,
+                        hashRing,
                         AnomalyDetectorSettings.NUM_MIN_SAMPLES,
                         transportService,
                         adTaskManager

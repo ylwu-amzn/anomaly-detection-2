@@ -34,6 +34,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import org.opensearch.ad.annotation.Generated;
+import org.opensearch.ad.common.exception.ADVersionConflictException;
 import org.opensearch.common.io.stream.StreamInput;
 import org.opensearch.common.io.stream.StreamOutput;
 import org.opensearch.common.io.stream.Writeable;
@@ -209,17 +210,19 @@ public class ADTaskProfile implements ToXContentObject, Writeable, Writeable.Wri
         this.thresholdModelTrainingDataSize = input.readOptionalInt();
         this.modelSizeInBytes = input.readOptionalLong();
         this.nodeId = input.readOptionalString();
-        if (input.readBoolean()) {
-            this.entity = new Entity(input);
-        } else {
-            this.entity = null;
+        if (input.available() > 0) {
+            if (input.readBoolean()) {
+                this.entity = new Entity(input);
+            } else {
+                this.entity = null;
+            }
+            this.taskId = input.readOptionalString();
+            this.adTaskType = input.readOptionalString();
+            totalEntitiesCount = input.readOptionalInt();
+            pendingEntitiesCount = input.readOptionalInt();
+            runningEntitiesCount = input.readOptionalInt();
+            runningEntities = input.readOptionalStringArray();
         }
-        this.taskId = input.readOptionalString();
-        this.adTaskType = input.readOptionalString();
-        totalEntitiesCount = input.readOptionalInt();
-        pendingEntitiesCount = input.readOptionalInt();
-        runningEntitiesCount = input.readOptionalInt();
-        runningEntities = input.readOptionalStringArray();
     }
 
     @Override

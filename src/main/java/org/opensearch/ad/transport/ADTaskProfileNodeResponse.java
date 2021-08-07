@@ -47,6 +47,8 @@ public class ADTaskProfileNodeResponse extends BaseNodeResponse {
     public ADTaskProfileNodeResponse(StreamInput in) throws IOException {
         super(in);
         if (in.readBoolean()) {
+//            byte[] buffer = new byte[Integer.BYTES];
+//            in.read(buffer);
             this.adTaskProfiles = in.readList(ADTaskProfile::new);
         } else {
             this.adTaskProfiles = null;
@@ -60,8 +62,13 @@ public class ADTaskProfileNodeResponse extends BaseNodeResponse {
     @Override
     public void writeTo(StreamOutput out) throws IOException {
         super.writeTo(out);
-        if (adTaskProfiles != null) {
-            out.writeBoolean(true);
+        if (adTaskProfiles != null && adTaskProfiles.size() > 0) {
+//            out.writeBoolean(true);
+//            if (adTaskProfiles.size() == 1) {
+//                adTaskProfiles.get(0).writeTo(out);
+//            } else {
+//                out.writeList(adTaskProfiles);
+//            }
             out.writeList(adTaskProfiles);
         } else {
             out.writeBoolean(false);

@@ -1013,8 +1013,9 @@ public class ADTaskManager {
     private void getADTaskProfile(ADTask adDetectorLevelTask, ActionListener<Map<String, ADTaskProfile>> listener) {
         String detectorId = adDetectorLevelTask.getDetectorId();
 
-        DiscoveryNode[] dataNodes = nodeFilter.getEligibleDataNodes();
-        ADTaskProfileRequest adTaskProfileRequest = new ADTaskProfileRequest(detectorId, dataNodes);
+        // DiscoveryNode[] dataNodes = nodeFilter.getEligibleDataNodes();
+        DiscoveryNode[] dataNodes = hashRing.getNodesWithSameLocalAdVersion();
+        ADTaskProfileRequest adTaskProfileRequest = new ADTaskProfileRequest(detectorId, hashRing, dataNodes);
         client.execute(ADTaskProfileAction.INSTANCE, adTaskProfileRequest, ActionListener.wrap(response -> {
             if (response.hasFailures()) {
                 listener.onFailure(response.failures().get(0));
