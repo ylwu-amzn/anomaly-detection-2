@@ -65,7 +65,7 @@ public class RCFResultResponse extends ActionResponse implements ToXContentObjec
         confidence = in.readDouble();
         forestSize = in.readVInt();
         attribution = in.readDoubleArray();
-        if (Bwc.supportMultiCategoryFields(in.getVersion())) {
+        if (in.available() > 0) {
             totalUpdates = in.readLong();
         }
     }
@@ -101,9 +101,12 @@ public class RCFResultResponse extends ActionResponse implements ToXContentObjec
         out.writeDouble(confidence);
         out.writeVInt(forestSize);
         out.writeDoubleArray(attribution);
-        if (Bwc.supportMultiCategoryFields(out.getVersion())) {
-            out.writeLong(totalUpdates);
-        }
+        // We have limit RCF result action can only be sent to nodes with same AD version check
+        // {@link AnomalyResultTransportAction#onFeatureResponseForSingleEntityDetector}, so it's
+        // safe to write total updates. The cons is we can't user other data nodes with different
+        // AD version to run realtime job while rolling upgrade. But this is some backend logic
+        // which user should not concern too much.
+        out.writeLong(totalUpdates);
     }
 
     @Override

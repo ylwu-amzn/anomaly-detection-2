@@ -94,8 +94,13 @@ public class ADDataMigrator {
     }
 
     public void migrateData() {
-        if (!dataMigrated.get()) {
+        if (!dataMigrated.getAndSet(true)) {
             logger.info("000000000000000000000000000000000000000000000000000000000000 start to backfilltask");
+
+            if (!detectionIndices.doesAnomalyDetectorJobIndexExist()) {
+                logger.info("000000000000000000000000000000000000000000000000000000000000 job index doesn't exist");
+                return;
+            }
 
             if (detectionIndices.doesDetectorStateIndexExist()) {
                 migrateDetectionStateToRealtimeTask();
@@ -158,7 +163,7 @@ public class ADDataMigrator {
         }
         String jobId = job.getName();
 
-        AnomalyDetectorFunction function = () -> {
+        AnomalyDetectorFunction createRealtimeTaskFunction = () -> {
             GetRequest getRequest = new GetRequest(DETECTION_STATE_INDEX, jobId);
             client.get(getRequest, ActionListener.wrap(r -> {
                 if (r != null && r.isExists()) {
@@ -180,13 +185,17 @@ public class ADDataMigrator {
                 createRealtimeADTask(job, null, detectorJobs);
             }));
         };
-        checkIfRealtimeTaskExistsAndBackfill(jobId, function);
+        checkIfRealtimeTaskExistsAndBackfill(job, createRealtimeTaskFunction, detectorJobs);
     }
 
-    private void checkIfRealtimeTaskExistsAndBackfill(String jobId, AnomalyDetectorFunction function) {
+    private void checkIfRealtimeTaskExistsAndBackfill(AnomalyDetectorJob job, AnomalyDetectorFunction createRealtimeTaskFunction, ConcurrentLinkedQueue<AnomalyDetectorJob> detectorJobs) {
+        String jobId = job.getName();
         BoolQueryBuilder query = new BoolQueryBuilder();
         query.filter(new TermQueryBuilder(DETECTOR_ID_FIELD, jobId));
-        // query.filter(new TermQueryBuilder(IS_LATEST_FIELD, true));
+        if (job.isEnabled()) {
+            query.filter(new TermQueryBuilder(IS_LATEST_FIELD, true));
+        }
+
         query.filter(new TermsQueryBuilder(TASK_TYPE_FIELD, taskTypeToString(ADTaskType.REALTIME_TASK_TYPES)));
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder()
                 .query(query)
@@ -195,14 +204,17 @@ public class ADDataMigrator {
         client.search(searchRequest, ActionListener.wrap(r -> {
             if (r != null && r.getHits().getTotalHits().value > 0) {
                 logger.info("000000000000000000000000000000000000000000000000000000000000backfilltask task exists, no need to backfill "+jobId);
+//                function.execute();
+                // Run next realtime job
+                backfillRealtimeTask(detectorJobs);
                 return;
             }
             logger.info("000000000000000000000000000000000000000000000000000000000000backfilltask task doesn't exists, start to backfill "+jobId);
-            function.execute();
+            createRealtimeTaskFunction.execute();
         }, e -> {
             if (e instanceof ResourceNotFoundException) {
                 logger.info("000000000000000000000000000000000000000000000000000000000000backfilltask task +++++++ doesn't exists, start to backfill "+jobId);
-                function.execute();
+                createRealtimeTaskFunction.execute();
             }
             logger.error("Failed to search tasks of detector " + jobId);
         }));
@@ -256,5 +268,9 @@ public class ADDataMigrator {
             logger.error("1111111111111backfilltask " + job.getName(), e);
             backfillRealtimeTask(detectorJobs);
         }));
+    }
+
+    public void setMigrationDone() {
+        this.dataMigrated.set(true);
     }
 }

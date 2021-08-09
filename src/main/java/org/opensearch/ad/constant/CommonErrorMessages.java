@@ -87,4 +87,6 @@ public class CommonErrorMessages {
     public static String FAIL_TO_DELETE_AD_RESULT = "Fail to delete anomaly result";
     public static String FAIL_TO_GET_STATS = "Fail to get stats";
     public static String FAIL_TO_SEARCH = "Fail to search";
+
+    public static String HISTORICAL_DETECTOR_IS_DEPRECATED = "Historical detector is deprecated";
 }

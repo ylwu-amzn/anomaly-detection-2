@@ -793,4 +793,12 @@ public class ADTask implements ToXContentObject, Writeable {
     public User getUser() {
         return user;
     }
+
+    public void setLatest(Boolean latest) {
+        isLatest = latest;
+    }
+
+    public void setLastUpdateTime(Instant lastUpdateTime) {
+        this.lastUpdateTime = lastUpdateTime;
+    }
 }

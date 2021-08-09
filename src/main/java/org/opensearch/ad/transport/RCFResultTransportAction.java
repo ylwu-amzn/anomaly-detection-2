@@ -74,7 +74,10 @@ public class RCFResultTransportAction extends HandledTransportAction<RCFResultRe
                     request.getFeatures(),
                     ActionListener
                         .wrap(
-                            result -> listener
+                            result -> {
+                                LOG.info("555555555555555555555555555555555555555555555555555555555555 sigle flow RCF model finised, total updates : {}, score: {}, forestSize: {}, confidence: {}",
+                                        result.getTotalUpdates(), result.getScore(), result.getForestSize(), result.getConfidence());
+                                listener
                                 .onResponse(
                                     new RCFResultResponse(
                                         result.getScore(),
@@ -83,7 +86,8 @@ public class RCFResultTransportAction extends HandledTransportAction<RCFResultRe
                                         result.getAttribution(),
                                         result.getTotalUpdates()
                                     )
-                                ),
+                                );
+                                },
                             exception -> {
                                 LOG.warn(exception);
                                 listener.onFailure(exception);

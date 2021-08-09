@@ -532,7 +532,7 @@ public class AnomalyDetectorJobRunner implements ScheduledJobRunner {
             profiles.add(DetectorProfileName.INIT_PROGRESS);
             ProfileRequest profileRequest = new ProfileRequest(detectorId, profiles, true, dataNodes);
             client.execute(ProfileAction.INSTANCE, profileRequest, ActionListener.wrap(r -> {
-                log.debug("Update latest realtime task for HC detector {}, total updates: {}", detectorId, r.getTotalUpdates());
+                log.info("Update latest realtime task for HC detector {}, total updates: {}", detectorId, r.getTotalUpdates());
                 updateLatestRealtimeTask(
                         jobParameter,
                         detectorId,
@@ -543,7 +543,7 @@ public class AnomalyDetectorJobRunner implements ScheduledJobRunner {
                     );
             }, e -> { log.error("Failed to get init progress profile for " + detectorId, e); }));
         } else {
-            log.debug("Update latest realtime task for SINGLE detector {}, total updates: {}", detectorId, response.getRcfTotalUpdates());
+            log.info("Update latest realtime task for SINGLE detector {}, total updates: {}", detectorId, response.getRcfTotalUpdates());
             updateLatestRealtimeTask(
                     jobParameter,
                     detectorId,
@@ -640,7 +640,8 @@ public class AnomalyDetectorJobRunner implements ScheduledJobRunner {
     private void updateLatestRealtimeTask(ScheduledJobParameter job, String detectorId, String taskState, Long rcfTotalUpdates, Long detectorIntervalInMinutes, String error) {
         adTaskManager.updateLatestRealtimeTask(detectorId, taskState, rcfTotalUpdates, detectorIntervalInMinutes, error,
                 ActionListener.wrap(r-> {
-                    log.info("Updated latest realtime task successfully for detector " + detectorId);
+                    log.info("Updated latest realtime task successfully for detector {}, taskState: {}, RCF total update: {}, detectorIntervalInMinutes: {}",
+                            detectorId, taskState, rcfTotalUpdates, detectorIntervalInMinutes);
                 }, e->{
                     if ((e instanceof ResourceNotFoundException) && e.getMessage().contains("can't find latest task")) {
                         adTaskManager.createRealtimeTask((AnomalyDetectorJob) job);

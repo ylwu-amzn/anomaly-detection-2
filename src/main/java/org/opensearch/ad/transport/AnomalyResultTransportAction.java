@@ -912,6 +912,10 @@ public class AnomalyResultTransportAction extends HandledTransportAction<ActionR
                 final AtomicReference<AnomalyResultResponse> anomalyResultResponse = new AtomicReference<>();
 
                 String thresholdNodeId = thresholdNode.getId();
+                for (RCFResultResponse result : rcfResults) {
+                    LOG.info("555555555555555555555555555555555555555555555555555555555555 single entity ddetector tottal updates: {}",
+                            result.getTotalUpdates());
+                }
                 long rcfTotalUpdates = rcfResults.get(0).getTotalUpdates();
                 LOG.info("Sending threshold request to {} for model {}", thresholdNodeId, thresholdModelID);
                 ThresholdActionListener thresholdListener = new ThresholdActionListener(

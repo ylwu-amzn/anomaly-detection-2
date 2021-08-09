@@ -32,7 +32,6 @@ import java.io.IOException;
 
 import org.opensearch.action.ActionRequestValidationException;
 import org.opensearch.action.support.nodes.BaseNodesRequest;
-import org.opensearch.ad.cluster.HashRing;
 import org.opensearch.ad.constant.CommonErrorMessages;
 import org.opensearch.cluster.node.DiscoveryNode;
 import org.opensearch.common.Strings;
@@ -42,17 +41,15 @@ import org.opensearch.common.io.stream.StreamOutput;
 public class ADTaskProfileRequest extends BaseNodesRequest<ADTaskProfileRequest> {
 
     private String detectorId;
-    private HashRing hashRing;
 
     public ADTaskProfileRequest(StreamInput in) throws IOException {
         super(in);
         this.detectorId = in.readString();
     }
 
-    public ADTaskProfileRequest(String detectorId, HashRing hashRing, DiscoveryNode... nodes) {
+    public ADTaskProfileRequest(String detectorId, DiscoveryNode... nodes) {
         super(nodes);
         this.detectorId = detectorId;
-        this.hashRing = hashRing;
     }
 
     @Override
@@ -72,9 +69,5 @@ public class ADTaskProfileRequest extends BaseNodesRequest<ADTaskProfileRequest>
 
     public String getDetectorId() {
         return detectorId;
-    }
-
-    public HashRing getHashRing() {
-        return hashRing;
     }
 }

@@ -32,6 +32,8 @@ import java.util.stream.Collectors;
 import com.google.common.collect.ImmutableList;
 
 public enum ADTaskType {
+    @Deprecated
+    HISTORICAL,
     REALTIME_SINGLE_ENTITY,
     REALTIME_HC_DETECTOR,
     HISTORICAL_SINGLE_ENTITY,
@@ -39,9 +41,9 @@ public enum ADTaskType {
     HISTORICAL_HC_ENTITY;
 
     public static List<ADTaskType> HISTORICAL_DETECTOR_TASK_TYPES = ImmutableList
-        .of(ADTaskType.HISTORICAL_HC_DETECTOR, ADTaskType.HISTORICAL_SINGLE_ENTITY);
+        .of(ADTaskType.HISTORICAL_HC_DETECTOR, ADTaskType.HISTORICAL_SINGLE_ENTITY, ADTaskType.HISTORICAL);
     public static List<ADTaskType> ALL_HISTORICAL_TASK_TYPES = ImmutableList
-        .of(ADTaskType.HISTORICAL_HC_DETECTOR, ADTaskType.HISTORICAL_SINGLE_ENTITY, ADTaskType.HISTORICAL_HC_ENTITY);
+        .of(ADTaskType.HISTORICAL_HC_DETECTOR, ADTaskType.HISTORICAL_SINGLE_ENTITY, ADTaskType.HISTORICAL_HC_ENTITY, ADTaskType.HISTORICAL);
     public static List<ADTaskType> REALTIME_TASK_TYPES = ImmutableList
         .of(ADTaskType.REALTIME_SINGLE_ENTITY, ADTaskType.REALTIME_HC_DETECTOR);
     public static List<ADTaskType> ALL_DETECTOR_TASK_TYPES = ImmutableList
@@ -49,7 +51,8 @@ public enum ADTaskType {
             ADTaskType.REALTIME_SINGLE_ENTITY,
             ADTaskType.REALTIME_HC_DETECTOR,
             ADTaskType.HISTORICAL_SINGLE_ENTITY,
-            ADTaskType.HISTORICAL_HC_DETECTOR
+            ADTaskType.HISTORICAL_HC_DETECTOR,
+            ADTaskType.HISTORICAL
         );
 
     public static List<String> taskTypeToString(List<ADTaskType> adTaskTypes) {

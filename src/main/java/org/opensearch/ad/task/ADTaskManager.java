@@ -34,6 +34,7 @@ import static org.opensearch.ad.constant.CommonErrorMessages.FAIL_TO_FIND_DETECT
 import static org.opensearch.ad.constant.CommonErrorMessages.NO_ELIGIBLE_NODE_TO_RUN_DETECTOR;
 import static org.opensearch.ad.constant.CommonName.DETECTION_STATE_INDEX;
 import static org.opensearch.ad.indices.AnomalyDetectionIndices.ALL_AD_RESULTS_INDEX_PATTERN;
+import static org.opensearch.ad.model.ADTask.COORDINATING_NODE_FIELD;
 import static org.opensearch.ad.model.ADTask.DETECTOR_ID_FIELD;
 import static org.opensearch.ad.model.ADTask.ERROR_FIELD;
 import static org.opensearch.ad.model.ADTask.ESTIMATED_MINUTES_LEFT_FIELD;
@@ -62,6 +63,7 @@ import static org.opensearch.ad.settings.AnomalyDetectorSettings.NUM_MIN_SAMPLES
 import static org.opensearch.ad.settings.AnomalyDetectorSettings.REQUEST_TIMEOUT;
 import static org.opensearch.ad.util.ExceptionUtil.getErrorMessage;
 import static org.opensearch.ad.util.ExceptionUtil.getShardsFailure;
+import static org.opensearch.ad.util.RestHandlerUtils.XCONTENT_WITH_TYPE;
 import static org.opensearch.ad.util.RestHandlerUtils.createXContentParserFromRegistry;
 import static org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken;
 
@@ -345,6 +347,7 @@ public class ADTaskManager {
         ActionListener<AnomalyDetectorJobResponse> listener
     ) {
         validateAdVersion(node.getId());
+        logger.info("------------- ylwudeb10 detector is : {}", detector.toString());
 //        DiscoveryNode localNode = clusterService.localNode();
 //        hashRing.validateAdVersion(localNode.getId(), node.getId());
 //        if (!hashRing.hasSameAdVersion(localNode.getId(), node.getId())) {
@@ -712,7 +715,7 @@ public class ADTaskManager {
             query.filter(nestedQueryBuilder);
         }
         SearchSourceBuilder sourceBuilder = new SearchSourceBuilder();
-        sourceBuilder.query(query).size(size);
+        sourceBuilder.query(query).sort(LAST_UPDATE_TIME_FIELD, SortOrder.DESC).size(size);
         SearchRequest searchRequest = new SearchRequest();
         searchRequest.source(sourceBuilder);
         searchRequest.indices(DETECTION_STATE_INDEX);
@@ -1015,7 +1018,7 @@ public class ADTaskManager {
 
         // DiscoveryNode[] dataNodes = nodeFilter.getEligibleDataNodes();
         DiscoveryNode[] dataNodes = hashRing.getNodesWithSameLocalAdVersion();
-        ADTaskProfileRequest adTaskProfileRequest = new ADTaskProfileRequest(detectorId, hashRing, dataNodes);
+        ADTaskProfileRequest adTaskProfileRequest = new ADTaskProfileRequest(detectorId, dataNodes);
         client.execute(ADTaskProfileAction.INSTANCE, adTaskProfileRequest, ActionListener.wrap(response -> {
             if (response.hasFailures()) {
                 listener.onFailure(response.failures().get(0));
@@ -1745,6 +1748,7 @@ public class ADTaskManager {
             adTaskCacheManager.removeRealtimeTaskCache(detectorId);
         }
         Map<String, Object> updatedFields = new HashMap<>();
+        updatedFields.put(COORDINATING_NODE_FIELD, clusterService.localNode().getId());
         if (initProgress != null) {
             updatedFields.put(INIT_PROGRESS_FIELD, initProgress);
             updatedFields.put(ESTIMATED_MINUTES_LEFT_FIELD, Math.max(0, NUM_MIN_SAMPLES - rcfTotalUpdates) * detectorIntervalInMinutes);
@@ -2400,6 +2404,41 @@ public class ADTaskManager {
                 logger.error("Failed to get AD task " + taskId, e);
                 listener.onFailure(e);
             }
+        }));
+    }
+
+    public void resetLatestFlagAsFalse(List<ADTask> adTasks) {
+        if (adTasks == null || adTasks.size() == 0) {
+            return;
+        }
+        BulkRequest bulkRequest = new BulkRequest();
+        adTasks.forEach(task -> {
+            try {
+                task.setLatest(false);
+                task.setLastUpdateTime(Instant.now());
+                IndexRequest indexRequest = new IndexRequest(DETECTION_STATE_INDEX)
+                        .id(task.getTaskId())
+                        .source(task.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), XCONTENT_WITH_TYPE));
+                bulkRequest.add(indexRequest);
+            } catch (Exception e) {
+                logger.error("3333333333333333333333333333333333333333333333333333333333333333333333333333 Fail to parse task AD task to XContent, task id " + task.getTaskId(), e);
+            }
+        });
+
+        bulkRequest.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
+        client.execute(BulkAction.INSTANCE, bulkRequest, ActionListener.wrap(res -> {
+            BulkItemResponse[] bulkItemResponses = res.getItems();
+            if (bulkItemResponses != null && bulkItemResponses.length > 0) {
+                for (BulkItemResponse bulkItemResponse : bulkItemResponses) {
+                    if (!bulkItemResponse.isFailed()) {
+                        logger.warn("3333333333333333333333333333333333333333333333333333333333333333333333333333 Reset AD tasks latest flag as false Successfully. Task id: {}", bulkItemResponse.getId());
+                    } else {
+                        logger.warn("3333333333333333333333333333333333333333333333333333333333333333333333333333 Failed to reset AD tasks latest flag as false. Task id: " + bulkItemResponse.getId());
+                    }
+                }
+            }
+        }, e -> {
+            logger.warn("Failed to reset AD tasks latest flag as false", e);
         }));
     }
 }

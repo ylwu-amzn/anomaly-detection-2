@@ -153,6 +153,13 @@ public class HashRing {
     private void buildCirclesOnAdVersions() {
         NodesInfoRequest nodesInfoRequest = new NodesInfoRequest();
         nodesInfoRequest.clear().addMetric(NodesInfoRequest.Metric.PLUGINS.metricName());
+        DiscoveryNode[] eligibleDataNodes = nodeFilter.getEligibleDataNodes();
+        Set<String> eligibleDataNodeIds = new HashSet<>();
+        if (eligibleDataNodes != null && eligibleDataNodes.length > 0) {
+            for (DiscoveryNode node : eligibleDataNodes) {
+                eligibleDataNodeIds.add(node.getId());
+            }
+        }
         client.admin().cluster().nodesInfo(nodesInfoRequest, ActionListener.wrap(r -> {
             logger.error("99999999998888888888 ylwudebug1: start to get node info to build hash ring");
             Map<String, NodeInfo> nodesMap = r.getNodesMap();
@@ -164,6 +171,9 @@ public class HashRing {
                         continue;
                     }
                     DiscoveryNode curNode = nodeInfo.getNode();
+                    if (!eligibleDataNodeIds.contains(curNode.getId())) {
+                        continue;
+                    }
                     TreeMap<Integer, DiscoveryNode> circle = null;
                     for (PluginInfo pluginInfo : plugins.getPluginInfos()) {
                         if ("opensearch-anomaly-detection".equals(pluginInfo.getName())) {
@@ -179,9 +189,25 @@ public class HashRing {
                     }
                 }
             }
-                    if (adVersionCircles.containsKey("1.0.0.0")) {
-                        dataMigrator.migrateData();
-                    }
+            String localNodeId = clusterService.localNode().getId();
+            if (adVersionCircles.containsKey("1.0.0.0") && adVersionCircles.size() > 1) {
+                Optional<DiscoveryNode> owningNode = getOwningNodeWithSameLocalAdVersion("1.0.0.0");
+                if (owningNode.isPresent() && localNodeId.equals(owningNode.get().getId())) {
+                    logger.info("---------------------------------------------------------------------this node should do migration");
+                    logger.info("---------------------------------------------------------------------this node should do migration");
+                    logger.info("---------------------------------------------------------------------this node should do migration");
+                    logger.info("---------------------------------------------------------------------this node should do migration");
+                    dataMigrator.migrateData();
+                } else {
+                    logger.info("---------------------------------------------------------------------nnnnnnnnnnnn this node should notdo migration");
+                    logger.info("---------------------------------------------------------------------nnnnnnnnnnnn this node should notdo migration");
+                    logger.info("---------------------------------------------------------------------nnnnnnnnnnnn this node should notdo migration");
+                    logger.info("---------------------------------------------------------------------nnnnnnnnnnnn this node should notdo migration");
+                    dataMigrator.setMigrationDone();
+                }
+            } else {
+                logger.info("---------------------------------------------------------------------11111 no need to migrate as all node runs 1.0.0.0");
+            }
 //            if (!dataMigrated.get() && adVersionCircles.containsKey("1.0.0.0")) {
 //                logger.info("000000000000000000000000000000000000000000000000000000000000 start to backfilltask");
 //                if (detectionIndices.doesDetectorStateIndexExist()) {
@@ -408,7 +434,7 @@ public class HashRing {
         return Objects.equals(nodeAdVersions.get(nodeId), nodeAdVersions.get(otherNodeId));
     }
 
-    public boolean hasSameAdVersion(String nodeId) {
+    public boolean hasSameAdVersionWithLocalNode(String nodeId) {
         logger.info("--------------- yyyyyy, remote node id  {}, local node id : {}", nodeId, clusterService.localNode().getId());
         return hasSameAdVersion(clusterService.localNode().getId(), nodeId);
     }
