@@ -119,6 +119,7 @@ public class ADClusterEventListener implements ClusterStateListener {
             boolean rebuiltDone = false;
 
             if (dataNodeAdded || dataNodeRemoved) {
+                LOG.info("================================================== rebuild hasssssring ");
                 rebuiltDone = hashRing.build();
             }
 

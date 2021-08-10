@@ -31,6 +31,7 @@ import static org.opensearch.action.ValidateActions.addValidationError;
 import java.io.IOException;
 import java.util.List;
 
+import org.opensearch.Version;
 import org.opensearch.action.ActionRequest;
 import org.opensearch.action.ActionRequestValidationException;
 import org.opensearch.ad.common.exception.ADVersionConflictException;
@@ -50,12 +51,18 @@ public class ForwardADTaskRequest extends ActionRequest {
     private List<String> staleRunningEntities;
     private User user;
     private ADTaskAction adTaskAction;
+    private Version remoteAdVersion;
 
-    public ForwardADTaskRequest(AnomalyDetector detector, DetectionDateRange detectionDateRange, User user, ADTaskAction adTaskAction) {
+    public ForwardADTaskRequest(AnomalyDetector detector, DetectionDateRange detectionDateRange, User user, ADTaskAction adTaskAction, Version remoteAdVersion) {
+//    public ForwardADTaskRequest(AnomalyDetector detector, DetectionDateRange detectionDateRange, User user, ADTaskAction adTaskAction) {
         this.detector = detector;
         this.detectionDateRange = detectionDateRange;
         this.user = user;
         this.adTaskAction = adTaskAction;
+        this.remoteAdVersion = remoteAdVersion;
+        if (remoteAdVersion == null || remoteAdVersion.onOrBefore(Version.V_1_0_0)) {
+            throw new ADVersionConflictException("Can't forward AD task request to node running old AD version " + remoteAdVersion);
+        }
     }
 
     public ForwardADTaskRequest(ADTask adTask, ADTaskAction adTaskAction) {

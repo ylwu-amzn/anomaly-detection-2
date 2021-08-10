@@ -93,6 +93,7 @@ import org.apache.lucene.search.join.ScoreMode;
 import org.opensearch.ExceptionsHelper;
 import org.opensearch.OpenSearchStatusException;
 import org.opensearch.ResourceAlreadyExistsException;
+import org.opensearch.Version;
 import org.opensearch.action.ActionListener;
 import org.opensearch.action.ActionListenerResponseHandler;
 import org.opensearch.action.bulk.BulkAction;
@@ -345,12 +346,15 @@ public class ADTaskManager {
         DiscoveryNode node,
         ActionListener<AnomalyDetectorJobResponse> listener
     ) {
-//        validateAdVersion(node.getId());
+        // TODO: check if we should remove this check
+//        hashRing.validateAdVersion(node.getId(), Version.V_1_0_0);
+        Version adVersion = hashRing.getAdVersionOfNode(node.getId());
         transportService
             .sendRequest(
                 node,
                 ForwardADTaskAction.NAME,
-                new ForwardADTaskRequest(detector, detectionDateRange, user, adTaskAction),
+                new ForwardADTaskRequest(detector, detectionDateRange, user, adTaskAction, adVersion),
+//                new ForwardADTaskRequest(detector, detectionDateRange, user, adTaskAction),
                 transportRequestOptions,
                 new ActionListenerResponseHandler<>(listener, AnomalyDetectorJobResponse::new)
             );

@@ -29,6 +29,7 @@ package org.opensearch.ad.cluster;
 import static org.opensearch.ad.settings.AnomalyDetectorSettings.COOLDOWN_MINUTES;
 
 import java.time.Clock;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
@@ -151,7 +152,8 @@ public class HashRing {
         return true;
     }
 
-    private void buildCirclesOnAdVersions() {
+    public void buildCirclesOnAdVersions() {
+        LOG.info("================================================== rebuild circles on AD versions ");
         NodesInfoRequest nodesInfoRequest = new NodesInfoRequest();
         nodesInfoRequest.clear().addMetric(NodesInfoRequest.Metric.PLUGINS.metricName());
         DiscoveryNode[] eligibleDataNodes = nodeFilter.getEligibleDataNodes();
@@ -161,9 +163,12 @@ public class HashRing {
                 eligibleDataNodeIds.add(node.getId());
             }
         }
+        LOG.info("================================================== rebuild circles on AD versions,  eligibleDataNodeIds: {}", Arrays.toString(eligibleDataNodeIds.toArray(new String[0])));
         client.admin().cluster().nodesInfo(nodesInfoRequest, ActionListener.wrap(r -> {
             logger.error("99999999998888888888 ylwudebug1: start to get node info to build hash ring");
             Map<String, NodeInfo> nodesMap = r.getNodesMap();
+            Set<String> cNodes = new HashSet<>();
+            LOG.info("================================================== rebuild circles on AD versions,  nodesMap Keys: {}", Arrays.toString(nodesMap.keySet().toArray(new String[0])));
             if (nodesMap != null && nodesMap.size() > 0) {
                 for (Map.Entry<String, NodeInfo> entry : nodesMap.entrySet()) {
                     NodeInfo nodeInfo = entry.getValue();
@@ -173,6 +178,7 @@ public class HashRing {
                     }
                     DiscoveryNode curNode = nodeInfo.getNode();
                     if (!eligibleDataNodeIds.contains(curNode.getId())) {
+                        LOG.info("================================================== rebuild circles on AD versions,  not eligible node: {} {}", curNode.getId(), curNode.getAddress().getAddress());
                         continue;
                     }
                     TreeMap<Integer, DiscoveryNode> circle = null;
@@ -180,17 +186,23 @@ public class HashRing {
                         if ("opensearch-anomaly-detection".equals(pluginInfo.getName())) {
                             Version version = ADVersionUtil.fromString(pluginInfo.getVersion());
                             circle = adVersionCircles.computeIfAbsent(version, key -> new TreeMap<>());
-                            circle.clear();
+//                            circle.clear();
                             nodeAdVersions.computeIfAbsent(curNode.getId(), key -> pluginInfo.getVersion());
+                            cNodes.add(curNode.getId());
+                            break;
                         }
                     }
                     if (circle != null) {
+                        circle.clear();
                         for (int i = 0; i < VIRTUAL_NODE_COUNT; i++) {
                             circle.put(Murmur3HashFunction.hash(curNode.getId() + i), curNode);
                         }
+                        LOG.info("================================================== rebuild circles on AD versions, add new node : {}, {}", curNode.getId(), curNode.getAddress().getAddress());
                     }
                 }
             }
+            LOG.info("================================================== eligible nodes: {}", Arrays.toString(eligibleDataNodeIds.toArray(new String[0])));
+            LOG.info("================================================== cNodes: {}", Arrays.toString(cNodes.toArray(new String[0])));
             //TODO: handle null pointer for lastEntry()
             if (adVersionCircles.firstEntry().getKey().onOrBefore(Version.V_1_0_0) && adVersionCircles.lastEntry().getKey().after(Version.V_1_0_0)) {
                 Optional<DiscoveryNode> owningNode = getOwningNodeWithHighestAdVersion(DEFAULT_HASH_RING_MODEL_ID);
@@ -336,6 +348,10 @@ public class HashRing {
         return nodeAdVersions.get(nodeId);
     }
 
+    public boolean hashNode(String nodeId) {
+        return nodeAdVersions.containsKey(nodeId);
+    }
+
     public Version getAdVersionOfNode(String nodeId) {
         return ADVersionUtil.fromString(nodeAdVersions.get(nodeId));
     }
@@ -350,4 +366,10 @@ public class HashRing {
         return Objects.equals(nodeAdVersions.get(nodeId), nodeAdVersions.get(otherNodeId));
     }
 
+    public void validateAdVersion(String nodeId, Version notSupportVersion) {
+        String nodeAdVersion = nodeAdVersions.get(nodeId);
+        if (ADVersionUtil.fromString(nodeAdVersion).onOrBefore(notSupportVersion)) {
+            throw new ADVersionConflictException("Can't run on node " + nodeId + " as it's running old AD version: " + nodeAdVersion);
+        }
+    }
 }
