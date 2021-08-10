@@ -35,14 +35,15 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.opensearch.Version;
 import org.opensearch.action.support.nodes.BaseNodeResponse;
-import org.opensearch.ad.model.ADTask;
+import org.opensearch.ad.cluster.ADVersionUtil;
+import org.opensearch.ad.cluster.HashRing;
 import org.opensearch.ad.model.ADTaskProfile;
 import org.opensearch.cluster.node.DiscoveryNode;
 import org.opensearch.common.io.stream.StreamInput;
 import org.opensearch.common.io.stream.StreamOutput;
 
 public class ADTaskProfileNodeResponse extends BaseNodeResponse {
-    private final Logger logger = LogManager.getLogger(this.getClass());
+    private static final Logger logger = LogManager.getLogger(ADTaskProfileNodeResponse.class);
     private List<ADTaskProfile> adTaskProfiles;
     private Version remoteAdVersion;
 
@@ -52,20 +53,40 @@ public class ADTaskProfileNodeResponse extends BaseNodeResponse {
         this.remoteAdVersion = remoteAdVersion;
     }
 
-    public ADTaskProfileNodeResponse(StreamInput in, Version remoteAdVersion) throws IOException {
+    //    public ADTaskProfileNodeResponse(StreamInput in, Version remoteAdVersion) throws IOException {
+//        super(in);
+//        DiscoveryNode node = this.getNode();
+//        node.getId();
+//        if (in.readBoolean()) {
+//            logger.info("6666666666666666666666 remote ad version is :  " + remoteAdVersion.toString());
+//            if (remoteAdVersion.onOrBefore(Version.V_1_0_0)) {
+//                logger.info("6666666666666666666 ylwudebu11: remote node AD version is 1.0.0.0, just parse 1 profile" );
+//                ADTaskProfile adTaskProfile = new ADTaskProfile(in);
+//                logger.info("6666666666666666666 ylwudebu11: remote node AD version is 1.0.0.0, just parse 1 profile : " + adTaskProfile );
+//                this.adTaskProfiles = ImmutableList.of(adTaskProfile);
+//            } else {
+//                logger.info("6666666666666666666 ylwudebu11: remote node AD version is {}, will read all profiles", remoteAdVersion );
+//                this.adTaskProfiles = in.readList(ADTaskProfile::new);
+//            }
+//        } else {
+//            this.adTaskProfiles = null;
+//        }
+//    }
+    public ADTaskProfileNodeResponse(StreamInput in, HashRing hashRing) throws IOException {
         super(in);
-
+        DiscoveryNode node = this.getNode();
+        String remoteNodeId = node.getId();
+        logger.info("66666666666666666666 hashRing is {}, remoteNodeId: {}", hashRing, remoteNodeId);
+        Version remoteAdVersion = ADVersionUtil.fromString(hashRing.getAdVersion(remoteNodeId));
         if (in.readBoolean()) {
-//            byte[] buffer = new byte[Integer.BYTES];
-//            in.read(buffer);
             logger.info("6666666666666666666666 remote ad version is :  " + remoteAdVersion.toString());
             if (remoteAdVersion.onOrBefore(Version.V_1_0_0)) {
-                logger.info("6666666666666666666 ylwudebu11: remote node AD version is 1.0.0.0, just parse 1 profile" );
+                logger.info("6666666666666666666 ylwudebu11: remote node AD version is 1.0.0.0, just parse 1 profile");
                 ADTaskProfile adTaskProfile = new ADTaskProfile(in);
-                logger.info("6666666666666666666 ylwudebu11: remote node AD version is 1.0.0.0, just parse 1 profile : " + adTaskProfile );
+                logger.info("6666666666666666666 ylwudebu11: remote node AD version is 1.0.0.0, just parse 1 profile : " + adTaskProfile);
                 this.adTaskProfiles = ImmutableList.of(adTaskProfile);
             } else {
-                logger.info("6666666666666666666 ylwudebu11: remote node AD version is {}, will read all profiles", remoteAdVersion );
+                logger.info("6666666666666666666 ylwudebu11: remote node AD version is {}, will read all profiles", remoteAdVersion);
                 this.adTaskProfiles = in.readList(ADTaskProfile::new);
             }
         } else {
@@ -105,25 +126,15 @@ public class ADTaskProfileNodeResponse extends BaseNodeResponse {
                 out.writeBoolean(false);
             }
         }
-
-//        if (adTaskProfiles != null && adTaskProfiles.size() > 0) {
-////            out.writeBoolean(true);
-////            if (adTaskProfiles.size() == 1) {
-////                adTaskProfiles.get(0).writeTo(out);
-////            } else {
-////                out.writeList(adTaskProfiles);
-////            }
-//            out.writeList(adTaskProfiles);
-//        } else {
-//            out.writeBoolean(false);
-//        }
     }
 
-    public static ADTaskProfileNodeResponse readNodeResponse(StreamInput in, Version remoteAdVersion) throws IOException {
-        return new ADTaskProfileNodeResponse(in, remoteAdVersion);
-    }
+//    public static ADTaskProfileNodeResponse readNodeResponse(StreamInput in, Version remoteAdVersion) throws IOException {
+//        logger.info("0000000000000000000000000000000 ADTaskProfileNodeResponse readNodeResponse with version " + remoteAdVersion);
+//        return new ADTaskProfileNodeResponse(in, remoteAdVersion);
+//    }
 
-    public static ADTaskProfileNodeResponse readNodeResponse(StreamInput in) throws IOException {
-        return new ADTaskProfileNodeResponse(in, null);
+    public static ADTaskProfileNodeResponse readNodeResponse(StreamInput in, HashRing hashRing) throws IOException {
+        logger.info("0000000000000000000000000000000 ADTaskProfileNodeResponse readNodeResponse with current version");
+        return new ADTaskProfileNodeResponse(in, hashRing);
     }
 }

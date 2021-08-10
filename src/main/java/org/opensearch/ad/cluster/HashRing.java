@@ -29,7 +29,6 @@ package org.opensearch.ad.cluster;
 import static org.opensearch.ad.settings.AnomalyDetectorSettings.COOLDOWN_MINUTES;
 
 import java.time.Clock;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
@@ -42,6 +41,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.opensearch.Version;
 import org.opensearch.action.ActionListener;
 import org.opensearch.action.admin.cluster.node.info.NodeInfo;
 import org.opensearch.action.admin.cluster.node.info.NodesInfoRequest;
@@ -66,6 +66,7 @@ public class HashRing {
     // Hash ring doesn't respond to more than 1 cluster membership changes within the
     // cool-down period.
     static final String COOLDOWN_MSG = "Hash ring doesn't respond to cluster state change within the cooldown period.";
+    private static final String DEFAULT_HASH_RING_MODEL_ID = "DEFAULT_HASHRING_MODEL_ID";
 
     private final int VIRTUAL_NODE_COUNT = 100;
     private final DiscoveryNodeFilterer nodeFilter;
@@ -78,7 +79,7 @@ public class HashRing {
     private AtomicBoolean membershipChangeRequied;
     private final Client client;
     private Map<String, String> nodeAdVersions;
-    private TreeMap<String, TreeMap<Integer, DiscoveryNode>> adVersionCircles;
+    private TreeMap<Version, TreeMap<Integer, DiscoveryNode>> adVersionCircles;
     private ClusterService clusterService;
     private ADDataMigrator dataMigrator;
     private final NamedXContentRegistry xContentRegistry;
@@ -177,7 +178,8 @@ public class HashRing {
                     TreeMap<Integer, DiscoveryNode> circle = null;
                     for (PluginInfo pluginInfo : plugins.getPluginInfos()) {
                         if ("opensearch-anomaly-detection".equals(pluginInfo.getName())) {
-                            circle = adVersionCircles.computeIfAbsent(pluginInfo.getVersion(), key -> new TreeMap<>());
+                            Version version = ADVersionUtil.fromString(pluginInfo.getVersion());
+                            circle = adVersionCircles.computeIfAbsent(version, key -> new TreeMap<>());
                             circle.clear();
                             nodeAdVersions.computeIfAbsent(curNode.getId(), key -> pluginInfo.getVersion());
                         }
@@ -189,9 +191,10 @@ public class HashRing {
                     }
                 }
             }
-            String localNodeId = clusterService.localNode().getId();
-            if (adVersionCircles.containsKey("1.0.0.0") && adVersionCircles.size() > 1) {
-                Optional<DiscoveryNode> owningNode = getOwningNodeWithSameLocalAdVersion("1.0.0.0");
+            //TODO: handle null pointer for lastEntry()
+            if (adVersionCircles.firstEntry().getKey().onOrBefore(Version.V_1_0_0) && adVersionCircles.lastEntry().getKey().after(Version.V_1_0_0)) {
+                Optional<DiscoveryNode> owningNode = getOwningNodeWithHighestAdVersion(DEFAULT_HASH_RING_MODEL_ID);
+                String localNodeId = clusterService.localNode().getId();
                 if (owningNode.isPresent() && localNodeId.equals(owningNode.get().getId())) {
                     logger.info("---------------------------------------------------------------------this node should do migration");
                     logger.info("---------------------------------------------------------------------this node should do migration");
@@ -208,146 +211,14 @@ public class HashRing {
             } else {
                 logger.info("---------------------------------------------------------------------11111 no need to migrate as all node runs 1.0.0.0");
             }
-//            if (!dataMigrated.get() && adVersionCircles.containsKey("1.0.0.0")) {
-//                logger.info("000000000000000000000000000000000000000000000000000000000000 start to backfilltask");
-//                if (detectionIndices.doesDetectorStateIndexExist()) {
-//                    migrateData();
-//                } else {
-//                    // If detection index doesn't exist, create index and execute historical detector.
-//                    detectionIndices.initDetectionStateIndex(ActionListener.wrap(res -> {
-//                        if (res.isAcknowledged()) {
-//                            logger.info("Created {} with mappings.", CommonName.DETECTION_STATE_INDEX);
-//                            migrateData();
-//                        } else {
-//                            String error = "Create index " + CommonName.DETECTION_STATE_INDEX + " with mappings not acknowledged";
-//                            logger.warn(error);
-//                        }
-//                    }, e -> {
-//                        if (ExceptionsHelper.unwrapCause(e) instanceof ResourceAlreadyExistsException) {
-//                            migrateData();
-//                        } else {
-//                            logger.error("Failed to init anomaly detection state index", e);
-//                        }
-//                    }));
-//                }
-//
-//            }
             logger.info("111111111111111111111111111111111111111111111111111111111111");
-            logger.info(Arrays.toString(adVersionCircles.keySet().toArray(new String[0])));
+            for (Version entry : adVersionCircles.keySet()) {
+                logger.info("111111111111111111111111111111111111111111111111111111111111 , version: " + entry);
+            }
         }, e -> {
             logger.error("99999999998888888888 ylwudebug1: failed to get node info to build hash ring", e);
         }));
     }
-
-//    private void migrateData() {
-//        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder().query(new MatchAllQueryBuilder()).size(MAX_DETECTOR_UPPER_LIMIT);
-//        SearchRequest searchRequest = new SearchRequest(ANOMALY_DETECTOR_JOB_INDEX).source(searchSourceBuilder);
-//        //TODO: check if realtime task exists in AD job runner.
-//        client.search(searchRequest, ActionListener.wrap(r -> {
-//            if (r == null || r.getHits().getTotalHits() == null || r.getHits().getTotalHits().value == 0) {
-//                logger.info("000000000000000000000000000000000000000000000000000000000000 No anomaly detector job found, will skip migrating data");
-//                return;
-//            }
-//            logger.info("000000000000000000000000000000000000000000000000000000000000 job count : {}", r.getHits().getTotalHits());
-//            ConcurrentLinkedQueue<AnomalyDetectorJob> detectorJobs = new ConcurrentLinkedQueue<>();
-//            Iterator<SearchHit> iterator = r.getHits().iterator();
-//            while (iterator.hasNext()) {
-//                SearchHit searchHit = iterator.next();
-//                try (XContentParser parser = createXContentParserFromRegistry(xContentRegistry, searchHit.getSourceRef())) {
-//                    ensureExpectedToken(XContentParser.Token.START_OBJECT, parser.nextToken(), parser);
-//                    AnomalyDetectorJob job = AnomalyDetectorJob.parse(parser);
-//                    detectorJobs.add(job);
-//                } catch (IOException e) {
-//                    logger.error("Fail to parse AD job " + searchHit.getId(), e);
-//                }
-//            }
-//            logger.info("000000000000000000000000000000000000000000000000000000000000backfilltask total jobs : {}", detectorJobs.size());
-//            backfillRealtimeTask(detectorJobs);
-//        }, e->{
-//            if (!(e instanceof IndexNotFoundException)) {
-//                logger.error("Failed to migrate AD data", e);
-//            }
-//        }));
-//    }
-
-//    public void backfillRealtimeTask(ConcurrentLinkedQueue<AnomalyDetectorJob> detectorJobs) {
-//        AnomalyDetectorJob job = detectorJobs.poll();
-//        if (job == null) {
-//            return;
-//        }
-//        String jobId = job.getName();
-//        GetRequest getRequest = new GetRequest(DETECTION_STATE_INDEX, jobId);
-//        client.get(getRequest, ActionListener.wrap(r -> {
-//            if (r != null && r.isExists()) {
-//                logger.info("000000000000000000000000000000000000000000000000000000000000backfilltask state exists for "+jobId);
-//                try (XContentParser parser = createXContentParserFromRegistry(xContentRegistry, r.getSourceAsBytesRef())) {
-//                    ensureExpectedToken(XContentParser.Token.START_OBJECT, parser.nextToken(), parser);
-//                    DetectorInternalState detectorState = DetectorInternalState.parse(parser);
-//                    createRealtimeADTask(job, detectorState.getError(), detectorJobs);
-//                } catch (IOException e) {
-//                    logger.error("1111111111111backfilltask " + jobId, e);
-//                    createRealtimeADTask(job, null, detectorJobs);
-//                }
-//            } else {
-//                logger.info("000000000000000000000000000000000000000000000000000000000000backfilltask state exists not for "+jobId);
-//                createRealtimeADTask(job, null, detectorJobs);
-//            }
-//        }, e -> {
-//            logger.error("1111111111111backfilltask22 " + jobId, e);
-//            createRealtimeADTask(job, null, detectorJobs);
-//        }));
-//    }
-
-//    private void createRealtimeADTask(AnomalyDetectorJob job, String error, ConcurrentLinkedQueue<AnomalyDetectorJob> detectorJobs) {
-//        logger.info("000000000000000000000000000000000000000000000000000000000000backfilltask start to create task for "+job.getName());
-//        client.get(new GetRequest(ANOMALY_DETECTORS_INDEX, job.getName()), ActionListener.wrap(r -> {
-//            if (r != null && r.isExists()) {
-//                try (XContentParser parser = createXContentParserFromRegistry(xContentRegistry, r.getSourceAsBytesRef())) {
-//                    ensureExpectedToken(XContentParser.Token.START_OBJECT, parser.nextToken(), parser);
-//                    AnomalyDetector detector = AnomalyDetector.parse(parser, r.getId());
-//                    ADTaskType taskType = detector.isMultientityDetector() ? ADTaskType.REALTIME_HC_DETECTOR : ADTaskType.REALTIME_SINGLE_ENTITY;
-//                    Instant now = Instant.now();
-//                    String userName = job.getUser() != null ? job.getUser().getName() : null;
-//                    ADTask adTask = new ADTask.Builder()
-//                            .detectorId(detector.getDetectorId())
-//                            .detector(detector)
-//                            .isLatest(true)
-//                            .taskType(taskType.name())
-//                            .executionStartTime(now)
-//                            .taskProgress(0.0f)
-//                            .initProgress(0.0f)
-//                            .state(ADTaskState.CREATED.name())
-//                            .lastUpdateTime(now)
-//                            .startedBy(userName)
-//                            .coordinatingNode(clusterService.localNode().getId())
-//                            .detectionDateRange(null)
-//                            .user(job.getUser())
-//                            .build();
-//                    IndexRequest indexRequest = new IndexRequest(DETECTION_STATE_INDEX)
-//                            .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
-//                            .source(adTask.toXContent(XContentFactory.jsonBuilder(), XCONTENT_WITH_TYPE));
-//                    logger.info("000000000000000000000000000000000000000000000000000000000000backfilltask start to create task22 for "+job.getName());
-//                    client.index(indexRequest, ActionListener.wrap(indexResponse -> {
-//                        logger.info("1111111111111backfilltask Backfilled realtime task successfully for detector {}", job.getName());
-//                        backfillRealtimeTask(detectorJobs);
-//                    }, ex -> {
-//                        logger.error("1111111111111backfilltask Failed to backfill realtime task for detector "+job.getName(), ex);
-//                        backfillRealtimeTask(detectorJobs);
-//                    }));
-//                } catch (IOException e) {
-//                    logger.error("1111111111111backfilltask " + job.getName(), e);
-//                    backfillRealtimeTask(detectorJobs);
-//                }
-//            } else {
-//                logger.error("1111111111111backfilltask job doesn't exist" + job.getName());
-//                backfillRealtimeTask(detectorJobs);
-//            }
-//        }, e -> {
-//            logger.error("1111111111111backfilltask " + job.getName(), e);
-//            backfillRealtimeTask(detectorJobs);
-//        }));
-//
-//    }
 
     /**
      * Compute the owning node of modelID using consistent hashing
@@ -370,6 +241,18 @@ public class HashRing {
 
     public Optional<DiscoveryNode> getOwningNodeWithSameLocalAdVersion(String modelId) {
         return getOwningNodeWithSameAdVersion(modelId, clusterService.localNode().getId());
+    }
+
+    public Optional<DiscoveryNode> getOwningNodeWithHighestAdVersion(String modelId) {
+        int modelHash = Murmur3HashFunction.hash(modelId);
+        TreeMap<Integer, DiscoveryNode> adVersionCircle = adVersionCircles.lastEntry().getValue();
+        Map.Entry<Integer, DiscoveryNode> entry = adVersionCircle.higherEntry(modelHash);
+        // The method can return an empty Optional. Say two concurrent getOwningNode requests to
+        // the hash ring before it's been built. The first one starts building it,
+        // turning on inProgress. The second one returns from build and continues on to
+        // the rest of hashing and look up while the ring is still being built and thus empty.
+        // The second getOwningNode request returns an empty Optional in this case.
+        return Optional.ofNullable(Optional.ofNullable(entry).orElse(adVersionCircle.firstEntry())).map(x -> x.getValue());
     }
 
     public Optional<DiscoveryNode> getOwningNodeWithSameAdVersion(String modelId, String nodeId) {
@@ -407,16 +290,45 @@ public class HashRing {
         return nodes;
     }
 
+    public Set<DiscoveryNode> getNodesWithSameAdVersion(Version adVersion) {
+        TreeMap<Integer, DiscoveryNode> circle = adVersionCircles.get(adVersion);
+        Set<String> nodeIds = new HashSet<>();
+        Set<DiscoveryNode> nodes = new HashSet<>();
+        if (circle == null) {
+            return nodes;
+        }
+        circle.entrySet().stream().forEach(e -> {
+            DiscoveryNode discoveryNode = e.getValue();
+            if (!nodeIds.contains(discoveryNode.getId())) {
+                nodeIds.add(discoveryNode.getId());
+                nodes.add(discoveryNode);
+            }
+        });
+        return nodes;
+    }
+
     public DiscoveryNode[] getNodesWithSameLocalAdVersion() {
         DiscoveryNode localNode = clusterService.localNode();
         return getNodesWithSameAdVersion(localNode).toArray(new DiscoveryNode[0]);
     }
+
+    public DiscoveryNode[] getNodesWithHighestAdVersion() {
+        Version highestAdVersion = adVersionCircles.lastEntry().getKey();
+        return getNodesWithSameAdVersion(highestAdVersion).toArray(new DiscoveryNode[0]);
+    }
+
+//    public DiscoveryNode[] getNodesWithHigherAdVersion(Version version) {
+//        adVersionCircles.higherEntry(version);
+//        Version highestAdVersion = adVersionCircles.pollLastEntry().getKey();
+//        return getNodesWithSameAdVersion(highestAdVersion).toArray(new DiscoveryNode[0]);
+//    }
 
     public void recordMembershipChange() {
         membershipChangeRequied.set(true);
     }
 
     public String getAdVersion(String nodeId) {
+        logger.info("66666666666666666666666666 local node id " + clusterService.localNode().getId());
         for(Map.Entry entry : nodeAdVersions.entrySet()) {
             logger.info("111111111111111111111111111111111111111111111111111111111111, node: {}, version: {}", entry.getKey(), entry.getValue());
         }
@@ -424,8 +336,8 @@ public class HashRing {
         return nodeAdVersions.get(nodeId);
     }
 
-    public String getLocalAdVersion() {
-        return nodeAdVersions.get(clusterService.localNode().getId());
+    public Version getAdVersionOfNode(String nodeId) {
+        return ADVersionUtil.fromString(nodeAdVersions.get(nodeId));
     }
 
     public void validateAdVersion(String nodeId, String remoteNodeId) {
@@ -436,11 +348,6 @@ public class HashRing {
 
     public boolean hasSameAdVersion(String nodeId, String otherNodeId) {
         return Objects.equals(nodeAdVersions.get(nodeId), nodeAdVersions.get(otherNodeId));
-    }
-
-    public boolean hasSameAdVersionWithLocalNode(String nodeId) {
-        logger.info("--------------- yyyyyy, remote node id  {}, local node id : {}", nodeId, clusterService.localNode().getId());
-        return hasSameAdVersion(clusterService.localNode().getId(), nodeId);
     }
 
 }

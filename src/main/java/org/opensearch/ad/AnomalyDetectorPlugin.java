@@ -244,6 +244,7 @@ public class AnomalyDetectorPlugin extends Plugin implements ActionPlugin, Scrip
     private ADTaskCacheManager adTaskCacheManager;
     private ADTaskManager adTaskManager;
     private ADBatchTaskRunner adBatchTaskRunner;
+    private HashRing hashRing;
     // package private for testing
     GenericObjectPool<LinkedBuffer> serializeRCFBufferPool;
 
@@ -642,7 +643,7 @@ public class AnomalyDetectorPlugin extends Plugin implements ActionPlugin, Scrip
         );
 
         ADDataMigrator dataMigrator = new ADDataMigrator(client, clusterService, xContentRegistry, anomalyDetectionIndices);
-        HashRing hashRing = new HashRing(nodeFilter, getClock(), settings, client, clusterService, xContentRegistry, anomalyDetectionIndices, dataMigrator);
+        hashRing = new HashRing(nodeFilter, getClock(), settings, client, clusterService, xContentRegistry, anomalyDetectionIndices, dataMigrator);
 
         anomalyDetectorRunner = new AnomalyDetectorRunner(modelManager, featureManager, AnomalyDetectorSettings.MAX_PREVIEW_RESULTS);
 
@@ -726,6 +727,9 @@ public class AnomalyDetectorPlugin extends Plugin implements ActionPlugin, Scrip
         );
 
         ADSearchHandler adSearchHandler = new ADSearchHandler(settings, clusterService, client);
+
+        LOG.info("yyyyyyyyyyyyyyyyywwwwwwwwwwwwwwwwwwwwwww plugin , init components and task profile action");
+        ADTaskProfileAction.getADTaskProfileActionInstance(hashRing);
 
         // return objects used by Guice to inject dependencies for e.g.,
         // transport action handler constructors
@@ -907,6 +911,7 @@ public class AnomalyDetectorPlugin extends Plugin implements ActionPlugin, Scrip
      */
     @Override
     public List<ActionHandler<? extends ActionRequest, ? extends ActionResponse>> getActions() {
+        LOG.info("yyyyyyyyyyyyyyyyywwwwwwwwwwwwwwwwwwwwwww plugin , register transport action");
         return Arrays
             .asList(
                 new ActionHandler<>(DeleteModelAction.INSTANCE, DeleteModelTransportAction.class),

@@ -29,7 +29,6 @@ package org.opensearch.ad.transport;
 import java.io.IOException;
 
 import org.opensearch.action.support.nodes.BaseNodeRequest;
-import org.opensearch.ad.common.exception.ADVersionConflictException;
 import org.opensearch.common.io.stream.StreamInput;
 import org.opensearch.common.io.stream.StreamOutput;
 

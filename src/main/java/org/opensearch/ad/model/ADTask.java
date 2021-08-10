@@ -32,7 +32,6 @@ import java.io.IOException;
 import java.time.Instant;
 
 import org.opensearch.ad.annotation.Generated;
-import org.opensearch.ad.common.exception.ADVersionConflictException;
 import org.opensearch.ad.util.ParseUtils;
 import org.opensearch.common.io.stream.StreamInput;
 import org.opensearch.common.io.stream.StreamOutput;

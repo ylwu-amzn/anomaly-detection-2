@@ -28,16 +28,34 @@ package org.opensearch.ad.transport;
 
 import static org.opensearch.ad.constant.CommonName.AD_TASK;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.opensearch.action.ActionType;
+import org.opensearch.ad.AnomalyDetectorJobRunner;
+import org.opensearch.ad.cluster.HashRing;
 import org.opensearch.ad.constant.CommonValue;
 
 public class ADTaskProfileAction extends ActionType<ADTaskProfileResponse> {
-
+    private static final Logger logger = LogManager.getLogger(AnomalyDetectorJobRunner.class);
     public static final String NAME = CommonValue.INTERNAL_ACTION_PREFIX + "detectors/profile/" + AD_TASK;
-    public static final ADTaskProfileAction INSTANCE = new ADTaskProfileAction();
+    public static ADTaskProfileAction INSTANCE;
 
-    private ADTaskProfileAction() {
-        super(NAME, ADTaskProfileResponse::new);
+    public static ADTaskProfileAction getADTaskProfileActionInstance(HashRing hashRing) {
+        logger.info("yyyyyyyyyyyyyyyyywwwwwwwwwwwwwwwwwwwwwww getADTaskProfileActionInstance");
+        if (INSTANCE != null) {
+            return INSTANCE;
+        }
+        synchronized (ADTaskProfileAction.class) {
+            if (INSTANCE != null) {
+                return INSTANCE;
+            }
+            INSTANCE = new ADTaskProfileAction(hashRing);
+            return INSTANCE;
+        }
+    }
+
+    private ADTaskProfileAction(HashRing hashRing) {
+        super(NAME, input -> new ADTaskProfileResponse(input, hashRing));
     }
 
 }

@@ -29,25 +29,30 @@ package org.opensearch.ad.transport;
 import java.io.IOException;
 import java.util.List;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.opensearch.Version;
 import org.opensearch.action.FailedNodeException;
 import org.opensearch.action.support.nodes.BaseNodesResponse;
+import org.opensearch.ad.cluster.HashRing;
 import org.opensearch.cluster.ClusterName;
 import org.opensearch.common.io.stream.StreamInput;
 import org.opensearch.common.io.stream.StreamOutput;
 
 public class ADTaskProfileResponse extends BaseNodesResponse<ADTaskProfileNodeResponse> {
 
-    private Version remoteAdVersion;
+    private final Logger logger = LogManager.getLogger(this.getClass());
+    private HashRing hashRing;
 
-    public ADTaskProfileResponse(StreamInput in) throws IOException {
-        super(new ClusterName(in), in.readList(ADTaskProfileNodeResponse::readNodeResponse), in.readList(FailedNodeException::new));
+    public ADTaskProfileResponse(StreamInput in, HashRing hashRing) throws IOException {
+        super(new ClusterName(in), in.readList(input -> ADTaskProfileNodeResponse.readNodeResponse(input, hashRing)), in.readList(FailedNodeException::new));
+        logger.info("0000000000000000000000000000000 ADTaskProfileResponse read from StreamInput");
     }
 
     public ADTaskProfileResponse(ClusterName clusterName, List<ADTaskProfileNodeResponse> nodes,
-                                 List<FailedNodeException> failures, Version remoteAdVersion) {
+                                 List<FailedNodeException> failures, HashRing hashRing) {
         super(clusterName, nodes, failures);
-        this.remoteAdVersion = remoteAdVersion;
+        this.hashRing = hashRing;
     }
 
     @Override
@@ -57,7 +62,8 @@ public class ADTaskProfileResponse extends BaseNodesResponse<ADTaskProfileNodeRe
 
     @Override
     public List<ADTaskProfileNodeResponse> readNodesFrom(StreamInput in) throws IOException {
-        return in.readList(streamInput -> ADTaskProfileNodeResponse.readNodeResponse(in, remoteAdVersion));
+        logger.info("0000000000000000000000000000000 HashRing is  " + hashRing);
+        return in.readList(streamInput -> ADTaskProfileNodeResponse.readNodeResponse(in, hashRing));
     }
 
 }

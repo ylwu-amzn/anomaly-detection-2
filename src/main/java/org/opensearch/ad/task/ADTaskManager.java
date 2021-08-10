@@ -111,7 +111,6 @@ import org.opensearch.action.update.UpdateResponse;
 import org.opensearch.ad.cluster.ADDataMigrator;
 import org.opensearch.ad.cluster.HashRing;
 import org.opensearch.ad.common.exception.ADTaskCancelledException;
-import org.opensearch.ad.common.exception.ADVersionConflictException;
 import org.opensearch.ad.common.exception.AnomalyDetectionException;
 import org.opensearch.ad.common.exception.DuplicateTaskException;
 import org.opensearch.ad.common.exception.LimitExceededException;
@@ -199,8 +198,6 @@ public class ADTaskManager {
     private volatile TransportRequestOptions transportRequestOptions;
     private final ThreadPool threadPool;
     private static int DEFAULT_MAINTAIN_INTERVAL_IN_SECONDS = 5;
-
-    private static final String DEFAULT_CRON_REQUEST_ID = "cron_request_id";
 
     public ADTaskManager(
         Settings settings,
@@ -300,7 +297,7 @@ public class ADTaskManager {
         ActionListener<AnomalyDetectorJobResponse> listener
     ) {
         String detectorId = detector.getDetectorId();
-        Optional<DiscoveryNode> owningNode = hashRing.getOwningNodeWithSameAdVersion(detectorId, clusterService.localNode().getId());
+        Optional<DiscoveryNode> owningNode = hashRing.getOwningNodeWithHighestAdVersion(detectorId);
         if (!owningNode.isPresent()) {
             logger.debug("Can't find eligible node to run as AD task's coordinating node");
             listener.onFailure(new OpenSearchStatusException("No eligible node to run detector", RestStatus.INTERNAL_SERVER_ERROR));
@@ -348,13 +345,7 @@ public class ADTaskManager {
         DiscoveryNode node,
         ActionListener<AnomalyDetectorJobResponse> listener
     ) {
-        validateAdVersion(node.getId());
-        logger.info("------------- ylwudeb10 detector is : {}", detector.toString());
-//        DiscoveryNode localNode = clusterService.localNode();
-//        hashRing.validateAdVersion(localNode.getId(), node.getId());
-//        if (!hashRing.hasSameAdVersion(localNode.getId(), node.getId())) {
-//            throw new ADVersionConflictException("Different AD version on remote node " + node.getId() + ". Local node AD version: " + hashRing.getAdVersion(localNode.getId()) + ", remote node AD version: " + hashRing.getAdVersion(node.getId()));
-//        }
+//        validateAdVersion(node.getId());
         transportService
             .sendRequest(
                 node,
@@ -365,10 +356,6 @@ public class ADTaskManager {
             );
     }
 
-    public void validateAdVersion(String remoteNodeId) {
-        DiscoveryNode localNode = clusterService.localNode();
-        hashRing.validateAdVersion(localNode.getId(), remoteNodeId);
-    }
     /**
      * Forward AD task to coordinating node
      *
@@ -717,10 +704,9 @@ public class ADTaskManager {
             query.filter(nestedQueryBuilder);
         }
         SearchSourceBuilder sourceBuilder = new SearchSourceBuilder();
-        sourceBuilder.query(query).sort(LAST_UPDATE_TIME_FIELD, SortOrder.DESC).size(size);
+        sourceBuilder.query(query).sort(EXECUTION_START_TIME_FIELD, SortOrder.DESC).size(size);
         SearchRequest searchRequest = new SearchRequest();
         searchRequest.source(sourceBuilder);
-        logger.info("yyllww: search query to get latest AD task: {}", sourceBuilder.toString());
         searchRequest.indices(DETECTION_STATE_INDEX);
 
         client.search(searchRequest, ActionListener.wrap(r -> {
@@ -743,7 +729,7 @@ public class ADTaskManager {
                     ADTask adTask = ADTask.parse(parser, searchHit.getId());
                     adTasks.add(adTask);
                 } catch (Exception e) {
-                    String message = "yyllww: Failed to parse AD task for detector " + detectorId + ", task id " + searchHit.getId();
+                    String message = "Failed to parse AD task for detector " + detectorId + ", task id " + searchHit.getId();
                     logger.error(message, e);
                     listener.onFailure(new OpenSearchStatusException(message, RestStatus.INTERNAL_SERVER_ERROR));
                 }
@@ -994,7 +980,6 @@ public class ADTaskManager {
     ) {
         getAndExecuteOnLatestADTask(detectorId, null, HISTORICAL_DETECTOR_TASK_TYPES, adTask -> {
             if (adTask.isPresent()) {
-                logger.info("yyllww: ad task exist, task id: {}, task type: {}, task: {}", adTask.get().getTaskId(), adTask.get().getTaskType(), adTask.toString());
                 getADTaskProfile(adTask.get(), ActionListener.wrap(adTaskProfiles -> {
                     DetectorProfile.Builder profileBuilder = new DetectorProfile.Builder();
                     profileBuilder.adTaskProfiles(adTaskProfiles);
@@ -1020,7 +1005,7 @@ public class ADTaskManager {
     private void getADTaskProfile(ADTask adDetectorLevelTask, ActionListener<Map<String, ADTaskProfile>> listener) {
         String detectorId = adDetectorLevelTask.getDetectorId();
 
-         DiscoveryNode[] dataNodes = nodeFilter.getEligibleDataNodes();
+        DiscoveryNode[] dataNodes = nodeFilter.getEligibleDataNodes();
 //        DiscoveryNode[] dataNodes = hashRing.getNodesWithSameLocalAdVersion();
         ADTaskProfileRequest adTaskProfileRequest = new ADTaskProfileRequest(detectorId, dataNodes);
         client.execute(ADTaskProfileAction.INSTANCE, adTaskProfileRequest, ActionListener.wrap(response -> {
@@ -2174,11 +2159,9 @@ public class ADTaskManager {
      */
     public void maintainRunningHistoricalTasks(TransportService transportService, String requestId, int size) {
         // request id could be null, `+ ""` is for backward compatibility consideration
-
-//        Optional<DiscoveryNode> owningNode = hashRing.getOwningNodeWithSameLocalAdVersion(requestId == null ? DEFAULT_CRON_REQUEST_ID : requestId);
-        Optional<DiscoveryNode> owningNode = hashRing.getOwningNodeWithSameLocalAdVersion(requestId + "");
+        Optional<DiscoveryNode> owningNode = hashRing.getOwningNodeWithHighestAdVersion(requestId + "");
         if (!owningNode.isPresent() || !clusterService.localNode().getId().equals(owningNode.get().getId())) {
-            logger.info("2222222222222222222222222222222222222222 ----- doennnt need to run on this node ");
+            logger.info("2222222222222222222222222222222222222222 ----- donnnt need to run on this node ");
             return;
         }
         logger.info("2222222222222222222222222222222222222222Start to maintain running historical tasks");
