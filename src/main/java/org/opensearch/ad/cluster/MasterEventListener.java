@@ -28,6 +28,8 @@ package org.opensearch.ad.cluster;
 
 import java.time.Clock;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.opensearch.ad.cluster.diskcleanup.IndexCleanup;
 import org.opensearch.ad.cluster.diskcleanup.ModelCheckpointIndexRetention;
 import org.opensearch.ad.settings.AnomalyDetectorSettings;
@@ -44,7 +46,7 @@ import org.opensearch.threadpool.ThreadPool;
 import com.google.common.annotations.VisibleForTesting;
 
 public class MasterEventListener implements LocalNodeMasterListener {
-
+    private static final Logger LOG = LogManager.getLogger(MasterEventListener.class);
     private Cancellable checkpointIndexRetentionCron;
     private Cancellable hourlyCron;
     private ClusterService clusterService;
@@ -74,7 +76,18 @@ public class MasterEventListener implements LocalNodeMasterListener {
     @Override
     public void onMaster() {
         if (hourlyCron == null) {
-            hourlyCron = threadPool.scheduleWithFixedDelay(new HourlyCron(client, nodeFilter), TimeValue.timeValueHours(1), executorName());
+            LOG.info("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
+            LOG.info("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
+            LOG.info("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
+            LOG.info("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
+            LOG.info("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
+            LOG.info("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
+            LOG.info("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
+            LOG.info("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
+            LOG.info("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
+            LOG.info("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
+            LOG.info("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ start schedule hourly cron");
+            hourlyCron = threadPool.scheduleWithFixedDelay(new HourlyCron(client, nodeFilter), TimeValue.timeValueMinutes(1), executorName());
             clusterService.addLifecycleListener(new LifecycleListener() {
                 @Override
                 public void beforeStop() {

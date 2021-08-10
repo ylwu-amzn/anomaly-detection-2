@@ -200,6 +200,8 @@ public class ADTaskManager {
     private final ThreadPool threadPool;
     private static int DEFAULT_MAINTAIN_INTERVAL_IN_SECONDS = 5;
 
+    private static final String DEFAULT_CRON_REQUEST_ID = "cron_request_id";
+
     public ADTaskManager(
         Settings settings,
         ClusterService clusterService,
@@ -718,6 +720,7 @@ public class ADTaskManager {
         sourceBuilder.query(query).sort(LAST_UPDATE_TIME_FIELD, SortOrder.DESC).size(size);
         SearchRequest searchRequest = new SearchRequest();
         searchRequest.source(sourceBuilder);
+        logger.info("yyllww: search query to get latest AD task: {}", sourceBuilder.toString());
         searchRequest.indices(DETECTION_STATE_INDEX);
 
         client.search(searchRequest, ActionListener.wrap(r -> {
@@ -740,7 +743,7 @@ public class ADTaskManager {
                     ADTask adTask = ADTask.parse(parser, searchHit.getId());
                     adTasks.add(adTask);
                 } catch (Exception e) {
-                    String message = "Failed to parse AD task for detector " + detectorId + ", task id " + searchHit.getId();
+                    String message = "yyllww: Failed to parse AD task for detector " + detectorId + ", task id " + searchHit.getId();
                     logger.error(message, e);
                     listener.onFailure(new OpenSearchStatusException(message, RestStatus.INTERNAL_SERVER_ERROR));
                 }
@@ -991,6 +994,7 @@ public class ADTaskManager {
     ) {
         getAndExecuteOnLatestADTask(detectorId, null, HISTORICAL_DETECTOR_TASK_TYPES, adTask -> {
             if (adTask.isPresent()) {
+                logger.info("yyllww: ad task exist, task id: {}, task type: {}, task: {}", adTask.get().getTaskId(), adTask.get().getTaskType(), adTask.toString());
                 getADTaskProfile(adTask.get(), ActionListener.wrap(adTaskProfiles -> {
                     DetectorProfile.Builder profileBuilder = new DetectorProfile.Builder();
                     profileBuilder.adTaskProfiles(adTaskProfiles);
@@ -1016,8 +1020,8 @@ public class ADTaskManager {
     private void getADTaskProfile(ADTask adDetectorLevelTask, ActionListener<Map<String, ADTaskProfile>> listener) {
         String detectorId = adDetectorLevelTask.getDetectorId();
 
-        // DiscoveryNode[] dataNodes = nodeFilter.getEligibleDataNodes();
-        DiscoveryNode[] dataNodes = hashRing.getNodesWithSameLocalAdVersion();
+         DiscoveryNode[] dataNodes = nodeFilter.getEligibleDataNodes();
+//        DiscoveryNode[] dataNodes = hashRing.getNodesWithSameLocalAdVersion();
         ADTaskProfileRequest adTaskProfileRequest = new ADTaskProfileRequest(detectorId, dataNodes);
         client.execute(ADTaskProfileAction.INSTANCE, adTaskProfileRequest, ActionListener.wrap(response -> {
             if (response.hasFailures()) {
@@ -2170,11 +2174,14 @@ public class ADTaskManager {
      */
     public void maintainRunningHistoricalTasks(TransportService transportService, String requestId, int size) {
         // request id could be null, `+ ""` is for backward compatibility consideration
-        Optional<DiscoveryNode> owningNode = hashRing.getOwningNode(requestId + "");
+
+//        Optional<DiscoveryNode> owningNode = hashRing.getOwningNodeWithSameLocalAdVersion(requestId == null ? DEFAULT_CRON_REQUEST_ID : requestId);
+        Optional<DiscoveryNode> owningNode = hashRing.getOwningNodeWithSameLocalAdVersion(requestId + "");
         if (!owningNode.isPresent() || !clusterService.localNode().getId().equals(owningNode.get().getId())) {
+            logger.info("2222222222222222222222222222222222222222 ----- doennnt need to run on this node ");
             return;
         }
-        logger.info("Start to maintain running historical tasks");
+        logger.info("2222222222222222222222222222222222222222Start to maintain running historical tasks");
 
         BoolQueryBuilder query = new BoolQueryBuilder();
         query.filter(new TermQueryBuilder(IS_LATEST_FIELD, true));

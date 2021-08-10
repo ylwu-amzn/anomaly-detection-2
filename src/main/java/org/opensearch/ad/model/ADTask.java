@@ -129,21 +129,20 @@ public class ADTask implements ToXContentObject, Writeable {
         } else {
             user = null;
         }
-        if (input.available() == 0) {
-            throw new ADVersionConflictException("Can't read ADTask of old AD version");
+        if (input.available() > 0) {
+            if (input.readBoolean()) {
+                this.detectionDateRange = new DetectionDateRange(input);
+            } else {
+                this.detectionDateRange = null;
+            }
+            if (input.readBoolean()) {
+                this.entity = new Entity(input);
+            } else {
+                this.entity = null;
+            }
+            this.parentTaskId = input.readOptionalString();
+            this.estimatedMinutesLeft = input.readOptionalInt();
         }
-        if (input.readBoolean()) {
-            this.detectionDateRange = new DetectionDateRange(input);
-        } else {
-            this.detectionDateRange = null;
-        }
-        if (input.readBoolean()) {
-            this.entity = new Entity(input);
-        } else {
-            this.entity = null;
-        }
-        this.parentTaskId = input.readOptionalString();
-        this.estimatedMinutesLeft = input.readOptionalInt();
     }
 
     @Override

@@ -29,7 +29,6 @@ package org.opensearch.ad.transport;
 import java.io.IOException;
 
 import org.opensearch.action.ActionResponse;
-import org.opensearch.ad.util.Bwc;
 import org.opensearch.common.io.stream.StreamInput;
 import org.opensearch.common.io.stream.StreamOutput;
 import org.opensearch.common.xcontent.ToXContentObject;

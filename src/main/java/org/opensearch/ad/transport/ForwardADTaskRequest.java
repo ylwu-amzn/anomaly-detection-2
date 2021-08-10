@@ -123,9 +123,10 @@ public class ForwardADTaskRequest extends ActionRequest {
             validationException = addValidationError(CommonErrorMessages.DETECTOR_MISSING, validationException);
         } else if (detector.getDetectorId() == null) {
             validationException = addValidationError(CommonErrorMessages.AD_ID_MISSING_MSG, validationException);
-        } else if (detector.getDetectionDateRange() != null) {
-            validationException = addValidationError(CommonErrorMessages.HISTORICAL_DETECTOR_IS_DEPRECATED, validationException);
         }
+//        else if (detector.getDetectionDateRange() != null) {
+//            validationException = addValidationError(CommonErrorMessages.HISTORICAL_DETECTOR_IS_DEPRECATED, validationException);
+//        }
         if (adTaskAction == null) {
             validationException = addValidationError(CommonErrorMessages.AD_TASK_ACTION_MISSING, validationException);
         }

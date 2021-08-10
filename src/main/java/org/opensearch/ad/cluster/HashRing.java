@@ -417,6 +417,10 @@ public class HashRing {
     }
 
     public String getAdVersion(String nodeId) {
+        for(Map.Entry entry : nodeAdVersions.entrySet()) {
+            logger.info("111111111111111111111111111111111111111111111111111111111111, node: {}, version: {}", entry.getKey(), entry.getValue());
+        }
+
         return nodeAdVersions.get(nodeId);
     }
 

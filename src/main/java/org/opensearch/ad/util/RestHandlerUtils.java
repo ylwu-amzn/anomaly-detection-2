@@ -181,15 +181,20 @@ public final class RestHandlerUtils {
                 Exception exception = cause instanceof OpenSearchStatusException? (OpenSearchStatusException) cause : (IndexNotFoundException)cause;
                 actionListener.onFailure(exception);
             } else {
-                RestStatus status = e instanceof IllegalArgumentException || e instanceof ResourceNotFoundException
-                    ? BAD_REQUEST
-                    : INTERNAL_SERVER_ERROR;
-                String errorMessage = e instanceof IllegalArgumentException || e instanceof AnomalyDetectionException
+                RestStatus status = isBadRequest(e) ? BAD_REQUEST : INTERNAL_SERVER_ERROR;
+                String errorMessage = isBadRequest(e) || isBadRequest(e.getCause())
                     ? e.getMessage()
                     : generalErrorMessage;
                 actionListener.onFailure(new OpenSearchStatusException(errorMessage, status));
             }
         });
+    }
+
+    public static boolean isBadRequest(Throwable e) {
+        if (e == null) {
+            return false;
+        }
+        return e instanceof IllegalArgumentException || e instanceof ResourceNotFoundException;
     }
 
     public static boolean isProperExceptionToReturn(Throwable e) {

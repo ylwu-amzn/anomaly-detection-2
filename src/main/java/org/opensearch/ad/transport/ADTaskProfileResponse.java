@@ -29,6 +29,7 @@ package org.opensearch.ad.transport;
 import java.io.IOException;
 import java.util.List;
 
+import org.opensearch.Version;
 import org.opensearch.action.FailedNodeException;
 import org.opensearch.action.support.nodes.BaseNodesResponse;
 import org.opensearch.cluster.ClusterName;
@@ -37,13 +38,14 @@ import org.opensearch.common.io.stream.StreamOutput;
 
 public class ADTaskProfileResponse extends BaseNodesResponse<ADTaskProfileNodeResponse> {
 
-    private String remoteAdVersion;
+    private Version remoteAdVersion;
 
     public ADTaskProfileResponse(StreamInput in) throws IOException {
         super(new ClusterName(in), in.readList(ADTaskProfileNodeResponse::readNodeResponse), in.readList(FailedNodeException::new));
     }
 
-    public ADTaskProfileResponse(ClusterName clusterName, List<ADTaskProfileNodeResponse> nodes, List<FailedNodeException> failures, String remoteAdVersion) {
+    public ADTaskProfileResponse(ClusterName clusterName, List<ADTaskProfileNodeResponse> nodes,
+                                 List<FailedNodeException> failures, Version remoteAdVersion) {
         super(clusterName, nodes, failures);
         this.remoteAdVersion = remoteAdVersion;
     }
@@ -56,8 +58,6 @@ public class ADTaskProfileResponse extends BaseNodesResponse<ADTaskProfileNodeRe
     @Override
     public List<ADTaskProfileNodeResponse> readNodesFrom(StreamInput in) throws IOException {
         return in.readList(streamInput -> ADTaskProfileNodeResponse.readNodeResponse(in, remoteAdVersion));
-//        return in.readList(ADTaskProfileNodeResponse::readNodeResponse);
-//        return in.readList(ADTaskProfileNodeResponse.readNodeResponse(in, remoteAdVersion));
     }
 
 }

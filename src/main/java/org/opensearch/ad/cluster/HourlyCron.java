@@ -55,8 +55,12 @@ public class HourlyCron implements Runnable {
 
     @Override
     public void run() {
-//        DiscoveryNode[] dataNodes = nodeFilter.getEligibleDataNodes();
-        DiscoveryNode[] dataNodes = hashRing.getNodesWithSameLocalAdVersion();
+        DiscoveryNode[] dataNodes = nodeFilter.getEligibleDataNodes();
+        LOG.info("----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------[ylwudebug1-hourlycron] start to run hourly cron on data nodes: {}", dataNodes.length);
+        LOG.info("----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------[ylwudebug1-hourlycron] start to run hourly cron on data nodes: {}", dataNodes.length);
+        LOG.info("----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------[ylwudebug1-hourlycron] start to run hourly cron on data nodes: {}", dataNodes.length);
+        LOG.info("----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------[ylwudebug1-hourlycron] start to run hourly cron on data nodes: {}", dataNodes.length);
+//        DiscoveryNode[] dataNodes = hashRing.getNodesWithSameLocalAdVersion();
 
         // we also add the cancel query function here based on query text from the negative cache.
 
