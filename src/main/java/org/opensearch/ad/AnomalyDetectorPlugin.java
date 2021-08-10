@@ -643,7 +643,7 @@ public class AnomalyDetectorPlugin extends Plugin implements ActionPlugin, Scrip
         );
 
         ADDataMigrator dataMigrator = new ADDataMigrator(client, clusterService, xContentRegistry, anomalyDetectionIndices);
-        hashRing = new HashRing(nodeFilter, getClock(), settings, client, clusterService, xContentRegistry, anomalyDetectionIndices, dataMigrator);
+        hashRing = new HashRing(nodeFilter, getClock(), settings, client, clusterService, xContentRegistry, anomalyDetectionIndices, dataMigrator, threadPool);
 
         anomalyDetectorRunner = new AnomalyDetectorRunner(modelManager, featureManager, AnomalyDetectorSettings.MAX_PREVIEW_RESULTS);
 

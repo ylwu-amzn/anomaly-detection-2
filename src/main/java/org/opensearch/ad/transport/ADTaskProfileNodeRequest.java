@@ -28,13 +28,11 @@ package org.opensearch.ad.transport;
 
 import java.io.IOException;
 
-import org.opensearch.Version;
 import org.opensearch.action.support.nodes.BaseNodeRequest;
-import org.opensearch.ad.cluster.ADVersionUtil;
 import org.opensearch.common.io.stream.StreamInput;
 import org.opensearch.common.io.stream.StreamOutput;
 
-public class ADTaskProfileNodeRequest extends AbstractADBaseNodeRequest {
+public class ADTaskProfileNodeRequest extends BaseNodeRequest {
     private String detectorId;
 
     public ADTaskProfileNodeRequest(StreamInput in) throws IOException {
@@ -42,18 +40,14 @@ public class ADTaskProfileNodeRequest extends AbstractADBaseNodeRequest {
         this.detectorId = in.readString();
     }
 
-    public ADTaskProfileNodeRequest(ADTaskProfileRequest request, String adVersion) {
+    public ADTaskProfileNodeRequest(ADTaskProfileRequest request) {
         this.detectorId = request.getDetectorId();
-        setAdVersion(adVersion);
     }
 
     @Override
     public void writeTo(StreamOutput out) throws IOException {
         super.writeTo(out);
         out.writeString(detectorId);
-        if (!ADVersionUtil.fromString(getAdVersion()).onOrBefore(Version.V_1_0_0)) {
-            out.writeString(getAdVersion());
-        }
     }
 
     public String getDetectorId() {

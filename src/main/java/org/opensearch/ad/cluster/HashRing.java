@@ -29,8 +29,10 @@ package org.opensearch.ad.cluster;
 import static org.opensearch.ad.settings.AnomalyDetectorSettings.COOLDOWN_MINUTES;
 
 import java.time.Clock;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -39,6 +41,7 @@ import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -52,17 +55,19 @@ import org.opensearch.ad.indices.AnomalyDetectionIndices;
 import org.opensearch.ad.util.DiscoveryNodeFilterer;
 import org.opensearch.client.Client;
 import org.opensearch.cluster.node.DiscoveryNode;
+import org.opensearch.cluster.node.DiscoveryNodes;
 import org.opensearch.cluster.routing.Murmur3HashFunction;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.unit.TimeValue;
 import org.opensearch.common.xcontent.NamedXContentRegistry;
 import org.opensearch.plugins.PluginInfo;
+import org.opensearch.threadpool.ThreadPool;
 
 public class HashRing {
     private final Logger logger = LogManager.getLogger(this.getClass());
     private static final Logger LOG = LogManager.getLogger(HashRing.class);
-    static final String REBUILD_MSG = "Rebuild hash ring";
+    static final String REBUILD_MSG = "########################## Rebuild hash ring";
     // In case of frequent node join/leave, hash ring has a cooldown period say 5 minute.
     // Hash ring doesn't respond to more than 1 cluster membership changes within the
     // cool-down period.
@@ -85,8 +90,12 @@ public class HashRing {
     private ADDataMigrator dataMigrator;
     private final NamedXContentRegistry xContentRegistry;
     private final AnomalyDetectionIndices detectionIndices;
+    private final AtomicBoolean newNodeChangeEvent;
+    private final ThreadPool threadPool;
 
-    public HashRing(DiscoveryNodeFilterer nodeFilter, Clock clock, Settings settings, Client client, ClusterService clusterService, NamedXContentRegistry xContentRegistry, AnomalyDetectionIndices detectionIndices, ADDataMigrator dataMigrator) {
+    public HashRing(DiscoveryNodeFilterer nodeFilter, Clock clock, Settings settings, Client client,
+                    ClusterService clusterService, NamedXContentRegistry xContentRegistry,
+                    AnomalyDetectionIndices detectionIndices, ADDataMigrator dataMigrator, ThreadPool threadPool) {
         this.circle = new TreeMap<>();
         this.nodeFilter = nodeFilter;
         this.inProgress = new Semaphore(1);
@@ -101,6 +110,8 @@ public class HashRing {
         this.dataMigrator = dataMigrator;
         this.nodeAdVersions = new ConcurrentHashMap<>();
         this.adVersionCircles = new TreeMap<>();
+        this.newNodeChangeEvent = new AtomicBoolean(false);
+        this.threadPool = threadPool;
     }
 
     /**
@@ -118,6 +129,8 @@ public class HashRing {
             return false;
         }
 
+        // Remove cooldown period, if node start up quickly, we may miss some data node.
+        // Need to rebuild for every call?
         // Check cooldown period
         if (clock.millis() - lastUpdate <= coolDownPeriod.getMillis()) {
             LOG.debug(COOLDOWN_MSG);
@@ -140,7 +153,7 @@ public class HashRing {
                 }
             }
             circle = newCircle;
-            buildCirclesOnAdVersions();
+            buildCirclesOnAdVersions(null);
             lastUpdate = clock.millis();
             membershipChangeRequied.set(false);
         } catch (Exception ex) {
@@ -152,9 +165,60 @@ public class HashRing {
         return true;
     }
 
-    public void buildCirclesOnAdVersions() {
+    public void buildA(DiscoveryNodes.Delta delta) {
+        LOG.info(REBUILD_MSG);
+
+        TreeMap<Integer, DiscoveryNode> newCircle = new TreeMap<>();
+        for (DiscoveryNode curNode : nodeFilter.getEligibleDataNodes()) {
+            for (int i = 0; i < VIRTUAL_NODE_COUNT; i++) {
+                newCircle.put(Murmur3HashFunction.hash(curNode.getId() + i), curNode);
+            }
+        }
+        circle = newCircle;
+
+        buildCirclesOnAdVersions(delta);
+    }
+
+    //TODO: if can't find some node, try to rebuild all
+    public void buildCirclesOnAdVersions(DiscoveryNodes.Delta delta) {
         LOG.info("================================================== rebuild circles on AD versions ");
         NodesInfoRequest nodesInfoRequest = new NodesInfoRequest();
+        if (delta != null) {
+            if (delta.removed()) {
+                List<String> removedNodeIds = delta.removedNodes().stream().map(DiscoveryNode::getId).collect(Collectors.toList());
+                logger.info("wwwwwwwwwwwwwwwwwwwwwwwuuuwwwuuBCBC , removedNodeIds : {}", Arrays.toString(removedNodeIds.toArray(new String[0])));
+                for (String nodeId : removedNodeIds) {
+                    String adVersion = this.nodeAdVersions.remove(nodeId);
+                    if (adVersion != null) {
+                        Version version = ADVersionUtil.fromString(adVersion);
+                        TreeMap<Integer, DiscoveryNode> circle = this.adVersionCircles.get(version);
+                        List<Integer> deleted = new ArrayList<>();
+                        for (Map.Entry<Integer, DiscoveryNode> entry : circle.entrySet()) {
+                            if (entry.getValue().getId().equals(nodeId)) {
+                                deleted.add(entry.getKey());
+                            }
+                        }
+                        if (deleted.size() == circle.size()) {
+                            adVersionCircles.remove(version);
+                        } else {
+                            for (Integer key : deleted) {
+                                circle.remove(key);
+                            }
+                        }
+                    }
+                }
+            }
+            if (delta.added()) {
+                List<String> addedNodeIds = delta.addedNodes().stream().map(DiscoveryNode::getId).collect(Collectors.toList());
+                String localNodeId = clusterService.localNode().getId();
+                if (!nodeAdVersions.containsKey(localNodeId)) {
+                    addedNodeIds.add(localNodeId);
+                }
+                logger.info("wwwwwwwwwwwwwwwwwwwwwwwuuuwwwuuBCBC , addedNodeIds : {}", Arrays.toString(addedNodeIds.toArray(new String[0])));
+                nodesInfoRequest.nodesIds(addedNodeIds.toArray(new String[0]));
+            }
+        }
+
         nodesInfoRequest.clear().addMetric(NodesInfoRequest.Metric.PLUGINS.metricName());
         DiscoveryNode[] eligibleDataNodes = nodeFilter.getEligibleDataNodes();
         Set<String> eligibleDataNodeIds = new HashSet<>();
@@ -168,6 +232,7 @@ public class HashRing {
             logger.error("99999999998888888888 ylwudebug1: start to get node info to build hash ring");
             Map<String, NodeInfo> nodesMap = r.getNodesMap();
             Set<String> cNodes = new HashSet<>();
+            Set<String> dNodes = new HashSet<>();
             LOG.info("================================================== rebuild circles on AD versions,  nodesMap Keys: {}", Arrays.toString(nodesMap.keySet().toArray(new String[0])));
             if (nodesMap != null && nodesMap.size() > 0) {
                 for (Map.Entry<String, NodeInfo> entry : nodesMap.entrySet()) {
@@ -177,6 +242,9 @@ public class HashRing {
                         continue;
                     }
                     DiscoveryNode curNode = nodeInfo.getNode();
+                    if (nodeFilter.isEligibleDataNode(curNode)) {
+                        dNodes.add(curNode.getId());
+                    }
                     if (!eligibleDataNodeIds.contains(curNode.getId())) {
                         LOG.info("================================================== rebuild circles on AD versions,  not eligible node: {} {}", curNode.getId(), curNode.getAddress().getAddress());
                         continue;
@@ -186,14 +254,13 @@ public class HashRing {
                         if ("opensearch-anomaly-detection".equals(pluginInfo.getName())) {
                             Version version = ADVersionUtil.fromString(pluginInfo.getVersion());
                             circle = adVersionCircles.computeIfAbsent(version, key -> new TreeMap<>());
-//                            circle.clear();
                             nodeAdVersions.computeIfAbsent(curNode.getId(), key -> pluginInfo.getVersion());
                             cNodes.add(curNode.getId());
                             break;
                         }
                     }
                     if (circle != null) {
-                        circle.clear();
+//                        circle.clear();
                         for (int i = 0; i < VIRTUAL_NODE_COUNT; i++) {
                             circle.put(Murmur3HashFunction.hash(curNode.getId() + i), curNode);
                         }
@@ -201,8 +268,10 @@ public class HashRing {
                     }
                 }
             }
-            LOG.info("================================================== eligible nodes: {}", Arrays.toString(eligibleDataNodeIds.toArray(new String[0])));
-            LOG.info("================================================== cNodes: {}", Arrays.toString(cNodes.toArray(new String[0])));
+            LOG.info("==================================================BCBC eligible nodes: {}", Arrays.toString(eligibleDataNodeIds.toArray(new String[0])));
+            LOG.info("==================================================BCBC cNodes: {}", Arrays.toString(cNodes.toArray(new String[0])));
+            LOG.info("==================================================BCBC dNodes: {}", Arrays.toString(dNodes.toArray(new String[0])));
+            LOG.info("==================================================BCBC allNodes: {}", Arrays.toString(nodeAdVersions.keySet().toArray(new String[0])));
 
             //TODO: handle null pointer for lastEntry()
             if (adVersionCircles.firstEntry().getKey().onOrBefore(Version.V_1_0_0) && adVersionCircles.lastEntry().getKey().after(Version.V_1_0_0)) {
@@ -374,8 +443,14 @@ public class HashRing {
         }
     }
 
-    public String getLocalAdVersion() {
-        client.admin().cluster()
-        return nodeAdVersions.get(clusterService.localNode().getId());
+    public DiscoveryNode[] getAllEligibleDataNodes() {
+        DiscoveryNode[] eligibleDataNodes = nodeFilter.getEligibleDataNodes();
+        List<DiscoveryNode> allNodes = new ArrayList<>();
+        for (DiscoveryNode node : eligibleDataNodes) {
+            if (nodeAdVersions.containsKey(node.getId())) {
+                allNodes.add(node);
+            }
+        }
+        return allNodes.toArray(new DiscoveryNode[0]);
     }
 }

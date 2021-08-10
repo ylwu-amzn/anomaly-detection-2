@@ -78,10 +78,10 @@ public class ADTaskProfileNodeResponse extends BaseNodeResponse {
         String remoteNodeId = node.getId();
         logger.info("66666666666666666666 hashRing is {}, remoteNodeId: {}", hashRing, remoteNodeId);
 
-        if (!hashRing.hashNode(remoteNodeId)) {
-            logger.info("66666666666666666666  rebuild hash ring");
-            hashRing.buildCirclesOnAdVersions();
-        }
+//        if (!hashRing.hashNode(remoteNodeId)) {
+//            logger.info("66666666666666666666  rebuild hash ring");
+//            hashRing.buildCirclesOnAdVersions(delta);
+//        }
         String version = hashRing.getAdVersion(remoteNodeId);
         Version remoteAdVersion = ADVersionUtil.fromString(version);
         if (in.readBoolean()) {
