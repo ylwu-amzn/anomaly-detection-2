@@ -35,6 +35,7 @@ import org.opensearch.Version;
 import org.opensearch.action.FailedNodeException;
 import org.opensearch.action.support.ActionFilters;
 import org.opensearch.action.support.nodes.TransportNodesAction;
+import org.opensearch.ad.cluster.ADVersionUtil;
 import org.opensearch.ad.cluster.HashRing;
 import org.opensearch.ad.model.ADTaskProfile;
 import org.opensearch.ad.task.ADTaskManager;
@@ -49,7 +50,7 @@ public class ADTaskProfileTransportAction extends
     private final Logger logger = LogManager.getLogger(this.getClass());
     private ADTaskManager adTaskManager;
     private HashRing hashRing;
-    private Version remoteAdVersion;
+//    private Version remoteAdVersion;
 
     @Inject
     public ADTaskProfileTransportAction(
@@ -87,12 +88,11 @@ public class ADTaskProfileTransportAction extends
 
     @Override
     protected ADTaskProfileNodeRequest newNodeRequest(ADTaskProfileRequest request) {
-        return new ADTaskProfileNodeRequest(request);
+        return new ADTaskProfileNodeRequest(request, hashRing.getLocalAdVersion());
     }
 
     @Override
     protected ADTaskProfileNodeResponse newNodeResponse(StreamInput in) throws IOException {
-
         return new ADTaskProfileNodeResponse(in, hashRing);
     }
 
@@ -102,9 +102,10 @@ public class ADTaskProfileTransportAction extends
 //            throw new ADVersionConflictException("Can't support get task profile among different AD versions");
 //        }
         String remoteNodeId = request.getParentTask().getNodeId();
-        this.remoteAdVersion = hashRing.getAdVersionOfNode(remoteNodeId);
-        logger.info("111111111111111111111111111111111111111111111111111111111111 remote ad version: {}, remoteNodeId: {}", remoteAdVersion, remoteNodeId);
+//        this.remoteAdVersion = hashRing.getAdVersionOfNode(remoteNodeId);
+        Version remoteAdVersion = ADVersionUtil.fromString(request.getAdVersion());
         List<ADTaskProfile> adTaskProfile = adTaskManager.getLocalADTaskProfilesByDetectorId(request.getDetectorId());
+        logger.info("ylwudebug1000: remote ad version: {}, remoteNodeId: {}", remoteAdVersion, remoteNodeId);
         return new ADTaskProfileNodeResponse(clusterService.localNode(), adTaskProfile, remoteAdVersion);
     }
 }

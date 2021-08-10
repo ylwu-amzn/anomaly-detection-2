@@ -203,6 +203,7 @@ public class HashRing {
             }
             LOG.info("================================================== eligible nodes: {}", Arrays.toString(eligibleDataNodeIds.toArray(new String[0])));
             LOG.info("================================================== cNodes: {}", Arrays.toString(cNodes.toArray(new String[0])));
+
             //TODO: handle null pointer for lastEntry()
             if (adVersionCircles.firstEntry().getKey().onOrBefore(Version.V_1_0_0) && adVersionCircles.lastEntry().getKey().after(Version.V_1_0_0)) {
                 Optional<DiscoveryNode> owningNode = getOwningNodeWithHighestAdVersion(DEFAULT_HASH_RING_MODEL_ID);
@@ -371,5 +372,10 @@ public class HashRing {
         if (ADVersionUtil.fromString(nodeAdVersion).onOrBefore(notSupportVersion)) {
             throw new ADVersionConflictException("Can't run on node " + nodeId + " as it's running old AD version: " + nodeAdVersion);
         }
+    }
+
+    public String getLocalAdVersion() {
+        client.admin().cluster()
+        return nodeAdVersions.get(clusterService.localNode().getId());
     }
 }

@@ -6,7 +6,9 @@ import org.opensearch.common.io.stream.StreamInput;
 
 import java.io.IOException;
 
-public abstract class AbstractADBaseNodeRequest extends BaseNodeRequest {
+public class AbstractADBaseNodeRequest extends BaseNodeRequest {
+    private String adVersion;
+
     public AbstractADBaseNodeRequest(StreamInput in) throws IOException {
         super(in);
     }
@@ -15,5 +17,11 @@ public abstract class AbstractADBaseNodeRequest extends BaseNodeRequest {
 
     }
 
-    public abstract boolean isCompatible();
+    public String getAdVersion() {
+        return this.adVersion;
+    }
+
+    public void setAdVersion(String adVersion) {
+        this.adVersion = adVersion;
+    }
 }
