@@ -118,7 +118,8 @@ public class AnomalyResultResponse extends ActionResponse implements ToXContentO
             features.add(new FeatureData(in));
         }
         error = in.readOptionalString();
-        // From AD 1.1, we only send AD result requests to nodes with same local AD version.
+        // We only send AD result requests to local node.
+        // We are going to use local model rather than distributed for realtime detection?
         rcfTotalUpdates = in.readOptionalLong();
         detectorIntervalInMinutes = in.readOptionalLong();
         isHCDetector = in.readOptionalBoolean();

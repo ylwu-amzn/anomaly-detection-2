@@ -285,7 +285,7 @@ public class AnomalyDetectorPlugin extends Plugin implements ActionPlugin, Scrip
         jobRunner.setAnomalyResultHandler(anomalyResultHandler);
         jobRunner.setSettings(settings);
         jobRunner.setIndexUtil(anomalyDetectionIndices);
-        jobRunner.setNodeFilter(nodeFilter);
+        jobRunner.setHashRing(hashRing);
         jobRunner.setAdTaskManager(adTaskManager);
 
         RestGetAnomalyDetectorAction restGetAnomalyDetectorAction = new RestGetAnomalyDetectorAction();
@@ -643,7 +643,7 @@ public class AnomalyDetectorPlugin extends Plugin implements ActionPlugin, Scrip
         );
 
         ADDataMigrator dataMigrator = new ADDataMigrator(client, clusterService, xContentRegistry, anomalyDetectionIndices);
-        hashRing = new HashRing(nodeFilter, getClock(), settings, client, clusterService, xContentRegistry, anomalyDetectionIndices, dataMigrator, threadPool);
+        hashRing = new HashRing(nodeFilter, getClock(), settings, client, clusterService, dataMigrator);
 
         anomalyDetectorRunner = new AnomalyDetectorRunner(modelManager, featureManager, AnomalyDetectorSettings.MAX_PREVIEW_RESULTS);
 
@@ -728,7 +728,6 @@ public class AnomalyDetectorPlugin extends Plugin implements ActionPlugin, Scrip
 
         ADSearchHandler adSearchHandler = new ADSearchHandler(settings, clusterService, client);
 
-        LOG.info("yyyyyyyyyyyyyyyyywwwwwwwwwwwwwwwwwwwwwww plugin , init components and task profile action");
         ADTaskProfileAction.getADTaskProfileActionInstance(hashRing);
 
         // return objects used by Guice to inject dependencies for e.g.,
@@ -911,7 +910,6 @@ public class AnomalyDetectorPlugin extends Plugin implements ActionPlugin, Scrip
      */
     @Override
     public List<ActionHandler<? extends ActionRequest, ? extends ActionResponse>> getActions() {
-        LOG.info("yyyyyyyyyyyyyyyyywwwwwwwwwwwwwwwwwwwwwww plugin , register transport action");
         return Arrays
             .asList(
                 new ActionHandler<>(DeleteModelAction.INSTANCE, DeleteModelTransportAction.class),

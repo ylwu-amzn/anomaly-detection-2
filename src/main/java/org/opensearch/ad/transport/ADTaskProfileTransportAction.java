@@ -29,8 +29,6 @@ package org.opensearch.ad.transport;
 import java.io.IOException;
 import java.util.List;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.opensearch.Version;
 import org.opensearch.action.FailedNodeException;
 import org.opensearch.action.support.ActionFilters;
@@ -46,7 +44,7 @@ import org.opensearch.transport.TransportService;
 
 public class ADTaskProfileTransportAction extends
     TransportNodesAction<ADTaskProfileRequest, ADTaskProfileResponse, ADTaskProfileNodeRequest, ADTaskProfileNodeResponse> {
-    private final Logger logger = LogManager.getLogger(this.getClass());
+
     private ADTaskManager adTaskManager;
     private HashRing hashRing;
     private Version remoteAdVersion;
@@ -81,7 +79,6 @@ public class ADTaskProfileTransportAction extends
         List<ADTaskProfileNodeResponse> responses,
         List<FailedNodeException> failures
     ) {
-        logger.info("11112222333344441111222233334444 new response: {}, hashRing: {}", responses.size(), hashRing);
         return new ADTaskProfileResponse(clusterService.getClusterName(), responses, failures, hashRing);
     }
 
@@ -98,12 +95,8 @@ public class ADTaskProfileTransportAction extends
 
     @Override
     protected ADTaskProfileNodeResponse nodeOperation(ADTaskProfileNodeRequest request) {
-//        if (!hashRing.hasSameAdVersionWithLocalNode(request.getParentTask().getNodeId())) {
-//            throw new ADVersionConflictException("Can't support get task profile among different AD versions");
-//        }
         String remoteNodeId = request.getParentTask().getNodeId();
-        this.remoteAdVersion = hashRing.getAdVersionOfNode(remoteNodeId);
-        logger.info("111111111111111111111111111111111111111111111111111111111111 remote ad version: {}, remoteNodeId: {}", remoteAdVersion, remoteNodeId);
+        this.remoteAdVersion = hashRing.getAdVersion(remoteNodeId);
         List<ADTaskProfile> adTaskProfile = adTaskManager.getLocalADTaskProfilesByDetectorId(request.getDetectorId());
         return new ADTaskProfileNodeResponse(clusterService.localNode(), adTaskProfile, remoteAdVersion);
     }

@@ -335,6 +335,7 @@ public class AnomalyResultTransportAction extends HandledTransportAction<ActionR
                                 Collectors
                                     .groupingBy(
                                         // from entity name to its node
+                                        // TODO: we are going to move to local model rather than distributed?
                                         e -> hashRing.getOwningNodeWithSameLocalAdVersion(e.getKey().toString()).get(),
                                         Collectors.toMap(Entry::getKey, Entry::getValue)
                                     )
@@ -511,6 +512,7 @@ public class AnomalyResultTransportAction extends HandledTransportAction<ActionR
 
             // HC logic ends and single entity logic starts here
             String thresholdModelID = modelPartitioner.getThresholdModelId(adID);
+            // TODO: we are going to move to local model rather than distributed?
             Optional<DiscoveryNode> asThresholdNode = hashRing.getOwningNodeWithSameLocalAdVersion(thresholdModelID);
             if (!asThresholdNode.isPresent()) {
                 listener.onFailure(new InternalFailure(adID, "Threshold model node is not available."));
@@ -616,6 +618,7 @@ public class AnomalyResultTransportAction extends HandledTransportAction<ActionR
             for (int i = 0; i < rcfPartitionNum; i++) {
                 String rcfModelID = modelPartitioner.getRcfModelId(adID, i);
 
+                // TODO: we are going to move to local model rather than distributed?
                 Optional<DiscoveryNode> rcfNode = hashRing.getOwningNodeWithSameLocalAdVersion(rcfModelID);
                 if (!rcfNode.isPresent()) {
                     continue;
@@ -912,10 +915,6 @@ public class AnomalyResultTransportAction extends HandledTransportAction<ActionR
                 final AtomicReference<AnomalyResultResponse> anomalyResultResponse = new AtomicReference<>();
 
                 String thresholdNodeId = thresholdNode.getId();
-                for (RCFResultResponse result : rcfResults) {
-                    LOG.info("555555555555555555555555555555555555555555555555555555555555 single entity ddetector tottal updates: {}",
-                            result.getTotalUpdates());
-                }
                 long rcfTotalUpdates = rcfResults.get(0).getTotalUpdates();
                 LOG.info("Sending threshold request to {} for model {}", thresholdNodeId, thresholdModelID);
                 ThresholdActionListener thresholdListener = new ThresholdActionListener(

@@ -101,10 +101,8 @@ public class RCFResultResponse extends ActionResponse implements ToXContentObjec
         out.writeVInt(forestSize);
         out.writeDoubleArray(attribution);
         // We have limit RCF result action can only be sent to nodes with same AD version check
-        // {@link AnomalyResultTransportAction#onFeatureResponseForSingleEntityDetector}, so it's
-        // safe to write total updates. The cons is we can't user other data nodes with different
-        // AD version to run realtime job while rolling upgrade. But this is some backend logic
-        // which user should not concern too much.
+        // {@link AnomalyResultTransportAction}.
+        // TODO: We will move to local RCF model?
         out.writeLong(totalUpdates);
     }
 

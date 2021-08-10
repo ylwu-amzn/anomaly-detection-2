@@ -241,7 +241,13 @@ public class GetAnomalyDetectorTransportAction extends HandledTransportAction<Ge
                             List<ADTask> duplicateAdTasks = new ArrayList<>();
                             for (ADTask task : taskList) {
                                 if (adTasks.containsKey(task.getTaskType())) {
-                                    LOG.info("3333333333333333333333333333333333333333333333333333333333333333333333333333, found duplicate task for {}, task: {}", task.getTaskType(), task);
+                                    LOG
+                                        .info(
+                                            "Found duplicate latest task of detector {}, task id: {}, task type: {}",
+                                            detectorID,
+                                            task.getTaskType(),
+                                            task.getTaskId()
+                                        );
                                     duplicateAdTasks.add(task);
                                     continue;
                                 }
@@ -438,25 +444,5 @@ public class GetAnomalyDetectorTransportAction extends HandledTransportAction<Ge
 
     private Set<String> getProfileListStrs(List<? extends Name> profileList) {
         return profileList.stream().map(profile -> profile.getName()).collect(Collectors.toSet());
-    }
-
-    @Override
-    public String toString() {
-        return "GetAnomalyDetectorTransportAction{" +
-                "clusterService=" + clusterService +
-                ", client=" + client +
-                ", allProfileTypeStrs=" + allProfileTypeStrs +
-                ", allProfileTypes=" + allProfileTypes +
-                ", defaultDetectorProfileTypes=" + defaultDetectorProfileTypes +
-                ", allEntityProfileTypeStrs=" + allEntityProfileTypeStrs +
-                ", allEntityProfileTypes=" + allEntityProfileTypes +
-                ", defaultEntityProfileTypes=" + defaultEntityProfileTypes +
-                ", xContentRegistry=" + xContentRegistry +
-                ", nodeFilter=" + nodeFilter +
-                ", transportService=" + transportService +
-                ", filterByEnabled=" + filterByEnabled +
-                ", adTaskManager=" + adTaskManager +
-                ", hashRing=" + hashRing +
-                '}';
     }
 }

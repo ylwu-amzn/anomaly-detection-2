@@ -346,15 +346,12 @@ public class ADTaskManager {
         DiscoveryNode node,
         ActionListener<AnomalyDetectorJobResponse> listener
     ) {
-        // TODO: check if we should remove this check
-//        hashRing.validateAdVersion(node.getId(), Version.V_1_0_0);
-        Version adVersion = hashRing.getAdVersionOfNode(node.getId());
+        Version adVersion = hashRing.getAdVersion(node.getId());
         transportService
             .sendRequest(
                 node,
                 ForwardADTaskAction.NAME,
                 new ForwardADTaskRequest(detector, detectionDateRange, user, adTaskAction, adVersion),
-//                new ForwardADTaskRequest(detector, detectionDateRange, user, adTaskAction),
                 transportRequestOptions,
                 new ActionListenerResponseHandler<>(listener, AnomalyDetectorJobResponse::new)
             );
@@ -1009,9 +1006,7 @@ public class ADTaskManager {
     private void getADTaskProfile(ADTask adDetectorLevelTask, ActionListener<Map<String, ADTaskProfile>> listener) {
         String detectorId = adDetectorLevelTask.getDetectorId();
 
-//        DiscoveryNode[] dataNodes = nodeFilter.getEligibleDataNodes();
-//        DiscoveryNode[] dataNodes = hashRing.getNodesWithSameLocalAdVersion();
-        DiscoveryNode[] dataNodes = hashRing.getAllEligibleDataNodes();
+        DiscoveryNode[] dataNodes = hashRing.getAllEligibleDataNodesWithKnownAdVersion();
         ADTaskProfileRequest adTaskProfileRequest = new ADTaskProfileRequest(detectorId, dataNodes);
         client.execute(ADTaskProfileAction.INSTANCE, adTaskProfileRequest, ActionListener.wrap(response -> {
             if (response.hasFailures()) {
@@ -1671,51 +1666,27 @@ public class ADTaskManager {
         Long detectorIntervalInMinutes,
         String error
     ) {
-        Float initProgress = null;
-        String state = null;
-        // calculate init progress and task state with RCF total updates
-        if (detectorIntervalInMinutes != null && rcfTotalUpdates != null) {
-            state = ADTaskState.INIT.name();
-            if (rcfTotalUpdates < NUM_MIN_SAMPLES) {
-                initProgress = (float) rcfTotalUpdates / NUM_MIN_SAMPLES;
-            } else {
-                state = ADTaskState.RUNNING.name();
-                initProgress = 1.0f;
-            }
-        }
-        // Check if new state is not null and override state calculated with rcf total updates
-        if (newState != null) {
-            state = newState;
-        }
-
-        error = Optional.ofNullable(error).orElse("");
-        if (!adTaskCacheManager.isRealtimeTaskChanged(detectorId, state, initProgress, error)) {
-            return;
-        }
-        if (ADTaskState.STOPPED.name().equals(state)) {
-            adTaskCacheManager.removeRealtimeTaskCache(detectorId);
-        }
-        Map<String, Object> updatedFields = new HashMap<>();
-        if (initProgress != null) {
-            updatedFields.put(INIT_PROGRESS_FIELD, initProgress);
-            updatedFields.put(ESTIMATED_MINUTES_LEFT_FIELD, Math.max(0, NUM_MIN_SAMPLES - rcfTotalUpdates) * detectorIntervalInMinutes);
-        }
-        if (state != null) {
-            updatedFields.put(STATE_FIELD, state);
-        }
-        if (error != null) {
-            updatedFields.put(ERROR_FIELD, error);
-        }
-        updateLatestRealtimeADTask(detectorId, updatedFields, state, initProgress, error);
+        updateLatestRealtimeTask(
+            detectorId,
+            newState,
+            rcfTotalUpdates,
+            detectorIntervalInMinutes,
+            error,
+            ActionListener
+                .wrap(
+                    r -> { logger.info("Updated latest realtiem task successfully for " + detectorId); },
+                    e -> { logger.warn("Update latest realtime task failed", e); }
+                )
+        );
     }
 
     public void updateLatestRealtimeTask(
-            String detectorId,
-            String newState,
-            Long rcfTotalUpdates,
-            Long detectorIntervalInMinutes,
-            String error,
-            ActionListener<UpdateResponse> listener
+        String detectorId,
+        String newState,
+        Long rcfTotalUpdates,
+        Long detectorIntervalInMinutes,
+        String error,
+        ActionListener<UpdateResponse> listener
     ) {
         Float initProgress = null;
         String state = null;
@@ -1759,13 +1730,20 @@ public class ADTaskManager {
             logger.debug("Updated latest realtime AD task successfully for detector {}", detectorId);
             adTaskCacheManager.updateRealtimeTaskCache(detectorId, newState, newInitProgress, newError);
             listener.onResponse(r);
-        }, e -> { logger.error("Failed to update realtime task for detector " + detectorId, e); listener.onFailure(e); }));
+        }, e -> {
+            logger.error("Failed to update realtime task for detector " + detectorId, e);
+            listener.onFailure(e);
+        }));
     }
 
+    /**
+     * Create realtime task for AD job. This may happen when user migrate from old AD version on or before OpenSearch1.0.
+     * @param job AD realtime job
+     */
     public void createRealtimeTask(AnomalyDetectorJob job) {
         ConcurrentLinkedQueue<AnomalyDetectorJob> detectorJobs = new ConcurrentLinkedQueue<>();
         detectorJobs.add(job);
-        dataMigrator.backfillRealtimeTask(detectorJobs);
+        dataMigrator.backfillRealtimeTask(detectorJobs, false);
     }
 
     /**
@@ -2166,10 +2144,9 @@ public class ADTaskManager {
         // request id could be null, `+ ""` is for backward compatibility consideration
         Optional<DiscoveryNode> owningNode = hashRing.getOwningNodeWithHighestAdVersion(requestId + "");
         if (!owningNode.isPresent() || !clusterService.localNode().getId().equals(owningNode.get().getId())) {
-            logger.info("2222222222222222222222222222222222222222 ----- donnnt need to run on this node ");
             return;
         }
-        logger.info("2222222222222222222222222222222222222222Start to maintain running historical tasks");
+        logger.info("Start to maintain running historical tasks");
 
         BoolQueryBuilder query = new BoolQueryBuilder();
         query.filter(new TermQueryBuilder(IS_LATEST_FIELD, true));
@@ -2402,6 +2379,10 @@ public class ADTaskManager {
         }));
     }
 
+    /**
+     * Set old AD task's latest flag as false.
+     * @param adTasks list of AD tasks
+     */
     public void resetLatestFlagAsFalse(List<ADTask> adTasks) {
         if (adTasks == null || adTasks.size() == 0) {
             return;
@@ -2412,11 +2393,11 @@ public class ADTaskManager {
                 task.setLatest(false);
                 task.setLastUpdateTime(Instant.now());
                 IndexRequest indexRequest = new IndexRequest(DETECTION_STATE_INDEX)
-                        .id(task.getTaskId())
-                        .source(task.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), XCONTENT_WITH_TYPE));
+                    .id(task.getTaskId())
+                    .source(task.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), XCONTENT_WITH_TYPE));
                 bulkRequest.add(indexRequest);
             } catch (Exception e) {
-                logger.error("3333333333333333333333333333333333333333333333333333333333333333333333333333 Fail to parse task AD task to XContent, task id " + task.getTaskId(), e);
+                logger.error("Fail to parse task AD task to XContent, task id " + task.getTaskId(), e);
             }
         });
 
@@ -2426,14 +2407,12 @@ public class ADTaskManager {
             if (bulkItemResponses != null && bulkItemResponses.length > 0) {
                 for (BulkItemResponse bulkItemResponse : bulkItemResponses) {
                     if (!bulkItemResponse.isFailed()) {
-                        logger.warn("3333333333333333333333333333333333333333333333333333333333333333333333333333 Reset AD tasks latest flag as false Successfully. Task id: {}", bulkItemResponse.getId());
+                        logger.warn("Reset AD tasks latest flag as false Successfully. Task id: {}", bulkItemResponse.getId());
                     } else {
-                        logger.warn("3333333333333333333333333333333333333333333333333333333333333333333333333333 Failed to reset AD tasks latest flag as false. Task id: " + bulkItemResponse.getId());
+                        logger.warn("Failed to reset AD tasks latest flag as false. Task id: " + bulkItemResponse.getId());
                     }
                 }
             }
-        }, e -> {
-            logger.warn("Failed to reset AD tasks latest flag as false", e);
-        }));
+        }, e -> { logger.warn("Failed to reset AD tasks latest flag as false", e); }));
     }
 }

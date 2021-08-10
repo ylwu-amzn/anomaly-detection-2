@@ -768,10 +768,6 @@ public class ADTask implements ToXContentObject, Writeable {
         return detectionDateRange;
     }
 
-    public void setDetectionDateRange(DetectionDateRange detectionDateRange) {
-        this.detectionDateRange = detectionDateRange;
-    }
-
     public Entity getEntity() {
         return entity;
     }
@@ -790,6 +786,10 @@ public class ADTask implements ToXContentObject, Writeable {
 
     public User getUser() {
         return user;
+    }
+
+    public void setDetectionDateRange(DetectionDateRange detectionDateRange) {
+        this.detectionDateRange = detectionDateRange;
     }
 
     public void setLatest(Boolean latest) {

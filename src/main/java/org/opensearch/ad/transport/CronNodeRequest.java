@@ -47,9 +47,6 @@ public class CronNodeRequest extends BaseNodeRequest {
 
     public CronNodeRequest(StreamInput in) throws IOException {
         super(in);
-//        if (in.available() == 0) {
-//            throw new ADVersionConflictException("Can't read CronNodeRequest of old AD version");
-//        }
         if (in.available() > 0) {
             requestId = in.readString();
         }

@@ -639,14 +639,6 @@ public class ADBatchTaskRunner {
         return threadedActionListener;
     }
 
-    private void waitBeforeNextEntity(long time) {
-        try {
-            Thread.sleep(time);
-        } catch (InterruptedException interruptedException) {
-            logger.warn("Exception while waiting", interruptedException);
-        }
-    }
-
     private void forwardOrExecuteEntityTask(
         ADTask adTask,
         TransportService transportService,
@@ -658,7 +650,6 @@ public class ADBatchTaskRunner {
                 startADBatchTaskOnWorkerNode(adTask, false, transportService, workerNodeResponseListener);
             } else {
                 // Execute batch task remotely
-//                adTaskManager.validateAdVersion(node.getId());
                 transportService
                     .sendRequest(
                         node,
@@ -681,8 +672,6 @@ public class ADBatchTaskRunner {
     }
 
     private void dispatchTask(ADTask adTask, ActionListener<DiscoveryNode> listener) {
-//        DiscoveryNode[] dataNodes = nodeFilter.getEligibleDataNodes();
-//        DiscoveryNode[] dataNodes = hashRing.getNodesWithSameLocalAdVersion();
         DiscoveryNode[] dataNodes = hashRing.getNodesWithHighestAdVersion();
         ADStatsRequest adStatsRequest = new ADStatsRequest(dataNodes);
         adStatsRequest.addAll(ImmutableSet.of(AD_EXECUTING_BATCH_TASK_COUNT.getName(), JVM_HEAP_USAGE.getName()));

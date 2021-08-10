@@ -34,7 +34,6 @@ import java.util.Arrays;
 import java.util.List;
 
 import org.opensearch.ad.annotation.Generated;
-import org.opensearch.ad.common.exception.ADVersionConflictException;
 import org.opensearch.common.io.stream.StreamInput;
 import org.opensearch.common.io.stream.StreamOutput;
 import org.opensearch.common.io.stream.Writeable;

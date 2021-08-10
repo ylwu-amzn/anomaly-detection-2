@@ -42,7 +42,6 @@ import java.util.stream.Collectors;
 
 import org.apache.logging.log4j.util.Strings;
 import org.opensearch.ad.annotation.Generated;
-import org.opensearch.ad.common.exception.ADVersionConflictException;
 import org.opensearch.ad.constant.CommonErrorMessages;
 import org.opensearch.ad.constant.CommonName;
 import org.opensearch.ad.constant.CommonValue;
@@ -121,7 +120,7 @@ public class AnomalyDetector implements Writeable, ToXContentObject {
     private User user;
     private String detectorType;
 
-    // support backward compatibility, will remove in future
+    // TODO: support backward compatibility, will remove in future
     @Deprecated
     private DetectionDateRange detectionDateRange;
 

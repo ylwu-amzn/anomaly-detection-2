@@ -46,13 +46,13 @@ public class AnomalyDetectorJobRequest extends ActionRequest {
     public AnomalyDetectorJobRequest(StreamInput in) throws IOException {
         super(in);
         detectorID = in.readString();
-        historical = in.readBoolean();
         seqNo = in.readLong();
         primaryTerm = in.readLong();
         rawPath = in.readString();
         if (in.readBoolean()) {
             detectionDateRange = new DetectionDateRange(in);
         }
+        historical = in.readBoolean();
     }
 
     public AnomalyDetectorJobRequest(String detectorID, long seqNo, long primaryTerm, String rawPath) {

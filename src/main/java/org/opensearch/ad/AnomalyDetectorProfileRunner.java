@@ -67,7 +67,6 @@ import org.opensearch.ad.transport.ProfileResponse;
 import org.opensearch.ad.transport.RCFPollingAction;
 import org.opensearch.ad.transport.RCFPollingRequest;
 import org.opensearch.ad.transport.RCFPollingResponse;
-import org.opensearch.ad.util.DiscoveryNodeFilterer;
 import org.opensearch.ad.util.ExceptionUtil;
 import org.opensearch.ad.util.MultiResponsesDelegateActionListener;
 import org.opensearch.client.Client;
@@ -360,6 +359,7 @@ public class AnomalyDetectorProfileRunner extends AbstractProfileRunner {
         boolean forMultiEntityDetector,
         MultiResponsesDelegateActionListener<DetectorProfile> listener
     ) {
+        // TODO: check with kaituo
         DiscoveryNode[] dataNodes = hashRing.getNodesWithSameLocalAdVersion();
         ProfileRequest profileRequest = new ProfileRequest(detector.getDetectorId(), profiles, forMultiEntityDetector, dataNodes);
         client.execute(ProfileAction.INSTANCE, profileRequest, onModelResponse(detector, profiles, job, listener));// get init progress
