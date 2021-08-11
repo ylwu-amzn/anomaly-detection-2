@@ -117,6 +117,7 @@ import org.opensearch.ad.common.exception.DuplicateTaskException;
 import org.opensearch.ad.common.exception.LimitExceededException;
 import org.opensearch.ad.common.exception.ResourceNotFoundException;
 import org.opensearch.ad.indices.AnomalyDetectionIndices;
+import org.opensearch.ad.model.ADEntityTaskProfile;
 import org.opensearch.ad.model.ADTask;
 import org.opensearch.ad.model.ADTaskAction;
 import org.opensearch.ad.model.ADTaskProfile;
@@ -298,7 +299,8 @@ public class ADTaskManager {
         ActionListener<AnomalyDetectorJobResponse> listener
     ) {
         String detectorId = detector.getDetectorId();
-        Optional<DiscoveryNode> owningNode = hashRing.getOwningNodeWithHighestAdVersion(detectorId);
+//        Optional<DiscoveryNode> owningNode = hashRing.getOwningNodeWithHighestAdVersion(detectorId);
+        Optional<DiscoveryNode> owningNode = hashRing.getOwningNodeWithSameLocalAdVersion(detectorId);
         if (!owningNode.isPresent()) {
             logger.debug("Can't find eligible node to run as AD task's coordinating node");
             listener.onFailure(new OpenSearchStatusException("No eligible node to run detector", RestStatus.INTERNAL_SERVER_ERROR));
@@ -779,8 +781,13 @@ public class ADTaskManager {
             return;
         }
         String taskId = adTask.getTaskId();
-        getADTaskProfile(adTask, ActionListener.wrap(taskProfiles -> {
-            if (!taskProfiles.containsKey(adTask.getTaskId())) {
+        getADTaskProfile(adTask, ActionListener.wrap(taskProfile -> {
+            if (taskProfile == null) {
+                logger.info("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++11111 no task profile return for detector " + adTask.getDetectorId());
+                return;
+            }
+            logger.info("11111111111111 ylwu1: final task profile : {}", taskProfile.toString());
+            if (taskProfile.getNodeId() == null) {
                 logger.debug("AD task not running. Reset task state as stopped, task id: {}", adTask.getTaskId());
                 // If no node is running this task, reset it as STOPPED.
                 resetTaskStateAsStopped(adTask, transportService, () -> function.execute());
@@ -790,15 +797,14 @@ public class ADTaskManager {
                 if (ADTaskType.HISTORICAL_HC_DETECTOR.name().equals(adTask.getTaskType())) {
                     // Check if any running entity not run on worker node. If yes, we need to remove it
                     // and poll next entity from pending entity queue and run it.
-                    ADTaskProfile detectorTaskProfile = taskProfiles.get(taskId);
-                    if (detectorTaskProfile.getRunningEntitiesCount() > 0) {
-                        List<String> runningTasksInCoordinatingNodeCache = Arrays.asList(detectorTaskProfile.getRunningEntities());
-                        List<String> runningTasksOnWorkerNode = taskProfiles
-                            .entrySet()
-                            .stream()
-                            .filter(entry -> !taskId.equals(entry.getKey()))
-                            .map(entry -> convertEntityToString(entry.getValue().getEntity(), adTask.getDetector()))
-                            .collect(Collectors.toList());
+                    Integer runningEntitiesCount = taskProfile.getRunningEntitiesCount();
+                    if (runningEntitiesCount != null && runningEntitiesCount > 0) {
+                        List<String> runningTasksInCoordinatingNodeCache = Arrays.asList(taskProfile.getRunningEntities());
+                        List<String> runningTasksOnWorkerNode = new ArrayList<>();
+                        if (taskProfile.getEntityTaskProfiles() != null && taskProfile.getEntityTaskProfiles().size() > 0) {
+                            taskProfile.getEntityTaskProfiles().forEach(entryTask -> runningTasksOnWorkerNode.add(convertEntityToString(entryTask.getEntity(), adTask.getDetector())));
+                        }
+
                         if (runningTasksInCoordinatingNodeCache.size() > runningTasksOnWorkerNode.size()) {
                             runningTasksInCoordinatingNodeCache.removeAll(runningTasksOnWorkerNode);
                             forwardStaleRunningEntitiesToCoordinatingNode(
@@ -981,9 +987,9 @@ public class ADTaskManager {
     ) {
         getAndExecuteOnLatestADTask(detectorId, null, HISTORICAL_DETECTOR_TASK_TYPES, adTask -> {
             if (adTask.isPresent()) {
-                getADTaskProfile(adTask.get(), ActionListener.wrap(adTaskProfiles -> {
+                getADTaskProfile(adTask.get(), ActionListener.wrap(adTaskProfile -> {
                     DetectorProfile.Builder profileBuilder = new DetectorProfile.Builder();
-                    profileBuilder.adTaskProfiles(adTaskProfiles);
+                    profileBuilder.adTaskProfile(adTaskProfile);
                     DetectorProfile detectorProfile = profileBuilder.build();
                     detectorProfile.merge(profile);
                     listener.onResponse(detectorProfile);
@@ -1003,10 +1009,13 @@ public class ADTaskManager {
      * @param adDetectorLevelTask detector level task
      * @param listener action listener
      */
-    private void getADTaskProfile(ADTask adDetectorLevelTask, ActionListener<Map<String, ADTaskProfile>> listener) {
+    private void getADTaskProfile(ADTask adDetectorLevelTask, ActionListener<ADTaskProfile> listener) {
         String detectorId = adDetectorLevelTask.getDetectorId();
 
         DiscoveryNode[] dataNodes = hashRing.getAllEligibleDataNodesWithKnownAdVersion();
+        for (DiscoveryNode n : dataNodes) {
+            logger.info("11111111111111111 ylwudebug1: get task profile from node {} ", n.getId());
+        }
         ADTaskProfileRequest adTaskProfileRequest = new ADTaskProfileRequest(detectorId, dataNodes);
         client.execute(ADTaskProfileAction.INSTANCE, adTaskProfileRequest, ActionListener.wrap(response -> {
             if (response.hasFailures()) {
@@ -1014,26 +1023,44 @@ public class ADTaskManager {
                 return;
             }
 
-            // key of adTaskProfileMap: task id
-            Map<String, ADTaskProfile> adTaskProfileMap = new HashMap<>();
+            List<ADEntityTaskProfile> adEntityTaskProfiles = new ArrayList<>();
+            ADTaskProfile detectorTaskProfile = new ADTaskProfile(adDetectorLevelTask);
             for (ADTaskProfileNodeResponse node : response.getNodes()) {
-                List<ADTaskProfile> profiles = node.getAdTaskProfiles();
-                if (profiles != null) {
-                    profiles.forEach(p -> {
-                        if (p.getTaskId() == null) {
-                            p.setTaskId(adDetectorLevelTask.getTaskId());
-                        }
-                        if (!ADTaskType.HISTORICAL_HC_ENTITY.name().equals(p.getAdTaskType())) {
-                            p.setAdTask(adDetectorLevelTask);
-                        }
-                        if (adTaskProfileMap.containsKey(p.getTaskId())) {
-                            logger.warn("Find duplicate task profile for task " + p.getTaskId());
-                        }
-                        adTaskProfileMap.put(p.getTaskId(), p);
-                    });
+                ADTaskProfile taskProfile = node.getAdTaskProfile();
+                if (taskProfile != null) {
+//                    if (!ADTaskType.HISTORICAL_HC_ENTITY.name().equals(taskProfile.getAdTaskType())) {
+//                        taskProfile.setAdTask(adDetectorLevelTask);
+//                    }
+                    logger.info("333333333333333333444444444444444444444444 {} , node id is null: {}", taskProfile.toString(), taskProfile.getNodeId() == null);
+                    if (taskProfile.getNodeId() != null) {
+                        detectorTaskProfile.setShingleSize(taskProfile.getShingleSize());
+                        detectorTaskProfile.setRcfTotalUpdates(taskProfile.getRcfTotalUpdates());
+                        detectorTaskProfile.setThresholdModelTrained(taskProfile.getThresholdModelTrained());
+                        detectorTaskProfile.setThresholdModelTrainingDataSize(taskProfile.getThresholdModelTrainingDataSize());
+                        detectorTaskProfile.setModelSizeInBytes(taskProfile.getModelSizeInBytes());
+                        detectorTaskProfile.setNodeId(taskProfile.getNodeId());
+                        detectorTaskProfile.setTotalEntitiesCount(taskProfile.getTotalEntitiesCount());
+                        detectorTaskProfile.setPendingEntitiesCount(taskProfile.getPendingEntitiesCount());
+                        detectorTaskProfile.setRunningEntitiesCount(taskProfile.getRunningEntitiesCount());
+                        detectorTaskProfile.setRunningEntities(taskProfile.getRunningEntities());
+                        detectorTaskProfile.setAdTaskType(taskProfile.getAdTaskType());
+                    }
+                    logger.info("33333333333333333344444444444444444444444455555555555555 {}", detectorTaskProfile.toString());
+                    if (taskProfile.getEntityTaskProfiles() != null) {
+                        logger.info("33333333333333333344444444444444444444444455555555555555aaaaaaa size: {}", taskProfile.getEntityTaskProfiles().size());
+                        adEntityTaskProfiles.addAll(taskProfile.getEntityTaskProfiles());
+                        logger.info("33333333333333333344444444444444444444444455555555555555aaaaaaabbbbb size: {}", adEntityTaskProfiles.size());
+                    }
+//                    logger.info("333333333333333333444444444444444444444444555555555555556666666666666666 {}", taskProfile.toString());
                 }
             }
-            listener.onResponse(adTaskProfileMap);
+            logger.info("33333333333333333344444444444444444444444455555555555555aaaaaaabbbbbcccc size: {}", adEntityTaskProfiles.size());
+            if ( adEntityTaskProfiles != null && adEntityTaskProfiles.size() > 0) {
+                detectorTaskProfile.setEntityTaskProfiles(adEntityTaskProfiles);
+                logger.info("333333333333333333444444444444444444444444555555555555556666666666666666777777777777 {}", detectorTaskProfile.toString());
+            }
+            logger.info("3333333333333333334444444444444444444444445555555555555566666666666666667777777777778888888 {}", detectorTaskProfile.toString());
+            listener.onResponse(detectorTaskProfile);
         }, e -> {
             logger.error("Failed to get task profile for task " + adDetectorLevelTask.getTaskId(), e);
             listener.onFailure(e);
@@ -2069,6 +2096,67 @@ public class ADTaskManager {
         return adTaskProfiles;
     }
 
+    public ADTaskProfile getLocalADTaskProfilesByDetectorIdA(String detectorId) {
+
+        List<String> tasksOfDetector = adTaskCacheManager.getTasksOfDetector(detectorId);
+        ADTaskProfile detectorTaskProfile = null;
+
+        String localNodeId = clusterService.localNode().getId();
+        if (adTaskCacheManager.isHCTaskRunning(detectorId)) {
+            logger.info("1111111111111112222222222222222 , start to get HC entity task for detector " + detectorId);
+            if (adTaskCacheManager.hasEntity(detectorId) || tasksOfDetector.size() > 0) {
+                detectorTaskProfile = new ADTaskProfile();
+            }
+            if (adTaskCacheManager.hasEntity(detectorId)) {
+                logger.info("1111111111 ylwudebu1: this is coordinating node of detector {}, node id: {}", detectorId, clusterService.localNode().getId());
+                detectorTaskProfile.setNodeId(localNodeId);
+                detectorTaskProfile.setTotalEntitiesCount(adTaskCacheManager.getTopEntityCount(detectorId));
+                detectorTaskProfile.setPendingEntitiesCount(adTaskCacheManager.getPendingEntityCount(detectorId));
+                detectorTaskProfile.setRunningEntitiesCount(adTaskCacheManager.getRunningEntityCount(detectorId));
+                detectorTaskProfile.setRunningEntities(adTaskCacheManager.getRunningEntities(detectorId));
+                detectorTaskProfile.setAdTaskType(ADTaskType.HISTORICAL_HC_ENTITY.name());
+            }
+            if (tasksOfDetector.size() > 0) {
+                List<ADEntityTaskProfile> entityTaskProfiles = new ArrayList<>();
+
+                tasksOfDetector.forEach(taskId -> {
+                    logger.info("1111111111 ylwudebu1: this is workder node of detector {}, node id: {}, entity id: {}", detectorId, clusterService.localNode().getId(), adTaskCacheManager.getEntity(taskId));
+                    ADEntityTaskProfile entityTaskProfile = new ADEntityTaskProfile(
+                            adTaskCacheManager.getShingle(taskId).size(),
+                            adTaskCacheManager.getRcfModel(taskId).getTotalUpdates(),
+                            adTaskCacheManager.isThresholdModelTrained(taskId),
+                            adTaskCacheManager.getThresholdModelTrainingDataSize(taskId),
+                            adTaskCacheManager.getModelSize(taskId),
+                            localNodeId,
+                            adTaskCacheManager.getEntity(taskId),
+                            taskId
+                    );
+                    entityTaskProfiles.add(entityTaskProfile);
+                });
+                detectorTaskProfile.setEntityTaskProfiles(entityTaskProfiles);
+            }
+        } else {
+            logger.info("1111111111111112222222222222222 , start to get single entity task for detector " + detectorId);
+            if (tasksOfDetector.size() > 1) {
+                String error = "Multiple tasks are running for detector: " + detectorId + ". You can stop detector to kill all running tasks.";
+                logger.warn("1111111111111112222222222222222" + error);
+                throw new LimitExceededException(error);
+            }
+            if (tasksOfDetector.size() == 1) {
+                String taskId = tasksOfDetector.get(0);
+                detectorTaskProfile = new ADTaskProfile(
+                        adTaskCacheManager.getShingle(taskId).size(),
+                        adTaskCacheManager.getRcfModel(taskId).getTotalUpdates(),
+                        adTaskCacheManager.isThresholdModelTrained(taskId),
+                        adTaskCacheManager.getThresholdModelTrainingDataSize(taskId),
+                        adTaskCacheManager.getModelSize(taskId),
+                        localNodeId
+                );
+            }
+        }
+        return detectorTaskProfile;
+    }
+
     /**
      * Remove stale running entity from coordinating node cache. If no more entities, reset task as STOPPED.
      *
@@ -2142,6 +2230,7 @@ public class ADTaskManager {
      */
     public void maintainRunningHistoricalTasks(TransportService transportService, String requestId, int size) {
         // request id could be null, `+ ""` is for backward compatibility consideration
+        // Find owning node with highest AD version to make sure we only have 1 node maintain running historical tasks.
         Optional<DiscoveryNode> owningNode = hashRing.getOwningNodeWithHighestAdVersion(requestId + "");
         if (!owningNode.isPresent() || !clusterService.localNode().getId().equals(owningNode.get().getId())) {
             return;

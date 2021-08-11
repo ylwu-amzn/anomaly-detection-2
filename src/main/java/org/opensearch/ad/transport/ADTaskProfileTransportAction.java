@@ -79,7 +79,7 @@ public class ADTaskProfileTransportAction extends
         List<ADTaskProfileNodeResponse> responses,
         List<FailedNodeException> failures
     ) {
-        return new ADTaskProfileResponse(clusterService.getClusterName(), responses, failures, hashRing);
+        return new ADTaskProfileResponse(clusterService.getClusterName(), responses, failures);
     }
 
     @Override
@@ -89,15 +89,15 @@ public class ADTaskProfileTransportAction extends
 
     @Override
     protected ADTaskProfileNodeResponse newNodeResponse(StreamInput in) throws IOException {
-
-        return new ADTaskProfileNodeResponse(in, hashRing);
+        return new ADTaskProfileNodeResponse(in);
     }
 
     @Override
     protected ADTaskProfileNodeResponse nodeOperation(ADTaskProfileNodeRequest request) {
         String remoteNodeId = request.getParentTask().getNodeId();
         this.remoteAdVersion = hashRing.getAdVersion(remoteNodeId);
-        List<ADTaskProfile> adTaskProfile = adTaskManager.getLocalADTaskProfilesByDetectorId(request.getDetectorId());
+        ADTaskProfile adTaskProfile = adTaskManager.getLocalADTaskProfilesByDetectorIdA(request.getDetectorId());
+//        List<ADTaskProfile> adTaskProfile = adTaskManager.getLocalADTaskProfilesByDetectorId(request.getDetectorId());
         return new ADTaskProfileNodeResponse(clusterService.localNode(), adTaskProfile, remoteAdVersion);
     }
 }

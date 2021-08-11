@@ -32,7 +32,9 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
+import org.opensearch.Version;
 import org.opensearch.ad.annotation.Generated;
 import org.opensearch.common.io.stream.StreamInput;
 import org.opensearch.common.io.stream.StreamOutput;
@@ -62,6 +64,7 @@ public class ADTaskProfile implements ToXContentObject, Writeable, Writeable.Wri
     public static final String PENDING_ENTITIES_COUNT_FIELD = "pending_entities_count";
     public static final String RUNNING_ENTITIES_COUNT_FIELD = "running_entities_count";
     public static final String RUNNING_ENTITIES_FIELD = "running_entities";
+    public static final String ENTITY_TASK_PROFILE_FIELD = "entity_task_profiles";
 
     private ADTask adTask;
     private Integer shingleSize;
@@ -77,6 +80,16 @@ public class ADTaskProfile implements ToXContentObject, Writeable, Writeable.Wri
     private Integer pendingEntitiesCount;
     private Integer runningEntitiesCount;
     private String[] runningEntities;
+
+    private List<ADEntityTaskProfile> entityTaskProfiles;
+
+    public ADTaskProfile() {
+
+    }
+
+    public ADTaskProfile(ADTask adTask) {
+        this.adTask = adTask;
+    }
 
     public ADTaskProfile(
         Integer shingleSize,
@@ -210,17 +223,25 @@ public class ADTaskProfile implements ToXContentObject, Writeable, Writeable.Wri
         this.modelSizeInBytes = input.readOptionalLong();
         this.nodeId = input.readOptionalString();
         if (input.available() > 0) {
+            this.totalEntitiesCount = input.readOptionalInt();
+            this.pendingEntitiesCount = input.readOptionalInt();
+            this.runningEntitiesCount = input.readOptionalInt();
+            this.runningEntities = input.readOptionalStringArray();
             if (input.readBoolean()) {
-                this.entity = new Entity(input);
-            } else {
-                this.entity = null;
+                this.entityTaskProfiles = input.readList(ADEntityTaskProfile::new);
             }
-            this.taskId = input.readOptionalString();
-            this.adTaskType = input.readOptionalString();
-            totalEntitiesCount = input.readOptionalInt();
-            pendingEntitiesCount = input.readOptionalInt();
-            runningEntitiesCount = input.readOptionalInt();
-            runningEntities = input.readOptionalStringArray();
+
+//            if (input.readBoolean()) {
+//                this.entity = new Entity(input);
+//            } else {
+//                this.entity = null;
+//            }
+//            this.taskId = input.readOptionalString();
+//            this.adTaskType = input.readOptionalString();
+//            totalEntitiesCount = input.readOptionalInt();
+//            pendingEntitiesCount = input.readOptionalInt();
+//            runningEntitiesCount = input.readOptionalInt();
+//            runningEntities = input.readOptionalStringArray();
         }
     }
 
@@ -239,18 +260,53 @@ public class ADTaskProfile implements ToXContentObject, Writeable, Writeable.Wri
         out.writeOptionalInt(thresholdModelTrainingDataSize);
         out.writeOptionalLong(modelSizeInBytes);
         out.writeOptionalString(nodeId);
-        if (entity != null) {
-            out.writeBoolean(true);
-            entity.writeTo(out);
-        } else {
-            out.writeBoolean(false);
-        }
-        out.writeOptionalString(taskId);
-        out.writeOptionalString(adTaskType);
+
         out.writeOptionalInt(totalEntitiesCount);
         out.writeOptionalInt(pendingEntitiesCount);
         out.writeOptionalInt(runningEntitiesCount);
         out.writeOptionalStringArray(runningEntities);
+        out.writeList(this.getEntityTaskProfiles());
+//        if (entity != null) {
+//            out.writeBoolean(true);
+//            entity.writeTo(out);
+//        } else {
+//            out.writeBoolean(false);
+//        }
+//        out.writeOptionalString(taskId);
+//        out.writeOptionalString(adTaskType);
+//        out.writeOptionalInt(totalEntitiesCount);
+//        out.writeOptionalInt(pendingEntitiesCount);
+//        out.writeOptionalInt(runningEntitiesCount);
+//        out.writeOptionalStringArray(runningEntities);
+    }
+
+    public void writeTo(StreamOutput out, Version adVersion) throws IOException {
+        if (adTask != null) {
+            out.writeBoolean(true);
+            adTask.writeTo(out);
+        } else {
+            out.writeBoolean(false);
+        }
+
+        out.writeOptionalInt(shingleSize);
+        out.writeOptionalLong(rcfTotalUpdates);
+        out.writeOptionalBoolean(thresholdModelTrained);
+        out.writeOptionalInt(thresholdModelTrainingDataSize);
+        out.writeOptionalLong(modelSizeInBytes);
+        out.writeOptionalString(nodeId);
+        if (!adVersion.onOrBefore(Version.V_1_0_0)) {
+            out.writeOptionalInt(totalEntitiesCount);
+            out.writeOptionalInt(pendingEntitiesCount);
+            out.writeOptionalInt(runningEntitiesCount);
+            out.writeOptionalStringArray(runningEntities);
+            if (this.getEntityTaskProfiles() != null) {
+                out.writeBoolean(true);
+                out.writeList(this.getEntityTaskProfiles());
+            } else {
+                out.writeBoolean(false);
+            }
+
+        }
     }
 
     @Override
@@ -294,6 +350,9 @@ public class ADTaskProfile implements ToXContentObject, Writeable, Writeable.Wri
         }
         if (runningEntities != null) {
             xContentBuilder.field(RUNNING_ENTITIES_FIELD, runningEntities);
+        }
+        if (entityTaskProfiles != null && entityTaskProfiles.size() > 0) {
+            xContentBuilder.field(ENTITY_TASK_PROFILE_FIELD, entityTaskProfiles.toArray());
         }
         return xContentBuilder.endObject();
     }
@@ -505,43 +564,6 @@ public class ADTaskProfile implements ToXContentObject, Writeable, Writeable.Wri
     }
 
     @Override
-    public String toString() {
-        return "ADTaskProfile{"
-            + "adTask="
-            + adTask
-            + ", shingleSize="
-            + shingleSize
-            + ", rcfTotalUpdates="
-            + rcfTotalUpdates
-            + ", thresholdModelTrained="
-            + thresholdModelTrained
-            + ", thresholdModelTrainingDataSize="
-            + thresholdModelTrainingDataSize
-            + ", modelSizeInBytes="
-            + modelSizeInBytes
-            + ", nodeId='"
-            + nodeId
-            + '\''
-            + ", entity="
-            + entity
-            + ", taskId='"
-            + taskId
-            + '\''
-            + ", adTaskType='"
-            + adTaskType
-            + '\''
-            + ", totalEntitiesCount="
-            + totalEntitiesCount
-            + ", pendingEntitiesCount="
-            + pendingEntitiesCount
-            + ", runningEntitiesCount="
-            + runningEntitiesCount
-            + ", runningEntities="
-            + Arrays.toString(runningEntities)
-            + '}';
-    }
-
-    @Override
     public Object read(StreamInput in) throws IOException {
         return new ADTaskProfile(in);
     }
@@ -553,5 +575,61 @@ public class ADTaskProfile implements ToXContentObject, Writeable, Writeable.Wri
         } else {
             throw new IllegalArgumentException("Can only write ADTaskProfile");
         }
+    }
+
+    public List<ADEntityTaskProfile> getEntityTaskProfiles() {
+        return entityTaskProfiles;
+    }
+
+    public void setEntityTaskProfiles(List<ADEntityTaskProfile> entityTaskProfiles) {
+        this.entityTaskProfiles = entityTaskProfiles;
+    }
+
+    public void setEntity(Entity entity) {
+        this.entity = entity;
+    }
+
+    public void setTotalEntitiesCount(Integer totalEntitiesCount) {
+        this.totalEntitiesCount = totalEntitiesCount;
+    }
+
+    public void setPendingEntitiesCount(Integer pendingEntitiesCount) {
+        this.pendingEntitiesCount = pendingEntitiesCount;
+    }
+
+    public void setRunningEntitiesCount(Integer runningEntitiesCount) {
+        this.runningEntitiesCount = runningEntitiesCount;
+    }
+
+    public void setRunningEntities(String[] runningEntities) {
+        this.runningEntities = runningEntities;
+    }
+
+    @Override
+    public String toString() {
+        String entitytaskString = null;
+        if (entityTaskProfiles != null && entityTaskProfiles.size() > 0) {
+            for (ADEntityTaskProfile p : entityTaskProfiles) {
+                entitytaskString = entitytaskString + "; " + p.toString();
+            }
+            //entitytaskString = Arrays.toString(entityTaskProfiles.stream().map(e -> e.toString()).collect(Collectors.toList()).toArray(new String[0]))
+        }
+        return "ADTaskProfile{" +
+                "adTask=" + adTask +
+                ", shingleSize=" + shingleSize +
+                ", rcfTotalUpdates=" + rcfTotalUpdates +
+                ", thresholdModelTrained=" + thresholdModelTrained +
+                ", thresholdModelTrainingDataSize=" + thresholdModelTrainingDataSize +
+                ", modelSizeInBytes=" + modelSizeInBytes +
+                ", nodeId='" + nodeId + '\'' +
+                ", entity=" + entity +
+                ", taskId='" + taskId + '\'' +
+                ", adTaskType='" + adTaskType + '\'' +
+                ", totalEntitiesCount=" + totalEntitiesCount +
+                ", pendingEntitiesCount=" + pendingEntitiesCount +
+                ", runningEntitiesCount=" + runningEntitiesCount +
+                ", runningEntities=" + Arrays.toString(runningEntities) +
+                ", entityTaskProfiles=" +  entitytaskString +
+                '}';
     }
 }

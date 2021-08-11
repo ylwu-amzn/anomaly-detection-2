@@ -728,8 +728,6 @@ public class AnomalyDetectorPlugin extends Plugin implements ActionPlugin, Scrip
 
         ADSearchHandler adSearchHandler = new ADSearchHandler(settings, clusterService, client);
 
-        ADTaskProfileAction.getADTaskProfileActionInstance(hashRing);
-
         // return objects used by Guice to inject dependencies for e.g.,
         // transport action handler constructors
         return ImmutableList

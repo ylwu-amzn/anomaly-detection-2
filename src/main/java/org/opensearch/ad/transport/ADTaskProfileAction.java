@@ -29,29 +29,15 @@ package org.opensearch.ad.transport;
 import static org.opensearch.ad.constant.CommonName.AD_TASK;
 
 import org.opensearch.action.ActionType;
-import org.opensearch.ad.cluster.HashRing;
 import org.opensearch.ad.constant.CommonValue;
 
 public class ADTaskProfileAction extends ActionType<ADTaskProfileResponse> {
 
     public static final String NAME = CommonValue.INTERNAL_ACTION_PREFIX + "detectors/profile/" + AD_TASK;
-    public static ADTaskProfileAction INSTANCE;
+    public static final ADTaskProfileAction INSTANCE = new ADTaskProfileAction();
 
-    public static ADTaskProfileAction getADTaskProfileActionInstance(HashRing hashRing) {
-        if (INSTANCE != null) {
-            return INSTANCE;
-        }
-        synchronized (ADTaskProfileAction.class) {
-            if (INSTANCE != null) {
-                return INSTANCE;
-            }
-            INSTANCE = new ADTaskProfileAction(hashRing);
-            return INSTANCE;
-        }
-    }
-
-    private ADTaskProfileAction(HashRing hashRing) {
-        super(NAME, input -> new ADTaskProfileResponse(input, hashRing));
+    private ADTaskProfileAction() {
+        super(NAME, ADTaskProfileResponse::new);
     }
 
 }

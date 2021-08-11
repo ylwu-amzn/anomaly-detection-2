@@ -31,31 +31,18 @@ import java.util.List;
 
 import org.opensearch.action.FailedNodeException;
 import org.opensearch.action.support.nodes.BaseNodesResponse;
-import org.opensearch.ad.cluster.HashRing;
 import org.opensearch.cluster.ClusterName;
 import org.opensearch.common.io.stream.StreamInput;
 import org.opensearch.common.io.stream.StreamOutput;
 
 public class ADTaskProfileResponse extends BaseNodesResponse<ADTaskProfileNodeResponse> {
 
-    private HashRing hashRing;
-
-    public ADTaskProfileResponse(StreamInput in, HashRing hashRing) throws IOException {
-        super(
-            new ClusterName(in),
-            in.readList(input -> ADTaskProfileNodeResponse.readNodeResponse(input, hashRing)),
-            in.readList(FailedNodeException::new)
-        );
+    public ADTaskProfileResponse(StreamInput in) throws IOException {
+        super(new ClusterName(in), in.readList(ADTaskProfileNodeResponse::readNodeResponse), in.readList(FailedNodeException::new));
     }
 
-    public ADTaskProfileResponse(
-        ClusterName clusterName,
-        List<ADTaskProfileNodeResponse> nodes,
-        List<FailedNodeException> failures,
-        HashRing hashRing
-    ) {
+    public ADTaskProfileResponse(ClusterName clusterName, List<ADTaskProfileNodeResponse> nodes, List<FailedNodeException> failures) {
         super(clusterName, nodes, failures);
-        this.hashRing = hashRing;
     }
 
     @Override
@@ -65,7 +52,7 @@ public class ADTaskProfileResponse extends BaseNodesResponse<ADTaskProfileNodeRe
 
     @Override
     public List<ADTaskProfileNodeResponse> readNodesFrom(StreamInput in) throws IOException {
-        return in.readList(streamInput -> ADTaskProfileNodeResponse.readNodeResponse(in, hashRing));
+        return in.readList(ADTaskProfileNodeResponse::readNodeResponse);
     }
 
 }

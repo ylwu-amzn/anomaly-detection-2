@@ -27,81 +27,57 @@
 package org.opensearch.ad.transport;
 
 import java.io.IOException;
-import java.util.List;
-import java.util.stream.Collectors;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.opensearch.Version;
 import org.opensearch.action.support.nodes.BaseNodeResponse;
-import org.opensearch.ad.cluster.ADVersionUtil;
-import org.opensearch.ad.cluster.HashRing;
 import org.opensearch.ad.model.ADTaskProfile;
 import org.opensearch.cluster.node.DiscoveryNode;
 import org.opensearch.common.io.stream.StreamInput;
 import org.opensearch.common.io.stream.StreamOutput;
 
-import com.google.common.collect.ImmutableList;
 
 public class ADTaskProfileNodeResponse extends BaseNodeResponse {
-    private List<ADTaskProfile> adTaskProfiles;
+    private static final Logger logger = LogManager.getLogger(ADTaskProfileNodeResponse.class);
+    private ADTaskProfile adTaskProfile;
     private Version remoteAdVersion;
 
-    public ADTaskProfileNodeResponse(DiscoveryNode node, List<ADTaskProfile> adTaskProfile, Version remoteAdVersion) {
+    public ADTaskProfileNodeResponse(DiscoveryNode node, ADTaskProfile adTaskProfile, Version remoteAdVersion) {
         super(node);
-        this.adTaskProfiles = adTaskProfile;
+        this.adTaskProfile = adTaskProfile;
         this.remoteAdVersion = remoteAdVersion;
     }
 
-    public ADTaskProfileNodeResponse(StreamInput in, HashRing hashRing) throws IOException {
+    public ADTaskProfileNodeResponse(StreamInput in) throws IOException {
         super(in);
-        String remoteNodeId = this.getNode().getId();
-        String version = hashRing.getAdVersionString(remoteNodeId);
-        Version remoteAdVersion = ADVersionUtil.fromString(version);
         if (in.readBoolean()) {
-            if (remoteAdVersion.onOrBefore(Version.V_1_0_0)) {
-                ADTaskProfile adTaskProfile = new ADTaskProfile(in);
-                this.adTaskProfiles = ImmutableList.of(adTaskProfile);
-            } else {
-                this.adTaskProfiles = in.readList(ADTaskProfile::new);
-            }
+            adTaskProfile = new ADTaskProfile(in);
         } else {
-            this.adTaskProfiles = null;
+            adTaskProfile = null;
         }
     }
 
-    public List<ADTaskProfile> getAdTaskProfiles() {
-        return adTaskProfiles;
+    public ADTaskProfile getAdTaskProfile() {
+        return adTaskProfile;
     }
 
     @Override
     public void writeTo(StreamOutput out) throws IOException {
+        logger.info("++++++++++++++++++++++++++++++++++++++++++++++++++ wwwdebug1, remote AD version: "  + remoteAdVersion);
+        logger.info("++++++++++++++++++++++++++++++++++++++++++++++++++ wwwdebug1, adTaskProfile: " + adTaskProfile);
         super.writeTo(out);
-        if (remoteAdVersion.onOrBefore(Version.V_1_0_0)) {
-            ADTaskProfile detectorTaskProfile = null;
-            if (adTaskProfiles != null && adTaskProfiles.size() > 0) {
-                List<ADTaskProfile> profiles = adTaskProfiles
-                    .stream()
-                    .filter(t -> t.getAdTask() != null && t.getAdTask().getParentTaskId() == null)
-                    .collect(Collectors.toList());
-                if (profiles.size() > 0) {
-                    detectorTaskProfile = profiles.get(0);
-                }
-            }
-            if (detectorTaskProfile != null) {
-                out.writeBoolean(true);
-                detectorTaskProfile.writeTo(out);
-            } else {
-                out.writeBoolean(false);
-            }
+        if (adTaskProfile != null && (!remoteAdVersion.onOrBefore(Version.V_1_0_0) || adTaskProfile.getNodeId() != null)) {
+            logger.info("++++++++++++++++++++++++++++++++++++++++++++++++++ wwwdebug1, write AD teak profile : true");
+            out.writeBoolean(true);
+            adTaskProfile.writeTo(out, remoteAdVersion);
         } else {
-            if (adTaskProfiles != null && adTaskProfiles.size() > 0) {
-                out.writeList(adTaskProfiles);
-            } else {
-                out.writeBoolean(false);
-            }
+            logger.info("++++++++++++++++++++++++++++++++++++++++++++++++++ wwwdebug1, write AD teak profile : false");
+            out.writeBoolean(false);
         }
     }
 
-    public static ADTaskProfileNodeResponse readNodeResponse(StreamInput in, HashRing hashRing) throws IOException {
-        return new ADTaskProfileNodeResponse(in, hashRing);
+    public static ADTaskProfileNodeResponse readNodeResponse(StreamInput in) throws IOException {
+        return new ADTaskProfileNodeResponse(in);
     }
 }

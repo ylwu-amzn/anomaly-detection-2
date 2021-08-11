@@ -266,6 +266,8 @@ public class HashRing {
             if (adVersionCircles.size() > 2
                 && adVersionCircles.firstEntry().getKey().onOrBefore(Version.V_1_0_0)
                 && adVersionCircles.lastEntry().getKey().after(Version.V_1_0_0)) {
+                // Find owning node with highest AD version to make sure the data migration logic be compatible to
+                // latest AD version when upgrade.
                 Optional<DiscoveryNode> owningNode = getOwningNodeWithHighestAdVersion(DEFAULT_HASH_RING_MODEL_ID);
                 String localNodeId = clusterService.localNode().getId();
                 if (owningNode.isPresent() && localNodeId.equals(owningNode.get().getId())) {
@@ -304,7 +306,7 @@ public class HashRing {
 
     private Optional<DiscoveryNode> getOwningNodeWithSameAdVersion(String modelId, String nodeId) {
         int modelHash = Murmur3HashFunction.hash(modelId);
-        String adVersion = nodeAdVersions.get(nodeId);
+        Version adVersion = getAdVersion(nodeId);
         Map.Entry<Integer, DiscoveryNode> entry = adVersionCircles.get(adVersion).higherEntry(modelHash);
         return Optional.ofNullable(Optional.ofNullable(entry).orElse(circle.firstEntry())).map(x -> x.getValue());
     }
@@ -319,8 +321,7 @@ public class HashRing {
     }
 
     private Set<DiscoveryNode> getNodesWithSameAdVersion(DiscoveryNode node) {
-        String adVersion = nodeAdVersions.get(node.getId());
-        TreeMap<Integer, DiscoveryNode> circle = adVersionCircles.get(adVersion);
+        TreeMap<Integer, DiscoveryNode> circle = adVersionCircles.get(getAdVersion(node.getId()));
         Set<String> nodeIds = new HashSet<>();
         Set<DiscoveryNode> nodes = new HashSet<>();
         nodeIds.add(node.getId());
@@ -338,40 +339,40 @@ public class HashRing {
         return nodes;
     }
 
-    /**
-     * Get an array of nodes with highest AD version in current cluster.
-     * @return array of nodes
-     */
-    public DiscoveryNode[] getNodesWithHighestAdVersion() {
-        Version highestAdVersion = adVersionCircles.lastEntry().getKey();
-        return getNodesWithSameAdVersion(highestAdVersion).toArray(new DiscoveryNode[0]);
-    }
+//    /**
+//     * Get an array of nodes with highest AD version in current cluster.
+//     * @return array of nodes
+//     */
+//    public DiscoveryNode[] getNodesWithHighestAdVersion() {
+//        Version highestAdVersion = adVersionCircles.lastEntry().getKey();
+//        return getNodesWithSameAdVersion(highestAdVersion).toArray(new DiscoveryNode[0]);
+//    }
 
-    private Set<DiscoveryNode> getNodesWithSameAdVersion(Version adVersion) {
-        TreeMap<Integer, DiscoveryNode> circle = adVersionCircles.get(adVersion);
-        Set<String> nodeIds = new HashSet<>();
-        Set<DiscoveryNode> nodes = new HashSet<>();
-        if (circle == null) {
-            return nodes;
-        }
-        circle.entrySet().stream().forEach(e -> {
-            DiscoveryNode discoveryNode = e.getValue();
-            if (!nodeIds.contains(discoveryNode.getId())) {
-                nodeIds.add(discoveryNode.getId());
-                nodes.add(discoveryNode);
-            }
-        });
-        return nodes;
-    }
+//    private Set<DiscoveryNode> getNodesWithSameAdVersion(Version adVersion) {
+//        TreeMap<Integer, DiscoveryNode> circle = adVersionCircles.get(adVersion);
+//        Set<String> nodeIds = new HashSet<>();
+//        Set<DiscoveryNode> nodes = new HashSet<>();
+//        if (circle == null) {
+//            return nodes;
+//        }
+//        circle.entrySet().stream().forEach(e -> {
+//            DiscoveryNode discoveryNode = e.getValue();
+//            if (!nodeIds.contains(discoveryNode.getId())) {
+//                nodeIds.add(discoveryNode.getId());
+//                nodes.add(discoveryNode);
+//            }
+//        });
+//        return nodes;
+//    }
 
-    /**
-     * Get AD version string.
-     * @param nodeId node id
-     * @return AD version string
-     */
-    public String getAdVersionString(String nodeId) {
-        return nodeAdVersions.get(nodeId);
-    }
+//    /**
+//     * Get AD version string.
+//     * @param nodeId node id
+//     * @return AD version string
+//     */
+//    public String getAdVersionString(String nodeId) {
+//        return nodeAdVersions.get(nodeId);
+//    }
 
     /**
      * Get AD version.

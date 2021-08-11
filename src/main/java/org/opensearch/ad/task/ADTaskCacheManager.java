@@ -613,6 +613,10 @@ public class ADTaskCacheManager {
         return hcTaskCaches.computeIfAbsent(detectorId, id -> new ADHCBatchTaskCache());
     }
 
+    public boolean isHCTaskRunning(String detectorId) {
+        return hcTaskCaches.containsKey(detectorId);
+    }
+
     /**
      * Set top entity count.
      *
