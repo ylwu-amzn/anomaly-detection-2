@@ -672,7 +672,6 @@ public class ADBatchTaskRunner {
     }
 
     private void dispatchTask(ADTask adTask, ActionListener<DiscoveryNode> listener) {
-        // DiscoveryNode[] dataNodes = hashRing.getNodesWithHighestAdVersion();
         hashRing.getNodesWithSameLocalAdVersion(dataNodes -> {
             ADStatsRequest adStatsRequest = new ADStatsRequest(dataNodes);
             adStatsRequest.addAll(ImmutableSet.of(AD_EXECUTING_BATCH_TASK_COUNT.getName(), JVM_HEAP_USAGE.getName()));

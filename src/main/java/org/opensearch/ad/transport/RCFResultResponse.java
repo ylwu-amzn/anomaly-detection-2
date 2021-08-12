@@ -29,6 +29,7 @@ package org.opensearch.ad.transport;
 import java.io.IOException;
 
 import org.opensearch.action.ActionResponse;
+import org.opensearch.ad.util.Bwc;
 import org.opensearch.common.io.stream.StreamInput;
 import org.opensearch.common.io.stream.StreamOutput;
 import org.opensearch.common.xcontent.ToXContentObject;
@@ -64,7 +65,7 @@ public class RCFResultResponse extends ActionResponse implements ToXContentObjec
         confidence = in.readDouble();
         forestSize = in.readVInt();
         attribution = in.readDoubleArray();
-        if (in.available() > 0) {
+        if (Bwc.supportMultiCategoryFields(in.getVersion())) {
             totalUpdates = in.readLong();
         }
     }
@@ -100,10 +101,9 @@ public class RCFResultResponse extends ActionResponse implements ToXContentObjec
         out.writeDouble(confidence);
         out.writeVInt(forestSize);
         out.writeDoubleArray(attribution);
-        // We have limit RCF result action can only be sent to nodes with same AD version check
-        // {@link AnomalyResultTransportAction}.
-        // TODO: We will move to local RCF model?
-        out.writeLong(totalUpdates);
+        if (Bwc.supportMultiCategoryFields(out.getVersion())) {
+            out.writeLong(totalUpdates);
+        }
     }
 
     @Override

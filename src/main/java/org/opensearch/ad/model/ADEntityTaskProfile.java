@@ -38,7 +38,7 @@ import org.opensearch.common.xcontent.XContentBuilder;
 import org.opensearch.common.xcontent.XContentParser;
 
 /**
- * One anomaly detection task means one detector starts to run until stopped.
+ * HC detector's entity task profile.
  */
 public class ADEntityTaskProfile implements ToXContentObject, Writeable {
 

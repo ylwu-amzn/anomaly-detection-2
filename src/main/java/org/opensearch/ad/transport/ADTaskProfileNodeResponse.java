@@ -64,15 +64,11 @@ public class ADTaskProfileNodeResponse extends BaseNodeResponse {
 
     @Override
     public void writeTo(StreamOutput out) throws IOException {
-        logger.info("++++++++++++++++++++++++++++++++++++++++++++++++++ wwwdebug1, remote AD version: " + remoteAdVersion);
-        logger.info("++++++++++++++++++++++++++++++++++++++++++++++++++ wwwdebug1, adTaskProfile: " + adTaskProfile);
         super.writeTo(out);
-        if (adTaskProfile != null && (ADVersionUtil.versionCompatibleWithLocalNode(remoteAdVersion) || adTaskProfile.getNodeId() != null)) {
-            logger.info("++++++++++++++++++++++++++++++++++++++++++++++++++ wwwdebug1, write AD teak profile : true");
+        if (adTaskProfile != null && (ADVersionUtil.versionCompatible(remoteAdVersion) || adTaskProfile.getNodeId() != null)) {
             out.writeBoolean(true);
             adTaskProfile.writeTo(out, remoteAdVersion);
         } else {
-            logger.info("++++++++++++++++++++++++++++++++++++++++++++++++++ wwwdebug1, write AD teak profile : false");
             out.writeBoolean(false);
         }
     }

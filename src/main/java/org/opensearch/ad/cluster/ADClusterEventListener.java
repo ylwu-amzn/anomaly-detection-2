@@ -75,7 +75,7 @@ public class ADClusterEventListener implements ClusterStateListener {
 
     @Override
     public void clusterChanged(ClusterChangedEvent event) {
-        LOG.info("4444444444444444444444444444444444444444 cluster change event received " + event.source());
+
         if (!nodeFilter.isEligibleNode(event.state().nodes().getLocalNode())) {
             LOG.debug(NODE_NOT_APPLIED_MSG);
             return;
@@ -94,13 +94,14 @@ public class ADClusterEventListener implements ClusterStateListener {
         }
 
         try {
+            // Init AD version hash ring as early as possible
             if (!hashRing.isAdVersionHashRingInited()) {
                 hashRing
                     .buildCirclesOnAdVersions(
                         ActionListener
                             .wrap(
-                                r -> { LOG.info("Init AD version hash ring successfully"); },
-                                e -> { LOG.error("Failed to init AD version hash ring"); }
+                                r -> LOG.info("Init AD version hash ring successfully"),
+                                e -> LOG.error("Failed to init AD version hash ring")
                             )
                     );
             }

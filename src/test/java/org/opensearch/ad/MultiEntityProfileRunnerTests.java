@@ -81,7 +81,6 @@ public class MultiEntityProfileRunnerTests extends AbstractADTest {
     private AnomalyDetectorProfileRunner runner;
     private Client client;
     private DiscoveryNodeFilterer nodeFilter;
-    // private HashRing hashRing;
     private int requiredSamples;
     private AnomalyDetector detector;
     private String detectorId;
@@ -116,7 +115,6 @@ public class MultiEntityProfileRunnerTests extends AbstractADTest {
         super.setUp();
         client = mock(Client.class);
         nodeFilter = mock(DiscoveryNodeFilterer.class);
-        // hashRing = mock(HashRing.class);
         requiredSamples = 128;
 
         detectorId = "A69pa3UBHuCbh-emo9oR";
@@ -133,8 +131,6 @@ public class MultiEntityProfileRunnerTests extends AbstractADTest {
             return null;
         }).when(adTaskManager).getAndExecuteOnLatestDetectorLevelTask(any(), any(), any(), any(), anyBoolean(), any());
         runner = new AnomalyDetectorProfileRunner(client, xContentRegistry(), nodeFilter, requiredSamples, transportService, adTaskManager);
-        // runner = new AnomalyDetectorProfileRunner(client, xContentRegistry(), hashRing, requiredSamples, transportService,
-        // adTaskManager);
 
         doAnswer(invocation -> {
             Object[] args = invocation.getArguments();

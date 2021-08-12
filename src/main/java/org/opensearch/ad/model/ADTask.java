@@ -128,6 +128,7 @@ public class ADTask implements ToXContentObject, Writeable {
         } else {
             user = null;
         }
+        // Below are new fields added since AD 1.1
         if (input.available() > 0) {
             if (input.readBoolean()) {
                 this.detectionDateRange = new DetectionDateRange(input);
@@ -175,6 +176,7 @@ public class ADTask implements ToXContentObject, Writeable {
         } else {
             out.writeBoolean(false); // user does not exist
         }
+        // Only forward AD task to nodes with same version, so it's ok to write these new fields.
         if (detectionDateRange != null) {
             out.writeBoolean(true);
             detectionDateRange.writeTo(out);

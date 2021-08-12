@@ -46,25 +46,12 @@ import org.opensearch.common.io.stream.StreamOutput;
 import org.opensearch.commons.authuser.User;
 
 public class ForwardADTaskRequest extends ActionRequest {
-    // private String remoteNodeId;
     private AnomalyDetector detector;
     private ADTask adTask;
     private DetectionDateRange detectionDateRange;
     private List<String> staleRunningEntities;
     private User user;
     private ADTaskAction adTaskAction;
-
-    /*public ForwardADTaskRequest(
-            AnomalyDetector detector,
-            DetectionDateRange detectionDateRange,
-            User user,
-            ADTaskAction adTaskAction
-    ) {
-        this.detector = detector;
-        this.detectionDateRange = detectionDateRange;
-        this.user = user;
-        this.adTaskAction = adTaskAction;
-    }*/
 
     public ForwardADTaskRequest(
         AnomalyDetector detector,
@@ -77,7 +64,7 @@ public class ForwardADTaskRequest extends ActionRequest {
         this.detectionDateRange = detectionDateRange;
         this.user = user;
         this.adTaskAction = adTaskAction;
-        if (!ADVersionUtil.versionCompatibleWithLocalNode(remoteAdVersion)) {
+        if (!ADVersionUtil.versionCompatible(remoteAdVersion)) {
             throw new ADVersionException("Can't forward AD task request to node running AD version " + remoteAdVersion);
         }
     }
@@ -97,7 +84,6 @@ public class ForwardADTaskRequest extends ActionRequest {
 
     public ForwardADTaskRequest(StreamInput in) throws IOException {
         super(in);
-        // this.remoteNodeId = this.getParentTask().getNodeId();
         this.detector = new AnomalyDetector(in);
         if (in.readBoolean()) {
             this.user = new User(in);
@@ -126,7 +112,7 @@ public class ForwardADTaskRequest extends ActionRequest {
             out.writeBoolean(false);
         }
         out.writeEnum(adTaskAction);
-        // From AD 1.1, we only forward AD task request to nodes with same local AD version
+        // From AD 1.1, only forward AD task request to nodes with same local AD version
         if (adTask != null) {
             out.writeBoolean(true);
             adTask.writeTo(out);
@@ -150,9 +136,6 @@ public class ForwardADTaskRequest extends ActionRequest {
         } else if (detector.getDetectorId() == null) {
             validationException = addValidationError(CommonErrorMessages.AD_ID_MISSING_MSG, validationException);
         }
-        // else if (detector.getDetectionDateRange() != null) {
-        // validationException = addValidationError(CommonErrorMessages.HISTORICAL_DETECTOR_IS_DEPRECATED, validationException);
-        // }
         if (adTaskAction == null) {
             validationException = addValidationError(CommonErrorMessages.AD_TASK_ACTION_MISSING, validationException);
         }

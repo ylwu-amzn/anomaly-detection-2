@@ -613,7 +613,26 @@ public class ADTaskCacheManager {
         return hcTaskCaches.computeIfAbsent(detectorId, id -> new ADHCBatchTaskCache());
     }
 
+    /**
+     * Check if there is any HC task running on current node.
+     * @param detectorId detector id
+     * @return true if find detector id in any entity task or HC cache
+     */
     public boolean isHCTaskRunning(String detectorId) {
+        Optional<ADBatchTaskCache> entityTask = this.taskCaches
+            .values()
+            .stream()
+            .filter(cache -> Objects.equals(detectorId, cache.getDetectorId()) && cache.getEntity() != null)
+            .findFirst();
+        return hcTaskCaches.containsKey(detectorId) || entityTask.isPresent();
+    }
+
+    /**
+     * Check if current node is coordianting node of HC detector.
+     * @param detectorId detector id
+     * @return true if find detector id in HC cache
+     */
+    public boolean isHCTaskCoordinatingNode(String detectorId) {
         return hcTaskCaches.containsKey(detectorId);
     }
 

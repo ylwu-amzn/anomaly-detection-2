@@ -43,23 +43,10 @@ public class ADVersionUtil {
         return normalizedVersion.toString();
     }
 
-    public static boolean versionCompatibleWithLocalNode(Version adVersion) {
+    public static boolean versionCompatible(Version adVersion) {
         if (Version.CURRENT.equals(adVersion)) {
             return true;
         }
         return adVersion != null && adVersion.after(Version.V_1_0_0);
-        // if (adVersion == null || adVersion.onOrBefore(Version.V_1_0_0)) {
-        // throw new ADVersionException("Can't forward AD task request to node running old AD version " + remoteAdVersion);
-        // }
-    }
-
-    public static boolean needToMigrateData(Version adVersion) {
-        if (Version.CURRENT.equals(adVersion)) {
-            return false;
-        }
-        return adVersion != null && adVersion.onOrBefore(Version.V_1_0_0);
-        // if (adVersion == null || adVersion.onOrBefore(Version.V_1_0_0)) {
-        // throw new ADVersionException("Can't forward AD task request to node running old AD version " + remoteAdVersion);
-        // }
     }
 }

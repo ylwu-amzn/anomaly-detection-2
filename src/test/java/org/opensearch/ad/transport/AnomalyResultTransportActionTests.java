@@ -37,7 +37,6 @@ import java.util.Map;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.opensearch.action.get.GetResponse;
 import org.opensearch.ad.ADIntegTestCase;
 import org.opensearch.ad.TestHelpers;
@@ -93,10 +92,9 @@ public class AnomalyResultTransportActionTests extends ADIntegTestCase {
         createDetectorIndex();
     }
 
-    @Ignore
     public void testFeatureQueryWithTermsAggregation() throws IOException {
         String adId = createDetectorWithFeatureAgg("{\"test\":{\"terms\":{\"field\":\"type\"}}}");
-        assertErrorMessageA(adId, "Failed to parse aggregation");
+        assertErrorMessage(adId, "Failed to parse aggregation");
     }
 
     public void testFeatureWithSumOfTextField() throws IOException {
@@ -129,7 +127,6 @@ public class AnomalyResultTransportActionTests extends ADIntegTestCase {
         assertErrorMessage(adId, "Field [type] of type [keyword] is not supported for aggregation [min]");
     }
 
-    @Ignore
     public void testFeatureWithAvgOfTextField() throws IOException {
         String adId = createDetectorWithFeatureAgg("{\"test\":{\"avg\":{\"field\":\"message\"}}}");
         assertErrorMessage(adId, "Text fields are not optimised for operations");
@@ -290,16 +287,16 @@ public class AnomalyResultTransportActionTests extends ADIntegTestCase {
         assertErrorMessage(adId, errorMessage, false);
     }
 
-    private void assertErrorMessageA(String adId, String errorMessage) {
-        AnomalyResultRequest resultRequest = new AnomalyResultRequest(adId, start, end);
-        RuntimeException e = expectThrowsAnyOf(
-            ImmutableList.of(NotSerializableExceptionWrapper.class, AnomalyDetectionException.class),
-            () -> client().execute(AnomalyResultAction.INSTANCE, resultRequest).actionGet(30_000)
-        );
-        // String message = e.getMessage();
-        // Throwable cause = e.getCause();
-        // String message1 = cause.getMessage();
-        String errorMessage1 = ExceptionUtil.getErrorMessage(e);
-        assertTrue(errorMessage1.contains(errorMessage));
-    }
+    // private void assertErrorMessageA(String adId, String errorMessage) {
+    // AnomalyResultRequest resultRequest = new AnomalyResultRequest(adId, start, end);
+    // RuntimeException e = expectThrowsAnyOf(
+    // ImmutableList.of(NotSerializableExceptionWrapper.class, AnomalyDetectionException.class),
+    // () -> client().execute(AnomalyResultAction.INSTANCE, resultRequest).actionGet(30_000)
+    // );
+    // // String message = e.getMessage();
+    // // Throwable cause = e.getCause();
+    // // String message1 = cause.getMessage();
+    // String errorMessage1 = ExceptionUtil.getErrorMessage(e);
+    // assertTrue(errorMessage1.contains(errorMessage));
+    // }
 }

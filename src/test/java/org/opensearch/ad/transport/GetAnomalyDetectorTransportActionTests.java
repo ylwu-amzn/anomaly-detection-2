@@ -94,7 +94,6 @@ public class GetAnomalyDetectorTransportActionTests extends OpenSearchSingleNode
         action = new GetAnomalyDetectorTransportAction(
             Mockito.mock(TransportService.class),
             Mockito.mock(DiscoveryNodeFilterer.class),
-            // Mockito.mock(HashRing.class),
             Mockito.mock(ActionFilters.class),
             clusterService,
             client(),

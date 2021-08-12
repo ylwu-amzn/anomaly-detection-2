@@ -62,7 +62,6 @@ public class GetAnomalyDetectorTests extends AbstractADTest {
     private GetAnomalyDetectorTransportAction action;
     private TransportService transportService;
     private DiscoveryNodeFilterer nodeFilter;
-    // private HashRing hashRing;
     private ActionFilters actionFilters;
     private Client client;
     private GetAnomalyDetectorRequest request;
@@ -106,7 +105,6 @@ public class GetAnomalyDetectorTests extends AbstractADTest {
         );
 
         nodeFilter = mock(DiscoveryNodeFilterer.class);
-        // hashRing = mock(HashRing.class);
 
         actionFilters = mock(ActionFilters.class);
 
@@ -118,7 +116,6 @@ public class GetAnomalyDetectorTests extends AbstractADTest {
         action = new GetAnomalyDetectorTransportAction(
             transportService,
             nodeFilter,
-            // hashRing,
             actionFilters,
             clusterService,
             client,
@@ -143,7 +140,7 @@ public class GetAnomalyDetectorTests extends AbstractADTest {
     }
 
     @SuppressWarnings("unchecked")
-    public void testValidRequest() {
+    public void testValidRequest() throws IOException {
         doAnswer(invocation -> {
             Object[] args = invocation.getArguments();
             GetRequest request = (GetRequest) args[0];

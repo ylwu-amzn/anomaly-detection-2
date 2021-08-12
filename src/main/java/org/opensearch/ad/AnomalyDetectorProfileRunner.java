@@ -88,7 +88,6 @@ public class AnomalyDetectorProfileRunner extends AbstractProfileRunner {
     private final Logger logger = LogManager.getLogger(AnomalyDetectorProfileRunner.class);
     private Client client;
     private NamedXContentRegistry xContentRegistry;
-    // private final HashRing hashRing;
     private DiscoveryNodeFilterer nodeFilter;
     private final TransportService transportService;
     private final ADTaskManager adTaskManager;
@@ -97,7 +96,6 @@ public class AnomalyDetectorProfileRunner extends AbstractProfileRunner {
         Client client,
         NamedXContentRegistry xContentRegistry,
         DiscoveryNodeFilterer nodeFilter,
-        // HashRing hashRing,
         long requiredSamples,
         TransportService transportService,
         ADTaskManager adTaskManager
@@ -106,7 +104,6 @@ public class AnomalyDetectorProfileRunner extends AbstractProfileRunner {
         this.client = client;
         this.xContentRegistry = xContentRegistry;
         this.nodeFilter = nodeFilter;
-        // this.hashRing = hashRing;
         if (requiredSamples <= 0) {
             throw new IllegalArgumentException("required samples should be a positive number, but was " + requiredSamples);
         }
@@ -365,15 +362,6 @@ public class AnomalyDetectorProfileRunner extends AbstractProfileRunner {
         DiscoveryNode[] dataNodes = nodeFilter.getEligibleDataNodes();
         ProfileRequest profileRequest = new ProfileRequest(detector.getDetectorId(), profiles, forMultiEntityDetector, dataNodes);
         client.execute(ProfileAction.INSTANCE, profileRequest, onModelResponse(detector, profiles, job, listener));// get init progress
-        // TODO: check with kaituo
-        // DiscoveryNode[] dataNodes = hashRing.getNodesWithSameLocalAdVersion();
-        // ProfileRequest profileRequest = new ProfileRequest(detector.getDetectorId(), profiles, forMultiEntityDetector, dataNodes);
-        // client.execute(ProfileAction.INSTANCE, profileRequest, onModelResponse(detector, profiles, job, listener));// get init progress
-        // hashRing.getNodesWithSameLocalAdVersion(dataNodes -> {
-        // ProfileRequest profileRequest = new ProfileRequest(detector.getDetectorId(), profiles, forMultiEntityDetector, dataNodes);
-        // client.execute(ProfileAction.INSTANCE, profileRequest, onModelResponse(detector, profiles, job, listener));// get init progress
-        // }, listener);
-
     }
 
     private ActionListener<ProfileResponse> onModelResponse(

@@ -194,11 +194,8 @@ public class HashRing {
     /**
      * Build AD version based circles with discovery node delta change. Listen to master event in
      * {@link ADClusterEventListener#clusterChanged(ClusterChangedEvent)}.
-     * If delta is null, will broadcast to get all nodes plugin information.
-     * If delta is not null, will send request to new added nodes to get their plugin information,
-     * and remove the left/removed nodes from cache.
+     * Will remove the removed nodes from cache and send request to newly added nodes to get their plugin information,and.
      *
-     * //TODO: if can't find some node, try to rebuild all
      * @param delta discovery node delta change
      */
     public void buildCirclesOnAdVersions(DiscoveryNodes.Delta delta) {
@@ -214,9 +211,15 @@ public class HashRing {
             } else {
                 LOG.debug("Skip updating circles on AD versions");
             }
-        }, e -> { LOG.error("Failed updasting circles on AD versions", e); }));
+        }, e -> { LOG.error("Failed updating circles on AD versions", e); }));
     }
 
+    /**
+     * Build AD version based circles by comparing with all eligible data nodes.
+     * 1. Remove nodes which are not eligible now;
+     * 2. Add nodes which are not in AD version circles.
+     * @param actionListener action listener
+     */
     public void buildCirclesOnAdVersions(ActionListener<Boolean> actionListener) {
         DiscoveryNode[] eligibleDataNodes = nodeFilter.getEligibleDataNodes();
         Set<String> eligibleNodeIds = new HashSet<>();
@@ -231,14 +234,13 @@ public class HashRing {
 
     public void buildCirclesOnAdVersions(Set<String> removedNodeIds, Set<String> addedNodeIds, ActionListener<Boolean> actionListener) {
         if (!adVersionCircleInProgress.tryAcquire()) {
-            LOG.info("888888888888888888 AD version based Hash ring change in progress, return.");
+            LOG.info("AD version hash ring change in progress, return.");
             actionListener.onResponse(false);
             return;
         }
         DiscoveryNode localNode = clusterService.localNode();
-        LOG.info("888888888888888888 local node id: {}", localNode.getId());
         if (removedNodeIds != null && removedNodeIds.size() > 0) {
-            LOG.info("888888888888888888 Removed node ids: {}", Arrays.toString(removedNodeIds.toArray(new String[0])));
+            LOG.info("Remove nodes from AD version hash ring: {}", Arrays.toString(removedNodeIds.toArray(new String[0])));
             for (String nodeId : removedNodeIds) {
                 removeNodeFromAdVersionCircles(nodeId);
             }
@@ -256,39 +258,28 @@ public class HashRing {
             return;
         }
 
-        LOG.info("888888888888888888 Added node ids: {}", Arrays.toString(allAddedNodes.toArray(new String[0])));
+        LOG.info("Add nodes to AD version hash ring: {}", Arrays.toString(allAddedNodes.toArray(new String[0])));
         NodesInfoRequest nodesInfoRequest = new NodesInfoRequest();
         nodesInfoRequest.nodesIds(allAddedNodes.toArray(new String[0]));
         nodesInfoRequest.clear().addMetric(NodesInfoRequest.Metric.PLUGINS.metricName());
 
         client.admin().cluster().nodesInfo(nodesInfoRequest, ActionListener.wrap(r -> {
             Map<String, NodeInfo> nodesMap = r.getNodesMap();
-            LOG.info("888888888888888888 nodesMap size: {}", nodesMap == null ? 0 : nodesMap.size());
             if (nodesMap != null && nodesMap.size() > 0) {
                 for (Map.Entry<String, NodeInfo> entry : nodesMap.entrySet()) {
                     NodeInfo nodeInfo = entry.getValue();
                     PluginsAndModules plugins = nodeInfo.getInfo(PluginsAndModules.class);
                     if (plugins == null) {
-                        LOG.info("888888888888888888 plugins is null for node " + nodeInfo.getNode().getId());
                         continue;
                     }
                     DiscoveryNode curNode = nodeInfo.getNode();
                     if (!nodeFilter.isEligibleDataNode(curNode)) {
-                        LOG.info("888888888888888888 is not eligible node " + curNode.getId());
                         continue;
                     }
                     TreeMap<Integer, DiscoveryNode> circle = null;
                     for (PluginInfo pluginInfo : plugins.getPluginInfos()) {
-                        LOG
-                            .info(
-                                "8888888888888888 plugin name: {}, version: {}, os version:{} ",
-                                pluginInfo.getName(),
-                                pluginInfo.getVersion(),
-                                pluginInfo.getOpenSearchVersion()
-                            );
                         if (AD_PLUGIN_NAME.equals(pluginInfo.getName()) || AD_PLUGIN_NAME_FOR_TEST.equals(pluginInfo.getName())) {
                             Version version = ADVersionUtil.fromString(pluginInfo.getVersion());
-                            LOG.info("8888888888888888 AD version " + version);
                             circle = adVersionCircles.computeIfAbsent(version, key -> new TreeMap<>());
                             nodeAdVersions.computeIfAbsent(curNode.getId(), key -> ADVersionUtil.fromString(pluginInfo.getVersion()));
                             break;
@@ -301,9 +292,9 @@ public class HashRing {
                     }
                 }
             }
-            LOG.info("888888888888888888  All nodes in AD version based circles: {}", nodeAdVersions);
+            LOG.info("All nodes in AD version hash ring: {}", nodeAdVersions);
 
-            if (adVersionCircles.size() > 2 && !ADVersionUtil.versionCompatibleWithLocalNode(adVersionCircles.lastEntry().getKey())) {
+            if (adVersionCircles.size() > 2 && !ADVersionUtil.versionCompatible(adVersionCircles.lastEntry().getKey())) {
                 // Find owning node with highest AD version to make sure the data migration logic be compatible to
                 // latest AD version when upgrade.
                 Optional<DiscoveryNode> owningNode = getOwningNodeWithHighestAdVersion(DEFAULT_HASH_RING_MODEL_ID);
@@ -320,13 +311,13 @@ public class HashRing {
         }, e -> {
             adVersionCircleInProgress.release();
             actionListener.onFailure(e);
-            LOG.error("888888888888888888  Failed to get node info to build AD version based hash ring", e);
+            LOG.error("Fail to get node info to build AD version hash ring", e);
         }));
     }
 
     private void removeNodeFromAdVersionCircles(String nodeId) {
         Version adVersion = this.nodeAdVersions.remove(nodeId);
-        if (adVersion != null) { // If adVersion is null, that means we haven't put this node in nodeAdVersions
+        if (adVersion != null) {
             TreeMap<Integer, DiscoveryNode> circle = this.adVersionCircles.get(adVersion);
             List<Integer> deleted = new ArrayList<>();
             for (Map.Entry<Integer, DiscoveryNode> entry : circle.entrySet()) {
@@ -377,16 +368,15 @@ public class HashRing {
         ActionListener<T> listener
     ) {
         buildCirclesOnAdVersions(ActionListener.wrap(r -> {
-            Optional<DiscoveryNode> owningNode = getOwningNodeWithSameAdVersion(modelId, clusterService.localNode().getId());
+            DiscoveryNode localNode = clusterService.localNode();
+            Version adVersion = nodeAdVersions.containsKey(localNode.getId()) ? getAdVersion(localNode.getId()) : Version.CURRENT;
+            Optional<DiscoveryNode> owningNode = getOwningNodeWithSameAdVersion(modelId, adVersion);
             function.accept(owningNode);
         }, e -> listener.onFailure(e)));
     }
 
-    private Optional<DiscoveryNode> getOwningNodeWithSameAdVersion(String modelId, String nodeId) {
+    private Optional<DiscoveryNode> getOwningNodeWithSameAdVersion(String modelId, Version adVersion) {
         int modelHash = Murmur3HashFunction.hash(modelId);
-        LOG.info("666666666666666666666666666666666666666666666666 nodeId: {}, adVersions: {}", nodeId, nodeAdVersions);
-        Version adVersion = getAdVersion(nodeId);
-        LOG.info("666666666666666666666666666666666666666666666666 {}", adVersion);
         Map.Entry<Integer, DiscoveryNode> entry = adVersionCircles.get(adVersion).higherEntry(modelHash);
         return Optional.ofNullable(Optional.ofNullable(entry).orElse(circle.firstEntry())).map(x -> x.getValue());
     }
@@ -394,9 +384,7 @@ public class HashRing {
     public <T> void getNodesWithSameLocalAdVersion(Consumer<DiscoveryNode[]> function, ActionListener<T> listener) {
         buildCirclesOnAdVersions(ActionListener.wrap(updated -> {
             DiscoveryNode localNode = clusterService.localNode();
-
             Version adVersion = nodeAdVersions.containsKey(localNode.getId()) ? getAdVersion(localNode.getId()) : Version.CURRENT;
-
             Set<DiscoveryNode> nodes = getNodesWithSameAdVersion(adVersion);
             if (!nodeAdVersions.containsKey(localNode.getId())) {
                 nodes.add(localNode);
@@ -406,13 +394,9 @@ public class HashRing {
     }
 
     private Set<DiscoveryNode> getNodesWithSameAdVersion(Version adVersion) {
-        LOG.info("5555555555555555555555555555555555 adVersionCircles: {}", adVersionCircles);
-        LOG.info("5555555555555555555555555555555555 nodeAdVersions: {}", nodeAdVersions);
         TreeMap<Integer, DiscoveryNode> circle = adVersionCircles.get(adVersion);
         Set<String> nodeIds = new HashSet<>();
         Set<DiscoveryNode> nodes = new HashSet<>();
-        // nodeIds.add(node.getId());
-        // nodes.add(node);
         if (circle == null) {
             return nodes;
         }
@@ -435,13 +419,6 @@ public class HashRing {
         return nodeAdVersions.get(nodeId);
     }
 
-    // public Version getAdVersionOrDefault(String nodeId) {
-    // if (nodeAdVersions.containsKey(nodeId)) {
-    // return Version.CURRENT;
-    // }
-    // return nodeAdVersions.get(nodeId);
-    // }
-
     /**
      * Get all eligible data nodes which AD version known in AD version based hash ring.
      * @param function consumer function
@@ -460,8 +437,4 @@ public class HashRing {
             function.accept(allNodes.toArray(new DiscoveryNode[0]));
         }, e -> listener.onFailure(e)));
     }
-
-    // public DiscoveryNode[] getEligibleDataNodes() {
-    // return nodeFilter.getEligibleDataNodes();
-    // }
 }

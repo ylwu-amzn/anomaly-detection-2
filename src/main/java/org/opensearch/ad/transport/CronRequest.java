@@ -42,6 +42,7 @@ public class CronRequest extends BaseNodesRequest<CronRequest> {
 
     public CronRequest(StreamInput in) throws IOException {
         super(in);
+        // The requestId field is added since AD 1.1
         if (in.available() > 0) {
             requestId = in.readString();
         }

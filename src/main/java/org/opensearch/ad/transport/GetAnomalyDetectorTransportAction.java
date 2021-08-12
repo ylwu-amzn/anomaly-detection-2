@@ -107,13 +107,11 @@ public class GetAnomalyDetectorTransportAction extends HandledTransportAction<Ge
     private final TransportService transportService;
     private volatile Boolean filterByEnabled;
     private final ADTaskManager adTaskManager;
-    // private final HashRing hashRing;
 
     @Inject
     public GetAnomalyDetectorTransportAction(
         TransportService transportService,
         DiscoveryNodeFilterer nodeFilter,
-        // HashRing hashRing,
         ActionFilters actionFilters,
         ClusterService clusterService,
         Client client,
@@ -143,7 +141,6 @@ public class GetAnomalyDetectorTransportAction extends HandledTransportAction<Ge
         clusterService.getClusterSettings().addSettingsUpdateConsumer(FILTER_BY_BACKEND_ROLES, it -> filterByEnabled = it);
         this.transportService = transportService;
         this.adTaskManager = adTaskManager;
-        // this.hashRing = hashRing;
     }
 
     @Override
@@ -223,7 +220,6 @@ public class GetAnomalyDetectorTransportAction extends HandledTransportAction<Ge
                         client,
                         xContentRegistry,
                         nodeFilter,
-                        // hashRing,
                         AnomalyDetectorSettings.NUM_MIN_SAMPLES,
                         transportService,
                         adTaskManager
