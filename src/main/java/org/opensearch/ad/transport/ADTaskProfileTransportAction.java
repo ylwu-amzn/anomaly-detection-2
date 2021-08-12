@@ -97,7 +97,7 @@ public class ADTaskProfileTransportAction extends
         String remoteNodeId = request.getParentTask().getNodeId();
         this.remoteAdVersion = hashRing.getAdVersion(remoteNodeId);
         ADTaskProfile adTaskProfile = adTaskManager.getLocalADTaskProfilesByDetectorIdA(request.getDetectorId());
-//        List<ADTaskProfile> adTaskProfile = adTaskManager.getLocalADTaskProfilesByDetectorId(request.getDetectorId());
+        // List<ADTaskProfile> adTaskProfile = adTaskManager.getLocalADTaskProfilesByDetectorId(request.getDetectorId());
         return new ADTaskProfileNodeResponse(clusterService.localNode(), adTaskProfile, remoteAdVersion);
     }
 }

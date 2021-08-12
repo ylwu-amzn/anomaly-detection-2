@@ -37,7 +37,6 @@ import org.opensearch.cluster.node.DiscoveryNode;
 import org.opensearch.common.io.stream.StreamInput;
 import org.opensearch.common.io.stream.StreamOutput;
 
-
 public class ADTaskProfileNodeResponse extends BaseNodeResponse {
     private static final Logger logger = LogManager.getLogger(ADTaskProfileNodeResponse.class);
     private ADTaskProfile adTaskProfile;
@@ -64,7 +63,7 @@ public class ADTaskProfileNodeResponse extends BaseNodeResponse {
 
     @Override
     public void writeTo(StreamOutput out) throws IOException {
-        logger.info("++++++++++++++++++++++++++++++++++++++++++++++++++ wwwdebug1, remote AD version: "  + remoteAdVersion);
+        logger.info("++++++++++++++++++++++++++++++++++++++++++++++++++ wwwdebug1, remote AD version: " + remoteAdVersion);
         logger.info("++++++++++++++++++++++++++++++++++++++++++++++++++ wwwdebug1, adTaskProfile: " + adTaskProfile);
         super.writeTo(out);
         if (adTaskProfile != null && (!remoteAdVersion.onOrBefore(Version.V_1_0_0) || adTaskProfile.getNodeId() != null)) {

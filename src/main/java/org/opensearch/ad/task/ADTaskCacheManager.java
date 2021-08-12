@@ -34,6 +34,7 @@ import static org.opensearch.ad.settings.AnomalyDetectorSettings.MAX_CACHED_DELE
 import static org.opensearch.ad.settings.AnomalyDetectorSettings.NUM_TREES;
 import static org.opensearch.ad.settings.AnomalyDetectorSettings.THRESHOLD_MODEL_TRAINING_SIZE;
 
+import java.util.Arrays;
 import java.util.Deque;
 import java.util.List;
 import java.util.Map;
@@ -561,13 +562,12 @@ public class ADTaskCacheManager {
      * @param detectorId detector id
      * @return detector's running entities in cache
      */
-    public String[] getRunningEntities(String detectorId) {
+    public List<String> getRunningEntities(String detectorId) {
         if (hcTaskCaches.containsKey(detectorId)) {
             ADHCBatchTaskCache hcTaskCache = getExistingHCTaskCache(detectorId);
-            return hcTaskCache.getRunningEntities();
-        } else {
-            return new String[] {};
+            return Arrays.asList(hcTaskCache.getRunningEntities());
         }
+        return null;
     }
 
     /**

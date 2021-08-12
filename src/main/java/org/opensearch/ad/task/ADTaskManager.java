@@ -71,7 +71,6 @@ import java.io.IOException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -299,7 +298,7 @@ public class ADTaskManager {
         ActionListener<AnomalyDetectorJobResponse> listener
     ) {
         String detectorId = detector.getDetectorId();
-//        Optional<DiscoveryNode> owningNode = hashRing.getOwningNodeWithHighestAdVersion(detectorId);
+        // Optional<DiscoveryNode> owningNode = hashRing.getOwningNodeWithHighestAdVersion(detectorId);
         Optional<DiscoveryNode> owningNode = hashRing.getOwningNodeWithSameLocalAdVersion(detectorId);
         if (!owningNode.isPresent()) {
             logger.debug("Can't find eligible node to run as AD task's coordinating node");
@@ -783,7 +782,11 @@ public class ADTaskManager {
         String taskId = adTask.getTaskId();
         getADTaskProfile(adTask, ActionListener.wrap(taskProfile -> {
             if (taskProfile == null) {
-                logger.info("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++11111 no task profile return for detector " + adTask.getDetectorId());
+                logger
+                    .info(
+                        "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++11111 no task profile return for detector "
+                            + adTask.getDetectorId()
+                    );
                 return;
             }
             logger.info("11111111111111 ylwu1: final task profile : {}", taskProfile.toString());
@@ -799,10 +802,15 @@ public class ADTaskManager {
                     // and poll next entity from pending entity queue and run it.
                     Integer runningEntitiesCount = taskProfile.getRunningEntitiesCount();
                     if (runningEntitiesCount != null && runningEntitiesCount > 0) {
-                        List<String> runningTasksInCoordinatingNodeCache = Arrays.asList(taskProfile.getRunningEntities());
+                        List<String> runningTasksInCoordinatingNodeCache = taskProfile.getRunningEntities();
                         List<String> runningTasksOnWorkerNode = new ArrayList<>();
                         if (taskProfile.getEntityTaskProfiles() != null && taskProfile.getEntityTaskProfiles().size() > 0) {
-                            taskProfile.getEntityTaskProfiles().forEach(entryTask -> runningTasksOnWorkerNode.add(convertEntityToString(entryTask.getEntity(), adTask.getDetector())));
+                            taskProfile
+                                .getEntityTaskProfiles()
+                                .forEach(
+                                    entryTask -> runningTasksOnWorkerNode
+                                        .add(convertEntityToString(entryTask.getEntity(), adTask.getDetector()))
+                                );
                         }
 
                         if (runningTasksInCoordinatingNodeCache.size() > runningTasksOnWorkerNode.size()) {
@@ -1028,10 +1036,15 @@ public class ADTaskManager {
             for (ADTaskProfileNodeResponse node : response.getNodes()) {
                 ADTaskProfile taskProfile = node.getAdTaskProfile();
                 if (taskProfile != null) {
-//                    if (!ADTaskType.HISTORICAL_HC_ENTITY.name().equals(taskProfile.getAdTaskType())) {
-//                        taskProfile.setAdTask(adDetectorLevelTask);
-//                    }
-                    logger.info("333333333333333333444444444444444444444444 {} , node id is null: {}", taskProfile.toString(), taskProfile.getNodeId() == null);
+                    // if (!ADTaskType.HISTORICAL_HC_ENTITY.name().equals(taskProfile.getAdTaskType())) {
+                    // taskProfile.setAdTask(adDetectorLevelTask);
+                    // }
+                    logger
+                        .info(
+                            "333333333333333333444444444444444444444444 {} , node id is null: {}",
+                            taskProfile.toString(),
+                            taskProfile.getNodeId() == null
+                        );
                     if (taskProfile.getNodeId() != null) {
                         detectorTaskProfile.setShingleSize(taskProfile.getShingleSize());
                         detectorTaskProfile.setRcfTotalUpdates(taskProfile.getRcfTotalUpdates());
@@ -1047,19 +1060,35 @@ public class ADTaskManager {
                     }
                     logger.info("33333333333333333344444444444444444444444455555555555555 {}", detectorTaskProfile.toString());
                     if (taskProfile.getEntityTaskProfiles() != null) {
-                        logger.info("33333333333333333344444444444444444444444455555555555555aaaaaaa size: {}", taskProfile.getEntityTaskProfiles().size());
+                        logger
+                            .info(
+                                "33333333333333333344444444444444444444444455555555555555aaaaaaa size: {}",
+                                taskProfile.getEntityTaskProfiles().size()
+                            );
                         adEntityTaskProfiles.addAll(taskProfile.getEntityTaskProfiles());
-                        logger.info("33333333333333333344444444444444444444444455555555555555aaaaaaabbbbb size: {}", adEntityTaskProfiles.size());
+                        logger
+                            .info(
+                                "33333333333333333344444444444444444444444455555555555555aaaaaaabbbbb size: {}",
+                                adEntityTaskProfiles.size()
+                            );
                     }
-//                    logger.info("333333333333333333444444444444444444444444555555555555556666666666666666 {}", taskProfile.toString());
+                    // logger.info("333333333333333333444444444444444444444444555555555555556666666666666666 {}", taskProfile.toString());
                 }
             }
             logger.info("33333333333333333344444444444444444444444455555555555555aaaaaaabbbbbcccc size: {}", adEntityTaskProfiles.size());
-            if ( adEntityTaskProfiles != null && adEntityTaskProfiles.size() > 0) {
+            if (adEntityTaskProfiles != null && adEntityTaskProfiles.size() > 0) {
                 detectorTaskProfile.setEntityTaskProfiles(adEntityTaskProfiles);
-                logger.info("333333333333333333444444444444444444444444555555555555556666666666666666777777777777 {}", detectorTaskProfile.toString());
+                logger
+                    .info(
+                        "333333333333333333444444444444444444444444555555555555556666666666666666777777777777 {}",
+                        detectorTaskProfile.toString()
+                    );
             }
-            logger.info("3333333333333333334444444444444444444444445555555555555566666666666666667777777777778888888 {}", detectorTaskProfile.toString());
+            logger
+                .info(
+                    "3333333333333333334444444444444444444444445555555555555566666666666666667777777777778888888 {}",
+                    detectorTaskProfile.toString()
+                );
             listener.onResponse(detectorTaskProfile);
         }, e -> {
             logger.error("Failed to get task profile for task " + adDetectorLevelTask.getTaskId(), e);
@@ -2059,43 +2088,6 @@ public class ADTaskManager {
         return 1 - (float) leftEntities / entityCount;
     }
 
-    /**
-     * Get local task profiles of detector.
-     * @param detectorId detector id
-     * @return list of AD task profile
-     */
-    public List<ADTaskProfile> getLocalADTaskProfilesByDetectorId(String detectorId) {
-        List<ADTaskProfile> adTaskProfiles = new ArrayList<>();
-        List<String> tasksOfDetector = adTaskCacheManager.getTasksOfDetector(detectorId);
-
-        if (tasksOfDetector.size() > 0) {
-            tasksOfDetector.forEach(taskId -> {
-                ADTaskProfile adTaskProfile = new ADTaskProfile(
-                    adTaskCacheManager.getShingle(taskId).size(),
-                    adTaskCacheManager.getRcfModel(taskId).getTotalUpdates(),
-                    adTaskCacheManager.isThresholdModelTrained(taskId),
-                    adTaskCacheManager.getThresholdModelTrainingDataSize(taskId),
-                    adTaskCacheManager.getModelSize(taskId),
-                    clusterService.localNode().getId(),
-                    adTaskCacheManager.getEntity(taskId),
-                    taskId
-                );
-                adTaskProfiles.add(adTaskProfile);
-            });
-        }
-        if (adTaskCacheManager.hasEntity(detectorId)) {
-            ADTaskProfile detectorTaskProfile = new ADTaskProfile(
-                clusterService.localNode().getId(),
-                adTaskCacheManager.getTopEntityCount(detectorId),
-                adTaskCacheManager.getPendingEntityCount(detectorId),
-                adTaskCacheManager.getRunningEntityCount(detectorId),
-                adTaskCacheManager.getRunningEntities(detectorId)
-            );
-            adTaskProfiles.add(detectorTaskProfile);
-        }
-        return adTaskProfiles;
-    }
-
     public ADTaskProfile getLocalADTaskProfilesByDetectorIdA(String detectorId) {
 
         List<String> tasksOfDetector = adTaskCacheManager.getTasksOfDetector(detectorId);
@@ -2108,28 +2100,40 @@ public class ADTaskManager {
                 detectorTaskProfile = new ADTaskProfile();
             }
             if (adTaskCacheManager.hasEntity(detectorId)) {
-                logger.info("1111111111 ylwudebu1: this is coordinating node of detector {}, node id: {}", detectorId, clusterService.localNode().getId());
+                logger
+                    .info(
+                        "1111111111 ylwudebu1: this is coordinating node of detector {}, node id: {}",
+                        detectorId,
+                        clusterService.localNode().getId()
+                    );
                 detectorTaskProfile.setNodeId(localNodeId);
                 detectorTaskProfile.setTotalEntitiesCount(adTaskCacheManager.getTopEntityCount(detectorId));
                 detectorTaskProfile.setPendingEntitiesCount(adTaskCacheManager.getPendingEntityCount(detectorId));
                 detectorTaskProfile.setRunningEntitiesCount(adTaskCacheManager.getRunningEntityCount(detectorId));
                 detectorTaskProfile.setRunningEntities(adTaskCacheManager.getRunningEntities(detectorId));
-                detectorTaskProfile.setAdTaskType(ADTaskType.HISTORICAL_HC_ENTITY.name());
+                detectorTaskProfile.setAdTaskType(ADTaskType.HISTORICAL_HC_DETECTOR.name());
             }
             if (tasksOfDetector.size() > 0) {
                 List<ADEntityTaskProfile> entityTaskProfiles = new ArrayList<>();
 
                 tasksOfDetector.forEach(taskId -> {
-                    logger.info("1111111111 ylwudebu1: this is workder node of detector {}, node id: {}, entity id: {}", detectorId, clusterService.localNode().getId(), adTaskCacheManager.getEntity(taskId));
+                    logger
+                        .info(
+                            "1111111111 ylwudebu1: this is workder node of detector {}, node id: {}, entity id: {}",
+                            detectorId,
+                            clusterService.localNode().getId(),
+                            adTaskCacheManager.getEntity(taskId)
+                        );
                     ADEntityTaskProfile entityTaskProfile = new ADEntityTaskProfile(
-                            adTaskCacheManager.getShingle(taskId).size(),
-                            adTaskCacheManager.getRcfModel(taskId).getTotalUpdates(),
-                            adTaskCacheManager.isThresholdModelTrained(taskId),
-                            adTaskCacheManager.getThresholdModelTrainingDataSize(taskId),
-                            adTaskCacheManager.getModelSize(taskId),
-                            localNodeId,
-                            adTaskCacheManager.getEntity(taskId),
-                            taskId
+                        adTaskCacheManager.getShingle(taskId).size(),
+                        adTaskCacheManager.getRcfModel(taskId).getTotalUpdates(),
+                        adTaskCacheManager.isThresholdModelTrained(taskId),
+                        adTaskCacheManager.getThresholdModelTrainingDataSize(taskId),
+                        adTaskCacheManager.getModelSize(taskId),
+                        localNodeId,
+                        adTaskCacheManager.getEntity(taskId),
+                        taskId,
+                        ADTaskType.HISTORICAL_HC_ENTITY.name()
                     );
                     entityTaskProfiles.add(entityTaskProfile);
                 });
@@ -2138,19 +2142,21 @@ public class ADTaskManager {
         } else {
             logger.info("1111111111111112222222222222222 , start to get single entity task for detector " + detectorId);
             if (tasksOfDetector.size() > 1) {
-                String error = "Multiple tasks are running for detector: " + detectorId + ". You can stop detector to kill all running tasks.";
+                String error = "Multiple tasks are running for detector: "
+                    + detectorId
+                    + ". You can stop detector to kill all running tasks.";
                 logger.warn("1111111111111112222222222222222" + error);
                 throw new LimitExceededException(error);
             }
             if (tasksOfDetector.size() == 1) {
                 String taskId = tasksOfDetector.get(0);
                 detectorTaskProfile = new ADTaskProfile(
-                        adTaskCacheManager.getShingle(taskId).size(),
-                        adTaskCacheManager.getRcfModel(taskId).getTotalUpdates(),
-                        adTaskCacheManager.isThresholdModelTrained(taskId),
-                        adTaskCacheManager.getThresholdModelTrainingDataSize(taskId),
-                        adTaskCacheManager.getModelSize(taskId),
-                        localNodeId
+                    adTaskCacheManager.getShingle(taskId).size(),
+                    adTaskCacheManager.getRcfModel(taskId).getTotalUpdates(),
+                    adTaskCacheManager.isThresholdModelTrained(taskId),
+                    adTaskCacheManager.getThresholdModelTrainingDataSize(taskId),
+                    adTaskCacheManager.getModelSize(taskId),
+                    localNodeId
                 );
             }
         }

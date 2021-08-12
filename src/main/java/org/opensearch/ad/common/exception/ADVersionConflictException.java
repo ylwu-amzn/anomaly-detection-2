@@ -23,12 +23,4 @@ public class ADVersionConflictException extends AnomalyDetectionException {
     public ADVersionConflictException(String anomalyDetectorId, String message) {
         super(anomalyDetectorId, message);
     }
-
-    public ADVersionConflictException(String anomalyDetectorId, String message, Throwable throwable) {
-        super(anomalyDetectorId, message, throwable);
-    }
-
-    public ADVersionConflictException(String anomalyDetectorId, Throwable cause) {
-        super(anomalyDetectorId, cause);
-    }
 }

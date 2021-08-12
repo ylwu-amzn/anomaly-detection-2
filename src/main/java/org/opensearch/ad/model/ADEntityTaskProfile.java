@@ -26,8 +26,10 @@
 
 package org.opensearch.ad.model;
 
-import com.google.common.base.Objects;
-import org.opensearch.ad.annotation.Generated;
+import static org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken;
+
+import java.io.IOException;
+
 import org.opensearch.common.io.stream.StreamInput;
 import org.opensearch.common.io.stream.StreamOutput;
 import org.opensearch.common.io.stream.Writeable;
@@ -35,17 +37,10 @@ import org.opensearch.common.xcontent.ToXContentObject;
 import org.opensearch.common.xcontent.XContentBuilder;
 import org.opensearch.common.xcontent.XContentParser;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-
-import static org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken;
-
 /**
  * One anomaly detection task means one detector starts to run until stopped.
  */
-public class ADEntityTaskProfile implements ToXContentObject, Writeable, Writeable.Writer, Writeable.Reader {
+public class ADEntityTaskProfile implements ToXContentObject, Writeable {
 
     public static final String SHINGLE_SIZE_FIELD = "shingle_size";
     public static final String RCF_TOTAL_UPDATES_FIELD = "rcf_total_updates";
@@ -75,7 +70,8 @@ public class ADEntityTaskProfile implements ToXContentObject, Writeable, Writeab
         Long modelSizeInBytes,
         String nodeId,
         Entity entity,
-        String taskId
+        String taskId,
+        String adTaskType
     ) {
         this.shingleSize = shingleSize;
         this.rcfTotalUpdates = rcfTotalUpdates;
@@ -85,12 +81,69 @@ public class ADEntityTaskProfile implements ToXContentObject, Writeable, Writeab
         this.nodeId = nodeId;
         this.entity = entity;
         this.taskId = taskId;
-        this.adTaskType = ADTaskType.HISTORICAL_HC_ENTITY.name();
+        this.adTaskType = adTaskType;
     }
 
+    public static ADEntityTaskProfile parse(XContentParser parser) throws IOException {
+        Integer shingleSize = null;
+        Long rcfTotalUpdates = null;
+        Boolean thresholdModelTrained = null;
+        Integer thresholdModelTrainingDataSize = null;
+        Long modelSizeInBytes = null;
+        String nodeId = null;
+        Entity entity = null;
+        String taskId = null;
+        String taskType = null;
 
-    public String getAdTaskType() {
-        return adTaskType;
+        ensureExpectedToken(XContentParser.Token.START_OBJECT, parser.currentToken(), parser);
+        while (parser.nextToken() != XContentParser.Token.END_OBJECT) {
+            String fieldName = parser.currentName();
+            parser.nextToken();
+
+            switch (fieldName) {
+                case SHINGLE_SIZE_FIELD:
+                    shingleSize = parser.intValue();
+                    break;
+                case RCF_TOTAL_UPDATES_FIELD:
+                    rcfTotalUpdates = parser.longValue();
+                    break;
+                case THRESHOLD_MODEL_TRAINED_FIELD:
+                    thresholdModelTrained = parser.booleanValue();
+                    break;
+                case THRESHOLD_MODEL_TRAINING_DATA_SIZE_FIELD:
+                    thresholdModelTrainingDataSize = parser.intValue();
+                    break;
+                case MODEL_SIZE_IN_BYTES:
+                    modelSizeInBytes = parser.longValue();
+                    break;
+                case NODE_ID_FIELD:
+                    nodeId = parser.text();
+                    break;
+                case ENTITY_FIELD:
+                    entity = Entity.parse(parser);
+                    break;
+                case TASK_ID_FIELD:
+                    taskId = parser.text();
+                    break;
+                case AD_TASK_TYPE_FIELD:
+                    taskType = parser.text();
+                    break;
+                default:
+                    parser.skipChildren();
+                    break;
+            }
+        }
+        return new ADEntityTaskProfile(
+            shingleSize,
+            rcfTotalUpdates,
+            thresholdModelTrained,
+            thresholdModelTrainingDataSize,
+            modelSizeInBytes,
+            nodeId,
+            entity,
+            taskId,
+            taskType
+        );
     }
 
     public ADEntityTaskProfile(StreamInput input) throws IOException {
@@ -160,7 +213,6 @@ public class ADEntityTaskProfile implements ToXContentObject, Writeable, Writeab
         return xContentBuilder.endObject();
     }
 
-
     public Integer getShingleSize() {
         return shingleSize;
     }
@@ -169,12 +221,28 @@ public class ADEntityTaskProfile implements ToXContentObject, Writeable, Writeab
         this.shingleSize = shingleSize;
     }
 
-    public String getNodeId() {
-        return nodeId;
+    public Long getRcfTotalUpdates() {
+        return rcfTotalUpdates;
     }
 
-    public void setNodeId(String nodeId) {
-        this.nodeId = nodeId;
+    public void setRcfTotalUpdates(Long rcfTotalUpdates) {
+        this.rcfTotalUpdates = rcfTotalUpdates;
+    }
+
+    public Boolean getThresholdModelTrained() {
+        return thresholdModelTrained;
+    }
+
+    public void setThresholdModelTrained(Boolean thresholdModelTrained) {
+        this.thresholdModelTrained = thresholdModelTrained;
+    }
+
+    public Integer getThresholdModelTrainingDataSize() {
+        return thresholdModelTrainingDataSize;
+    }
+
+    public void setThresholdModelTrainingDataSize(Integer thresholdModelTrainingDataSize) {
+        this.thresholdModelTrainingDataSize = thresholdModelTrainingDataSize;
     }
 
     public Long getModelSizeInBytes() {
@@ -185,6 +253,22 @@ public class ADEntityTaskProfile implements ToXContentObject, Writeable, Writeab
         this.modelSizeInBytes = modelSizeInBytes;
     }
 
+    public String getNodeId() {
+        return nodeId;
+    }
+
+    public void setNodeId(String nodeId) {
+        this.nodeId = nodeId;
+    }
+
+    public Entity getEntity() {
+        return entity;
+    }
+
+    public void setEntity(Entity entity) {
+        this.entity = entity;
+    }
+
     public String getTaskId() {
         return taskId;
     }
@@ -193,42 +277,11 @@ public class ADEntityTaskProfile implements ToXContentObject, Writeable, Writeab
         this.taskId = taskId;
     }
 
+    public String getAdTaskType() {
+        return adTaskType;
+    }
+
     public void setAdTaskType(String adTaskType) {
         this.adTaskType = adTaskType;
-    }
-
-    public Entity getEntity() {
-        return entity;
-    }
-
-
-
-    @Override
-    public Object read(StreamInput in) throws IOException {
-        return new ADEntityTaskProfile(in);
-    }
-
-    @Override
-    public void write(StreamOutput out, Object value) throws IOException {
-        if (value instanceof ADEntityTaskProfile) {
-            ((ADEntityTaskProfile) value).writeTo(out);
-        } else {
-            throw new IllegalArgumentException("Can only write ADEntityTaskProfile");
-        }
-    }
-
-    @Override
-    public String toString() {
-        return "ADEntityTaskProfile{" +
-                "shingleSize=" + shingleSize +
-                ", rcfTotalUpdates=" + rcfTotalUpdates +
-                ", thresholdModelTrained=" + thresholdModelTrained +
-                ", thresholdModelTrainingDataSize=" + thresholdModelTrainingDataSize +
-                ", modelSizeInBytes=" + modelSizeInBytes +
-                ", nodeId='" + nodeId + '\'' +
-                ", entity=" + entity +
-                ", taskId='" + taskId + '\'' +
-                ", adTaskType='" + adTaskType + '\'' +
-                '}';
     }
 }

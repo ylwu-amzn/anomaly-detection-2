@@ -27,7 +27,6 @@
 package org.opensearch.ad.model;
 
 import java.io.IOException;
-import java.util.Map;
 
 import org.apache.commons.lang.builder.EqualsBuilder;
 import org.apache.commons.lang.builder.HashCodeBuilder;

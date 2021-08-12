@@ -339,40 +339,40 @@ public class HashRing {
         return nodes;
     }
 
-//    /**
-//     * Get an array of nodes with highest AD version in current cluster.
-//     * @return array of nodes
-//     */
-//    public DiscoveryNode[] getNodesWithHighestAdVersion() {
-//        Version highestAdVersion = adVersionCircles.lastEntry().getKey();
-//        return getNodesWithSameAdVersion(highestAdVersion).toArray(new DiscoveryNode[0]);
-//    }
+    // /**
+    // * Get an array of nodes with highest AD version in current cluster.
+    // * @return array of nodes
+    // */
+    // public DiscoveryNode[] getNodesWithHighestAdVersion() {
+    // Version highestAdVersion = adVersionCircles.lastEntry().getKey();
+    // return getNodesWithSameAdVersion(highestAdVersion).toArray(new DiscoveryNode[0]);
+    // }
 
-//    private Set<DiscoveryNode> getNodesWithSameAdVersion(Version adVersion) {
-//        TreeMap<Integer, DiscoveryNode> circle = adVersionCircles.get(adVersion);
-//        Set<String> nodeIds = new HashSet<>();
-//        Set<DiscoveryNode> nodes = new HashSet<>();
-//        if (circle == null) {
-//            return nodes;
-//        }
-//        circle.entrySet().stream().forEach(e -> {
-//            DiscoveryNode discoveryNode = e.getValue();
-//            if (!nodeIds.contains(discoveryNode.getId())) {
-//                nodeIds.add(discoveryNode.getId());
-//                nodes.add(discoveryNode);
-//            }
-//        });
-//        return nodes;
-//    }
+    // private Set<DiscoveryNode> getNodesWithSameAdVersion(Version adVersion) {
+    // TreeMap<Integer, DiscoveryNode> circle = adVersionCircles.get(adVersion);
+    // Set<String> nodeIds = new HashSet<>();
+    // Set<DiscoveryNode> nodes = new HashSet<>();
+    // if (circle == null) {
+    // return nodes;
+    // }
+    // circle.entrySet().stream().forEach(e -> {
+    // DiscoveryNode discoveryNode = e.getValue();
+    // if (!nodeIds.contains(discoveryNode.getId())) {
+    // nodeIds.add(discoveryNode.getId());
+    // nodes.add(discoveryNode);
+    // }
+    // });
+    // return nodes;
+    // }
 
-//    /**
-//     * Get AD version string.
-//     * @param nodeId node id
-//     * @return AD version string
-//     */
-//    public String getAdVersionString(String nodeId) {
-//        return nodeAdVersions.get(nodeId);
-//    }
+    // /**
+    // * Get AD version string.
+    // * @param nodeId node id
+    // * @return AD version string
+    // */
+    // public String getAdVersionString(String nodeId) {
+    // return nodeAdVersions.get(nodeId);
+    // }
 
     /**
      * Get AD version.
