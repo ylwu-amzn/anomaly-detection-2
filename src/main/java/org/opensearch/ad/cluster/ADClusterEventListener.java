@@ -75,7 +75,7 @@ public class ADClusterEventListener implements ClusterStateListener {
 
     @Override
     public void clusterChanged(ClusterChangedEvent event) {
-
+        LOG.info("4444444444444444444444444444444444444444 cluster change event received " + event.source());
         if (!nodeFilter.isEligibleNode(event.state().nodes().getLocalNode())) {
             LOG.debug(NODE_NOT_APPLIED_MSG);
             return;
@@ -94,6 +94,9 @@ public class ADClusterEventListener implements ClusterStateListener {
         }
 
         try {
+            // if (!hashRing.isFirstClusterEventTriggered()) {
+            // hashRing.buildCirclesOnAdVersions();
+            // }
             Delta delta = event.nodesDelta();
 
             // Check whether it was a data node that was removed

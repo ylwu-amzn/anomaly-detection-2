@@ -70,7 +70,6 @@ import org.opensearch.ad.transport.RCFPollingResponse;
 import org.opensearch.ad.util.ExceptionUtil;
 import org.opensearch.ad.util.MultiResponsesDelegateActionListener;
 import org.opensearch.client.Client;
-import org.opensearch.cluster.node.DiscoveryNode;
 import org.opensearch.common.xcontent.LoggingDeprecationHandler;
 import org.opensearch.common.xcontent.NamedXContentRegistry;
 import org.opensearch.common.xcontent.XContentParser;
@@ -360,9 +359,14 @@ public class AnomalyDetectorProfileRunner extends AbstractProfileRunner {
         MultiResponsesDelegateActionListener<DetectorProfile> listener
     ) {
         // TODO: check with kaituo
-        DiscoveryNode[] dataNodes = hashRing.getNodesWithSameLocalAdVersion();
-        ProfileRequest profileRequest = new ProfileRequest(detector.getDetectorId(), profiles, forMultiEntityDetector, dataNodes);
-        client.execute(ProfileAction.INSTANCE, profileRequest, onModelResponse(detector, profiles, job, listener));// get init progress
+        // DiscoveryNode[] dataNodes = hashRing.getNodesWithSameLocalAdVersion();
+        // ProfileRequest profileRequest = new ProfileRequest(detector.getDetectorId(), profiles, forMultiEntityDetector, dataNodes);
+        // client.execute(ProfileAction.INSTANCE, profileRequest, onModelResponse(detector, profiles, job, listener));// get init progress
+        hashRing.getNodesWithSameLocalAdVersion(dataNodes -> {
+            ProfileRequest profileRequest = new ProfileRequest(detector.getDetectorId(), profiles, forMultiEntityDetector, dataNodes);
+            client.execute(ProfileAction.INSTANCE, profileRequest, onModelResponse(detector, profiles, job, listener));// get init progress
+        }, listener);
+
     }
 
     private ActionListener<ProfileResponse> onModelResponse(

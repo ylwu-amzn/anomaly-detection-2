@@ -34,6 +34,7 @@ import java.util.List;
 import org.opensearch.Version;
 import org.opensearch.action.ActionRequest;
 import org.opensearch.action.ActionRequestValidationException;
+import org.opensearch.ad.cluster.ADVersionUtil;
 import org.opensearch.ad.common.exception.ADVersionConflictException;
 import org.opensearch.ad.constant.CommonErrorMessages;
 import org.opensearch.ad.model.ADTask;
@@ -76,8 +77,8 @@ public class ForwardADTaskRequest extends ActionRequest {
         this.detectionDateRange = detectionDateRange;
         this.user = user;
         this.adTaskAction = adTaskAction;
-        if (remoteAdVersion == null || remoteAdVersion.onOrBefore(Version.V_1_0_0)) {
-            throw new ADVersionConflictException("Can't forward AD task request to node running old AD version " + remoteAdVersion);
+        if (!ADVersionUtil.versionCompatibleWithLocalNode(remoteAdVersion)) {
+            throw new ADVersionConflictException("Can't forward AD task request to node running AD version " + remoteAdVersion);
         }
     }
 

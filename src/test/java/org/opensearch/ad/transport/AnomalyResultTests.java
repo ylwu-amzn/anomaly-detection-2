@@ -214,6 +214,8 @@ public class AnomalyResultTests extends AbstractADTest {
 
         hashRing = mock(HashRing.class);
         when(hashRing.getOwningNode(any(String.class))).thenReturn(Optional.of(clusterService.state().nodes().getLocalNode()));
+        // when(hashRing.getOwningNodeWithSameLocalAdVersion(any(String.class)))
+        // .thenReturn(Optional.of(clusterService.state().nodes().getLocalNode()));
         when(hashRing.build()).thenReturn(true);
         featureQuery = mock(FeatureManager.class);
 
@@ -443,6 +445,7 @@ public class AnomalyResultTests extends AbstractADTest {
 
         // mock hashing ring response. This has to happen after setting up test nodes with the failure interceptor
         when(hashRing.getOwningNode(any(String.class))).thenReturn(Optional.of(testNodes[1].discoveryNode()));
+        // when(hashRing.getOwningNodeWithSameLocalAdVersion(any(String.class))).thenReturn(Optional.of(testNodes[1].discoveryNode()));
         // register handler on testNodes[1]
         new RCFResultTransportAction(
             new ActionFilters(Collections.emptySet()),
@@ -658,6 +661,7 @@ public class AnomalyResultTests extends AbstractADTest {
 
         // mock hashing ring response. This has to happen after setting up test nodes with the failure interceptor
         when(hashRing.getOwningNode(any(String.class))).thenReturn(Optional.of(testNodes[1].discoveryNode()));
+        // when(hashRing.getOwningNodeWithSameLocalAdVersion(any(String.class))).thenReturn(Optional.of(testNodes[1].discoveryNode()));
         // register handlers on testNodes[1]
         ActionFilters actionFilters = new ActionFilters(Collections.emptySet());
         new RCFResultTransportAction(actionFilters, testNodes[1].transportService, normalModelManager, adCircuitBreakerService);
@@ -754,6 +758,7 @@ public class AnomalyResultTests extends AbstractADTest {
                 .getConnection(same(rcfNode));
         } else {
             when(hashRing.getOwningNode(eq(thresholdModelID))).thenReturn(Optional.of(thresholdNode));
+            // when(hashRing.getOwningNodeWithSameLocalAdVersion(eq(thresholdModelID))).thenReturn(Optional.of(thresholdNode));
             doThrow(new NodeNotConnectedException(rcfNode, "rcf node not connected"))
                 .when(exceptionTransportService)
                 .getConnection(same(thresholdNode));

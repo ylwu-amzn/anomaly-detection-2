@@ -72,7 +72,6 @@ import org.opensearch.ad.model.Entity;
 import org.opensearch.ad.model.EntityProfileName;
 import org.opensearch.ad.settings.AnomalyDetectorSettings;
 import org.opensearch.ad.task.ADTaskManager;
-import org.opensearch.ad.util.DiscoveryNodeFilterer;
 import org.opensearch.ad.util.RestHandlerUtils;
 import org.opensearch.client.Client;
 import org.opensearch.cluster.service.ClusterService;
@@ -104,7 +103,6 @@ public class GetAnomalyDetectorTransportAction extends HandledTransportAction<Ge
     private final Set<EntityProfileName> allEntityProfileTypes;
     private final Set<EntityProfileName> defaultEntityProfileTypes;
     private final NamedXContentRegistry xContentRegistry;
-    private final DiscoveryNodeFilterer nodeFilter;
     private final TransportService transportService;
     private volatile Boolean filterByEnabled;
     private final ADTaskManager adTaskManager;
@@ -113,14 +111,13 @@ public class GetAnomalyDetectorTransportAction extends HandledTransportAction<Ge
     @Inject
     public GetAnomalyDetectorTransportAction(
         TransportService transportService,
-        DiscoveryNodeFilterer nodeFilter,
+        HashRing hashRing,
         ActionFilters actionFilters,
         ClusterService clusterService,
         Client client,
         Settings settings,
         NamedXContentRegistry xContentRegistry,
-        ADTaskManager adTaskManager,
-        HashRing hashRing
+        ADTaskManager adTaskManager
     ) {
         super(GetAnomalyDetectorAction.NAME, transportService, actionFilters, GetAnomalyDetectorRequest::new);
         this.clusterService = clusterService;
@@ -139,7 +136,6 @@ public class GetAnomalyDetectorTransportAction extends HandledTransportAction<Ge
         this.defaultEntityProfileTypes = new HashSet<EntityProfileName>(defaultEntityProfiles);
 
         this.xContentRegistry = xContentRegistry;
-        this.nodeFilter = nodeFilter;
         filterByEnabled = AnomalyDetectorSettings.FILTER_BY_BACKEND_ROLES.get(settings);
         clusterService.getClusterSettings().addSettingsUpdateConsumer(FILTER_BY_BACKEND_ROLES, it -> filterByEnabled = it);
         this.transportService = transportService;

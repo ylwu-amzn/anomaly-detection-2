@@ -524,13 +524,12 @@ public class AnomalyDetectorJobRunner implements ScheduledJobRunner {
         if (response.isHCDetector() != null
             && response.isHCDetector()
             && !adTaskManager.skipUpdateHCRealtimeTask(detectorId, response.getError())) {
-            DiscoveryNode[] dataNodes = hashRing.getAllEligibleDataNodesWithKnownAdVersion();
-
+            DiscoveryNode[] dataNodes = hashRing.getEligibleDataNodes();
             Set<DetectorProfileName> profiles = new HashSet<>();
             profiles.add(DetectorProfileName.INIT_PROGRESS);
             ProfileRequest profileRequest = new ProfileRequest(detectorId, profiles, true, dataNodes);
             client.execute(ProfileAction.INSTANCE, profileRequest, ActionListener.wrap(r -> {
-                log.info("Update latest realtime task for HC detector {}, total updates: {}", detectorId, r.getTotalUpdates());
+                log.debug("Update latest realtime task for HC detector {}, total updates: {}", detectorId, r.getTotalUpdates());
                 updateLatestRealtimeTask(
                     jobParameter,
                     detectorId,
@@ -541,7 +540,7 @@ public class AnomalyDetectorJobRunner implements ScheduledJobRunner {
                 );
             }, e -> { log.error("Failed to get init progress profile for " + detectorId, e); }));
         } else {
-            log.info("Update latest realtime task for SINGLE detector {}, total updates: {}", detectorId, response.getRcfTotalUpdates());
+            log.debug("Update latest realtime task for SINGLE detector {}, total updates: {}", detectorId, response.getRcfTotalUpdates());
             updateLatestRealtimeTask(
                 jobParameter,
                 detectorId,

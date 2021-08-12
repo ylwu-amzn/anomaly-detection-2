@@ -330,12 +330,12 @@ public class AnomalyDetectorJobTransportActionTests extends HistoricalAnalysisIn
         assertEquals(0, getExecutingADTask());
     }
 
-    // @Ignore
+    @Ignore
     public void testProfileHistoricalDetector() throws IOException, InterruptedException {
         ADTask adTask = startHistoricalAnalysis(startTime, endTime);
         GetAnomalyDetectorRequest request = taskProfileRequest(adTask.getDetectorId());
         GetAnomalyDetectorResponse response = client().execute(GetAnomalyDetectorAction.INSTANCE, request).actionGet(10000);
-        assertTrue(response.getDetectorProfile().getAdTaskProfiles().size() > 0);
+        assertTrue(response.getDetectorProfile().getAdTaskProfile() != null);
 
         ADTask finishedTask = getADTask(adTask.getTaskId());
         int i = 0;
@@ -348,7 +348,7 @@ public class AnomalyDetectorJobTransportActionTests extends HistoricalAnalysisIn
 
         response = client().execute(GetAnomalyDetectorAction.INSTANCE, request).actionGet(10000);
         System.out.println("------------------------------");
-        System.out.println(response.getDetectorProfile().getAdTaskProfiles().keySet());
+        System.out.println(response.getDetectorProfile().getAdTaskProfile());
         System.out.println("------------------------------");
         // assertNull(response.getDetectorProfile().getAdTaskProfile().getNodeId());
         // ADTask profileAdTask = response.getDetectorProfile().getAdTaskProfile().getAdTask();

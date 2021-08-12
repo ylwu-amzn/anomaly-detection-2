@@ -688,6 +688,7 @@ public class MultiEntityResultTests extends AbstractADTest {
         setUpTransportInterceptor(this::entityResultHandler);
         // mock hashing ring response. This has to happen after setting up test nodes with the failure interceptor
         when(hashRing.getOwningNode(any(String.class))).thenReturn(Optional.of(testNodes[1].discoveryNode()));
+        // when(hashRing.getOwningNodeWithSameLocalAdVersion(any(String.class))).thenReturn(Optional.of(testNodes[1].discoveryNode()));
         setUpEntityResult(1);
 
         PlainActionFuture<AnomalyResultResponse> listener = new PlainActionFuture<>();
@@ -746,6 +747,7 @@ public class MultiEntityResultTests extends AbstractADTest {
         setUpTransportInterceptor(this::entityResultHandler);
         // mock hashing ring response. This has to happen after setting up test nodes with the failure interceptor
         when(hashRing.getOwningNode(any(String.class))).thenReturn(Optional.of(testNodes[1].discoveryNode()));
+        // when(hashRing.getOwningNodeWithSameLocalAdVersion(any(String.class))).thenReturn(Optional.of(testNodes[1].discoveryNode()));
 
         ADCircuitBreakerService openBreaker = mock(ADCircuitBreakerService.class);
         when(openBreaker.isOpen()).thenReturn(true);
@@ -781,6 +783,7 @@ public class MultiEntityResultTests extends AbstractADTest {
         CountDownLatch inProgress = setUpSearchResponse();
         setUpTransportInterceptor(this::unackEntityResultHandler);
         // mock hashing ring response. This has to happen after setting up test nodes with the failure interceptor
+        // when(hashRing.getOwningNodeWithSameLocalAdVersion(any(String.class))).thenReturn(Optional.of(testNodes[1].discoveryNode()));
         when(hashRing.getOwningNode(any(String.class))).thenReturn(Optional.of(testNodes[1].discoveryNode()));
         setUpEntityResult(1);
 
@@ -810,6 +813,11 @@ public class MultiEntityResultTests extends AbstractADTest {
         when(hashRing.getOwningNode(eq(entity2.toString()))).thenReturn(Optional.of(testNodes[3].discoveryNode()));
 
         when(hashRing.getOwningNode(eq(entity3.toString()))).thenReturn(Optional.of(testNodes[4].discoveryNode()));
+        // when(hashRing.getOwningNodeWithSameLocalAdVersion(eq(entity1.toString()))).thenReturn(Optional.of(testNodes[2].discoveryNode()));
+        //
+        // when(hashRing.getOwningNodeWithSameLocalAdVersion(eq(entity2.toString()))).thenReturn(Optional.of(testNodes[3].discoveryNode()));
+        //
+        // when(hashRing.getOwningNodeWithSameLocalAdVersion(eq(entity3.toString()))).thenReturn(Optional.of(testNodes[4].discoveryNode()));
 
         for (int i = 2; i <= 4; i++) {
             setUpEntityResult(i);
@@ -833,6 +841,7 @@ public class MultiEntityResultTests extends AbstractADTest {
         setUpTransportInterceptor(this::entityResultHandler);
         setUpEntityResult(1);
         when(hashRing.getOwningNode(any(String.class))).thenReturn(Optional.of(testNodes[1].discoveryNode()));
+        // when(hashRing.getOwningNodeWithSameLocalAdVersion(any(String.class))).thenReturn(Optional.of(testNodes[1].discoveryNode()));
 
         List<Entity> hotEntities = new ArrayList<>();
         Map<String, Object> attrs4 = new HashMap<>();
@@ -881,6 +890,7 @@ public class MultiEntityResultTests extends AbstractADTest {
         CountDownLatch inProgress = setUpSearchResponse();
         setUpTransportInterceptor(this::entityResultHandler);
         when(hashRing.getOwningNode(any(String.class))).thenReturn(Optional.of(testNodes[1].discoveryNode()));
+        // when(hashRing.getOwningNodeWithSameLocalAdVersion(any(String.class))).thenReturn(Optional.of(testNodes[1].discoveryNode()));
 
         List<Entity> hotEntities = new ArrayList<>();
         Entity entity1 = Entity.createEntityByReordering(attrs1);
@@ -1050,6 +1060,7 @@ public class MultiEntityResultTests extends AbstractADTest {
 
         setUpTransportInterceptor(this::entityResultHandler);
         when(hashRing.getOwningNode(any(String.class))).thenReturn(Optional.of(testNodes[1].discoveryNode()));
+        // when(hashRing.getOwningNodeWithSameLocalAdVersion(any(String.class))).thenReturn(Optional.of(testNodes[1].discoveryNode()));
         setUpEntityResult(1);
 
         PlainActionFuture<AnomalyResultResponse> listener = new PlainActionFuture<>();

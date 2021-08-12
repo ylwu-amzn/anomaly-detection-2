@@ -627,7 +627,7 @@ public class AnomalyDetectorProfileRunnerTests extends AbstractProfileRunnerTest
     public void testInvalidRequiredSamples() {
         expectThrows(
             IllegalArgumentException.class,
-            () -> new AnomalyDetectorProfileRunner(client, xContentRegistry(), nodeFilter, 0, transportService, adTaskManager)
+            () -> new AnomalyDetectorProfileRunner(client, xContentRegistry(), hashRing, 0, transportService, adTaskManager)
         );
     }
 

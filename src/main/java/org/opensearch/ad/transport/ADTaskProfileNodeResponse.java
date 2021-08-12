@@ -32,6 +32,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.opensearch.Version;
 import org.opensearch.action.support.nodes.BaseNodeResponse;
+import org.opensearch.ad.cluster.ADVersionUtil;
 import org.opensearch.ad.model.ADTaskProfile;
 import org.opensearch.cluster.node.DiscoveryNode;
 import org.opensearch.common.io.stream.StreamInput;
@@ -66,7 +67,7 @@ public class ADTaskProfileNodeResponse extends BaseNodeResponse {
         logger.info("++++++++++++++++++++++++++++++++++++++++++++++++++ wwwdebug1, remote AD version: " + remoteAdVersion);
         logger.info("++++++++++++++++++++++++++++++++++++++++++++++++++ wwwdebug1, adTaskProfile: " + adTaskProfile);
         super.writeTo(out);
-        if (adTaskProfile != null && (!remoteAdVersion.onOrBefore(Version.V_1_0_0) || adTaskProfile.getNodeId() != null)) {
+        if (adTaskProfile != null && (ADVersionUtil.versionCompatibleWithLocalNode(remoteAdVersion) || adTaskProfile.getNodeId() != null)) {
             logger.info("++++++++++++++++++++++++++++++++++++++++++++++++++ wwwdebug1, write AD teak profile : true");
             out.writeBoolean(true);
             adTaskProfile.writeTo(out, remoteAdVersion);

@@ -31,8 +31,11 @@ import static org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedT
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 import org.opensearch.Version;
+import org.opensearch.ad.annotation.Generated;
+import org.opensearch.ad.cluster.ADVersionUtil;
 import org.opensearch.common.io.stream.StreamInput;
 import org.opensearch.common.io.stream.StreamOutput;
 import org.opensearch.common.io.stream.Writeable;
@@ -175,7 +178,7 @@ public class ADTaskProfile implements ToXContentObject, Writeable {
         out.writeOptionalInt(thresholdModelTrainingDataSize);
         out.writeOptionalLong(modelSizeInBytes);
         out.writeOptionalString(nodeId);
-        if (!adVersion.onOrBefore(Version.V_1_0_0)) {
+        if (ADVersionUtil.versionCompatibleWithLocalNode(adVersion)) {
             out.writeOptionalString(adTaskType);
             out.writeOptionalInt(totalEntitiesCount);
             out.writeOptionalInt(pendingEntitiesCount);
@@ -218,6 +221,9 @@ public class ADTaskProfile implements ToXContentObject, Writeable {
         }
         if (nodeId != null) {
             xContentBuilder.field(NODE_ID_FIELD, nodeId);
+        }
+        if (taskId != null) {
+            xContentBuilder.field(TASK_ID_FIELD, taskId);
         }
         if (adTaskType != null) {
             xContentBuilder.field(AD_TASK_TYPE_FIELD, adTaskType);
@@ -444,5 +450,51 @@ public class ADTaskProfile implements ToXContentObject, Writeable {
 
     public void setEntityTaskProfiles(List<ADEntityTaskProfile> entityTaskProfiles) {
         this.entityTaskProfiles = entityTaskProfiles;
+    }
+
+    @Generated
+    @Override
+    public boolean equals(Object o) {
+        if (this == o)
+            return true;
+        if (o == null || getClass() != o.getClass())
+            return false;
+        ADTaskProfile that = (ADTaskProfile) o;
+        return Objects.equals(adTask, that.adTask)
+            && Objects.equals(shingleSize, that.shingleSize)
+            && Objects.equals(rcfTotalUpdates, that.rcfTotalUpdates)
+            && Objects.equals(thresholdModelTrained, that.thresholdModelTrained)
+            && Objects.equals(thresholdModelTrainingDataSize, that.thresholdModelTrainingDataSize)
+            && Objects.equals(modelSizeInBytes, that.modelSizeInBytes)
+            && Objects.equals(nodeId, that.nodeId)
+            && Objects.equals(taskId, that.taskId)
+            && Objects.equals(adTaskType, that.adTaskType)
+            && Objects.equals(totalEntitiesCount, that.totalEntitiesCount)
+            && Objects.equals(pendingEntitiesCount, that.pendingEntitiesCount)
+            && Objects.equals(runningEntitiesCount, that.runningEntitiesCount)
+            && Objects.equals(runningEntities, that.runningEntities)
+            && Objects.equals(entityTaskProfiles, that.entityTaskProfiles);
+    }
+
+    @Generated
+    @Override
+    public int hashCode() {
+        return Objects
+            .hash(
+                adTask,
+                shingleSize,
+                rcfTotalUpdates,
+                thresholdModelTrained,
+                thresholdModelTrainingDataSize,
+                modelSizeInBytes,
+                nodeId,
+                taskId,
+                adTaskType,
+                totalEntitiesCount,
+                pendingEntitiesCount,
+                runningEntitiesCount,
+                runningEntities,
+                entityTaskProfiles
+            );
     }
 }

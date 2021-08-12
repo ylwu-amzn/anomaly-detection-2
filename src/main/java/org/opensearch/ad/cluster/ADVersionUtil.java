@@ -11,6 +11,8 @@
 
 package org.opensearch.ad.cluster;
 
+import static org.opensearch.ad.constant.CommonName.AD_PLUGIN_VERSION_FOR_TEST;
+
 import org.opensearch.Version;
 
 public class ADVersionUtil {
@@ -18,6 +20,9 @@ public class ADVersionUtil {
     public static final int VERSION_SEGMENTS = 3;
 
     public static Version fromString(String adVersion) {
+        if (AD_PLUGIN_VERSION_FOR_TEST.equals(adVersion)) {
+            return Version.CURRENT;
+        }
         return Version.fromString(normalizeVersion(adVersion));
     }
 
@@ -36,5 +41,25 @@ public class ADVersionUtil {
             normalizedVersion.append(versions[i]);
         }
         return normalizedVersion.toString();
+    }
+
+    public static boolean versionCompatibleWithLocalNode(Version adVersion) {
+        if (Version.CURRENT.equals(adVersion)) {
+            return true;
+        }
+        return adVersion != null && adVersion.after(Version.V_1_0_0);
+        // if (adVersion == null || adVersion.onOrBefore(Version.V_1_0_0)) {
+        // throw new ADVersionConflictException("Can't forward AD task request to node running old AD version " + remoteAdVersion);
+        // }
+    }
+
+    public static boolean needToMigrateData(Version adVersion) {
+        if (Version.CURRENT.equals(adVersion)) {
+            return false;
+        }
+        return adVersion != null && adVersion.onOrBefore(Version.V_1_0_0);
+        // if (adVersion == null || adVersion.onOrBefore(Version.V_1_0_0)) {
+        // throw new ADVersionConflictException("Can't forward AD task request to node running old AD version " + remoteAdVersion);
+        // }
     }
 }

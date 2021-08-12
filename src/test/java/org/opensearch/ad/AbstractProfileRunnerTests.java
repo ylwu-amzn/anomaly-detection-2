@@ -44,11 +44,11 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.opensearch.Version;
 import org.opensearch.action.get.GetResponse;
+import org.opensearch.ad.cluster.HashRing;
 import org.opensearch.ad.model.ADTask;
 import org.opensearch.ad.model.AnomalyDetector;
 import org.opensearch.ad.model.DetectorProfileName;
 import org.opensearch.ad.task.ADTaskManager;
-import org.opensearch.ad.util.DiscoveryNodeFilterer;
 import org.opensearch.client.Client;
 import org.opensearch.cluster.ClusterName;
 import org.opensearch.cluster.ClusterState;
@@ -80,7 +80,7 @@ public class AbstractProfileRunnerTests extends AbstractADTest {
 
     protected AnomalyDetectorProfileRunner runner;
     protected Client client;
-    protected DiscoveryNodeFilterer nodeFilter;
+    protected HashRing hashRing;
     protected AnomalyDetector detector;
     protected ClusterService clusterService;
     protected TransportService transportService;
@@ -164,7 +164,7 @@ public class AbstractProfileRunnerTests extends AbstractADTest {
     public void setUp() throws Exception {
         super.setUp();
         client = mock(Client.class);
-        nodeFilter = mock(DiscoveryNodeFilterer.class);
+        hashRing = mock(HashRing.class);
         clusterService = mock(ClusterService.class);
         adTaskManager = mock(ADTaskManager.class);
         when(clusterService.state()).thenReturn(ClusterState.builder(new ClusterName("test cluster")).build());
@@ -178,7 +178,7 @@ public class AbstractProfileRunnerTests extends AbstractADTest {
             function.accept(Optional.of(TestHelpers.randomAdTask()));
             return null;
         }).when(adTaskManager).getAndExecuteOnLatestDetectorLevelTask(any(), any(), any(), any(), anyBoolean(), any());
-        runner = new AnomalyDetectorProfileRunner(client, xContentRegistry(), nodeFilter, requiredSamples, transportService, adTaskManager);
+        runner = new AnomalyDetectorProfileRunner(client, xContentRegistry(), hashRing, requiredSamples, transportService, adTaskManager);
 
         detectorIntervalMin = 3;
         detectorGetReponse = mock(GetResponse.class);

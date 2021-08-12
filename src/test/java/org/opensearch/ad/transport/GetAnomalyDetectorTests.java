@@ -46,11 +46,11 @@ import org.opensearch.action.get.GetResponse;
 import org.opensearch.action.support.ActionFilters;
 import org.opensearch.action.support.PlainActionFuture;
 import org.opensearch.ad.AbstractADTest;
+import org.opensearch.ad.cluster.HashRing;
 import org.opensearch.ad.constant.CommonErrorMessages;
 import org.opensearch.ad.model.Entity;
 import org.opensearch.ad.settings.AnomalyDetectorSettings;
 import org.opensearch.ad.task.ADTaskManager;
-import org.opensearch.ad.util.DiscoveryNodeFilterer;
 import org.opensearch.client.Client;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.settings.ClusterSettings;
@@ -61,7 +61,7 @@ import org.opensearch.transport.TransportService;
 public class GetAnomalyDetectorTests extends AbstractADTest {
     private GetAnomalyDetectorTransportAction action;
     private TransportService transportService;
-    private DiscoveryNodeFilterer nodeFilter;
+    private HashRing hashRing;
     private ActionFilters actionFilters;
     private Client client;
     private GetAnomalyDetectorRequest request;
@@ -104,7 +104,7 @@ public class GetAnomalyDetectorTests extends AbstractADTest {
             Collections.emptySet()
         );
 
-        nodeFilter = mock(DiscoveryNodeFilterer.class);
+        hashRing = mock(HashRing.class);
 
         actionFilters = mock(ActionFilters.class);
 
@@ -115,7 +115,7 @@ public class GetAnomalyDetectorTests extends AbstractADTest {
 
         action = new GetAnomalyDetectorTransportAction(
             transportService,
-            nodeFilter,
+            hashRing,
             actionFilters,
             clusterService,
             client,
@@ -140,7 +140,7 @@ public class GetAnomalyDetectorTests extends AbstractADTest {
     }
 
     @SuppressWarnings("unchecked")
-    public void testValidRequest() throws IOException {
+    public void testValidRequest() {
         doAnswer(invocation -> {
             Object[] args = invocation.getArguments();
             GetRequest request = (GetRequest) args[0];

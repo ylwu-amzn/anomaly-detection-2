@@ -38,6 +38,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.opensearch.OpenSearchStatusException;
 import org.opensearch.action.ActionListener;
+import org.opensearch.ad.common.exception.AnomalyDetectionException;
 import org.opensearch.ad.common.exception.ResourceNotFoundException;
 import org.opensearch.ad.model.AnomalyDetector;
 import org.opensearch.ad.model.Feature;
@@ -54,7 +55,6 @@ import org.opensearch.rest.RestChannel;
 import org.opensearch.rest.RestRequest;
 import org.opensearch.rest.RestStatus;
 import org.opensearch.search.fetch.subphase.FetchSourceContext;
-import org.opensearch.transport.RemoteTransportException;
 
 import com.google.common.collect.ImmutableMap;
 
@@ -181,14 +181,16 @@ public final class RestHandlerUtils {
                 );
             if (isProperExceptionToReturn(e)) {
                 actionListener.onFailure(e);
-            } else if (e instanceof RemoteTransportException && isProperExceptionToReturn(cause)) {
+            } else if (isProperExceptionToReturn(cause)) {
                 Exception exception = cause instanceof OpenSearchStatusException
                     ? (OpenSearchStatusException) cause
                     : (IndexNotFoundException) cause;
                 actionListener.onFailure(exception);
             } else {
                 RestStatus status = isBadRequest(e) ? BAD_REQUEST : INTERNAL_SERVER_ERROR;
-                String errorMessage = isBadRequest(e) || isBadRequest(e.getCause()) ? e.getMessage() : generalErrorMessage;
+                String errorMessage = isBadRequest(e) || isBadRequest(e.getCause()) || e instanceof AnomalyDetectionException
+                    ? e.getMessage()
+                    : generalErrorMessage;
                 actionListener.onFailure(new OpenSearchStatusException(errorMessage, status));
             }
         });

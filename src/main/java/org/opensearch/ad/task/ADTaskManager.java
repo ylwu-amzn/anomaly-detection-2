@@ -299,22 +299,24 @@ public class ADTaskManager {
     ) {
         String detectorId = detector.getDetectorId();
         // Optional<DiscoveryNode> owningNode = hashRing.getOwningNodeWithHighestAdVersion(detectorId);
-        Optional<DiscoveryNode> owningNode = hashRing.getOwningNodeWithSameLocalAdVersion(detectorId);
-        if (!owningNode.isPresent()) {
-            logger.debug("Can't find eligible node to run as AD task's coordinating node");
-            listener.onFailure(new OpenSearchStatusException("No eligible node to run detector", RestStatus.INTERNAL_SERVER_ERROR));
-            return;
-        }
-        logger.debug("coordinating node is : {} for detector: {}", owningNode.get().getId(), detectorId);
-        forwardDetectRequestToCoordinatingNode(
-            detector,
-            detectionDateRange,
-            user,
-            ADTaskAction.START,
-            transportService,
-            owningNode.get(),
-            listener
-        );
+        hashRing.getOwningNodeWithSameLocalAdVersion(detectorId, owningNode -> {
+            if (!owningNode.isPresent()) {
+                logger.debug("Can't find eligible node to run as AD task's coordinating node");
+                listener.onFailure(new OpenSearchStatusException("No eligible node to run detector", RestStatus.INTERNAL_SERVER_ERROR));
+                return;
+            }
+            logger.debug("coordinating node is : {} for detector: {}", owningNode.get().getId(), detectorId);
+            forwardDetectRequestToCoordinatingNode(
+                detector,
+                detectionDateRange,
+                user,
+                ADTaskAction.START,
+                transportService,
+                owningNode.get(),
+                listener
+            );
+        }, listener);
+
     }
 
     /**
@@ -1020,80 +1022,85 @@ public class ADTaskManager {
     private void getADTaskProfile(ADTask adDetectorLevelTask, ActionListener<ADTaskProfile> listener) {
         String detectorId = adDetectorLevelTask.getDetectorId();
 
-        DiscoveryNode[] dataNodes = hashRing.getAllEligibleDataNodesWithKnownAdVersion();
-        for (DiscoveryNode n : dataNodes) {
-            logger.info("11111111111111111 ylwudebug1: get task profile from node {} ", n.getId());
-        }
-        ADTaskProfileRequest adTaskProfileRequest = new ADTaskProfileRequest(detectorId, dataNodes);
-        client.execute(ADTaskProfileAction.INSTANCE, adTaskProfileRequest, ActionListener.wrap(response -> {
-            if (response.hasFailures()) {
-                listener.onFailure(response.failures().get(0));
-                return;
+        // DiscoveryNode[] dataNodes = hashRing.getAllEligibleDataNodesWithKnownAdVersion();
+        hashRing.getAllEligibleDataNodesWithKnownAdVersion(dataNodes -> {
+            for (DiscoveryNode n : dataNodes) {
+                logger.info("11111111111111111 ylwudebug1: get task profile from node {} ", n.getId());
             }
+            ADTaskProfileRequest adTaskProfileRequest = new ADTaskProfileRequest(detectorId, dataNodes);
+            client.execute(ADTaskProfileAction.INSTANCE, adTaskProfileRequest, ActionListener.wrap(response -> {
+                if (response.hasFailures()) {
+                    listener.onFailure(response.failures().get(0));
+                    return;
+                }
 
-            List<ADEntityTaskProfile> adEntityTaskProfiles = new ArrayList<>();
-            ADTaskProfile detectorTaskProfile = new ADTaskProfile(adDetectorLevelTask);
-            for (ADTaskProfileNodeResponse node : response.getNodes()) {
-                ADTaskProfile taskProfile = node.getAdTaskProfile();
-                if (taskProfile != null) {
-                    // if (!ADTaskType.HISTORICAL_HC_ENTITY.name().equals(taskProfile.getAdTaskType())) {
-                    // taskProfile.setAdTask(adDetectorLevelTask);
-                    // }
+                List<ADEntityTaskProfile> adEntityTaskProfiles = new ArrayList<>();
+                ADTaskProfile detectorTaskProfile = new ADTaskProfile(adDetectorLevelTask);
+                for (ADTaskProfileNodeResponse node : response.getNodes()) {
+                    ADTaskProfile taskProfile = node.getAdTaskProfile();
+                    if (taskProfile != null) {
+                        // if (!ADTaskType.HISTORICAL_HC_ENTITY.name().equals(taskProfile.getAdTaskType())) {
+                        // taskProfile.setAdTask(adDetectorLevelTask);
+                        // }
+                        logger
+                            .info(
+                                "333333333333333333444444444444444444444444 {} , node id is null: {}",
+                                taskProfile.toString(),
+                                taskProfile.getNodeId() == null
+                            );
+                        if (taskProfile.getNodeId() != null) {
+                            detectorTaskProfile.setShingleSize(taskProfile.getShingleSize());
+                            detectorTaskProfile.setRcfTotalUpdates(taskProfile.getRcfTotalUpdates());
+                            detectorTaskProfile.setThresholdModelTrained(taskProfile.getThresholdModelTrained());
+                            detectorTaskProfile.setThresholdModelTrainingDataSize(taskProfile.getThresholdModelTrainingDataSize());
+                            detectorTaskProfile.setModelSizeInBytes(taskProfile.getModelSizeInBytes());
+                            detectorTaskProfile.setNodeId(taskProfile.getNodeId());
+                            detectorTaskProfile.setTotalEntitiesCount(taskProfile.getTotalEntitiesCount());
+                            detectorTaskProfile.setPendingEntitiesCount(taskProfile.getPendingEntitiesCount());
+                            detectorTaskProfile.setRunningEntitiesCount(taskProfile.getRunningEntitiesCount());
+                            detectorTaskProfile.setRunningEntities(taskProfile.getRunningEntities());
+                            detectorTaskProfile.setAdTaskType(taskProfile.getAdTaskType());
+                        }
+                        logger.info("33333333333333333344444444444444444444444455555555555555 {}", detectorTaskProfile.toString());
+                        if (taskProfile.getEntityTaskProfiles() != null) {
+                            logger
+                                .info(
+                                    "33333333333333333344444444444444444444444455555555555555aaaaaaa size: {}",
+                                    taskProfile.getEntityTaskProfiles().size()
+                                );
+                            adEntityTaskProfiles.addAll(taskProfile.getEntityTaskProfiles());
+                            logger
+                                .info(
+                                    "33333333333333333344444444444444444444444455555555555555aaaaaaabbbbb size: {}",
+                                    adEntityTaskProfiles.size()
+                                );
+                        }
+                        // logger.info("333333333333333333444444444444444444444444555555555555556666666666666666 {}",
+                        // taskProfile.toString());
+                    }
+                }
+                logger
+                    .info("33333333333333333344444444444444444444444455555555555555aaaaaaabbbbbcccc size: {}", adEntityTaskProfiles.size());
+                if (adEntityTaskProfiles != null && adEntityTaskProfiles.size() > 0) {
+                    detectorTaskProfile.setEntityTaskProfiles(adEntityTaskProfiles);
                     logger
                         .info(
-                            "333333333333333333444444444444444444444444 {} , node id is null: {}",
-                            taskProfile.toString(),
-                            taskProfile.getNodeId() == null
+                            "333333333333333333444444444444444444444444555555555555556666666666666666777777777777 {}",
+                            detectorTaskProfile.toString()
                         );
-                    if (taskProfile.getNodeId() != null) {
-                        detectorTaskProfile.setShingleSize(taskProfile.getShingleSize());
-                        detectorTaskProfile.setRcfTotalUpdates(taskProfile.getRcfTotalUpdates());
-                        detectorTaskProfile.setThresholdModelTrained(taskProfile.getThresholdModelTrained());
-                        detectorTaskProfile.setThresholdModelTrainingDataSize(taskProfile.getThresholdModelTrainingDataSize());
-                        detectorTaskProfile.setModelSizeInBytes(taskProfile.getModelSizeInBytes());
-                        detectorTaskProfile.setNodeId(taskProfile.getNodeId());
-                        detectorTaskProfile.setTotalEntitiesCount(taskProfile.getTotalEntitiesCount());
-                        detectorTaskProfile.setPendingEntitiesCount(taskProfile.getPendingEntitiesCount());
-                        detectorTaskProfile.setRunningEntitiesCount(taskProfile.getRunningEntitiesCount());
-                        detectorTaskProfile.setRunningEntities(taskProfile.getRunningEntities());
-                        detectorTaskProfile.setAdTaskType(taskProfile.getAdTaskType());
-                    }
-                    logger.info("33333333333333333344444444444444444444444455555555555555 {}", detectorTaskProfile.toString());
-                    if (taskProfile.getEntityTaskProfiles() != null) {
-                        logger
-                            .info(
-                                "33333333333333333344444444444444444444444455555555555555aaaaaaa size: {}",
-                                taskProfile.getEntityTaskProfiles().size()
-                            );
-                        adEntityTaskProfiles.addAll(taskProfile.getEntityTaskProfiles());
-                        logger
-                            .info(
-                                "33333333333333333344444444444444444444444455555555555555aaaaaaabbbbb size: {}",
-                                adEntityTaskProfiles.size()
-                            );
-                    }
-                    // logger.info("333333333333333333444444444444444444444444555555555555556666666666666666 {}", taskProfile.toString());
                 }
-            }
-            logger.info("33333333333333333344444444444444444444444455555555555555aaaaaaabbbbbcccc size: {}", adEntityTaskProfiles.size());
-            if (adEntityTaskProfiles != null && adEntityTaskProfiles.size() > 0) {
-                detectorTaskProfile.setEntityTaskProfiles(adEntityTaskProfiles);
                 logger
                     .info(
-                        "333333333333333333444444444444444444444444555555555555556666666666666666777777777777 {}",
+                        "3333333333333333334444444444444444444444445555555555555566666666666666667777777777778888888 {}",
                         detectorTaskProfile.toString()
                     );
-            }
-            logger
-                .info(
-                    "3333333333333333334444444444444444444444445555555555555566666666666666667777777777778888888 {}",
-                    detectorTaskProfile.toString()
-                );
-            listener.onResponse(detectorTaskProfile);
-        }, e -> {
-            logger.error("Failed to get task profile for task " + adDetectorLevelTask.getTaskId(), e);
-            listener.onFailure(e);
-        }));
+                listener.onResponse(detectorTaskProfile);
+            }, e -> {
+                logger.error("Failed to get task profile for task " + adDetectorLevelTask.getTaskId(), e);
+                listener.onFailure(e);
+            }));
+        }, listener);
+
     }
 
     private boolean validateDetector(AnomalyDetector detector, ActionListener<AnomalyDetectorJobResponse> listener) {

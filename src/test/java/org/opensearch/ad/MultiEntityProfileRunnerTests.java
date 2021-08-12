@@ -57,6 +57,7 @@ import org.opensearch.action.get.GetRequest;
 import org.opensearch.action.get.GetResponse;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
+import org.opensearch.ad.cluster.HashRing;
 import org.opensearch.ad.constant.CommonName;
 import org.opensearch.ad.model.ADTask;
 import org.opensearch.ad.model.AnomalyDetector;
@@ -70,7 +71,6 @@ import org.opensearch.ad.task.ADTaskManager;
 import org.opensearch.ad.transport.ProfileAction;
 import org.opensearch.ad.transport.ProfileNodeResponse;
 import org.opensearch.ad.transport.ProfileResponse;
-import org.opensearch.ad.util.DiscoveryNodeFilterer;
 import org.opensearch.client.Client;
 import org.opensearch.cluster.ClusterName;
 import org.opensearch.cluster.node.DiscoveryNode;
@@ -80,7 +80,7 @@ import org.opensearch.transport.TransportService;
 public class MultiEntityProfileRunnerTests extends AbstractADTest {
     private AnomalyDetectorProfileRunner runner;
     private Client client;
-    private DiscoveryNodeFilterer nodeFilter;
+    private HashRing hashRing;
     private int requiredSamples;
     private AnomalyDetector detector;
     private String detectorId;
@@ -114,7 +114,7 @@ public class MultiEntityProfileRunnerTests extends AbstractADTest {
     public void setUp() throws Exception {
         super.setUp();
         client = mock(Client.class);
-        nodeFilter = mock(DiscoveryNodeFilterer.class);
+        hashRing = mock(HashRing.class);
         requiredSamples = 128;
 
         detectorId = "A69pa3UBHuCbh-emo9oR";
@@ -130,7 +130,7 @@ public class MultiEntityProfileRunnerTests extends AbstractADTest {
             function.accept(Optional.of(TestHelpers.randomAdTask()));
             return null;
         }).when(adTaskManager).getAndExecuteOnLatestDetectorLevelTask(any(), any(), any(), any(), anyBoolean(), any());
-        runner = new AnomalyDetectorProfileRunner(client, xContentRegistry(), nodeFilter, requiredSamples, transportService, adTaskManager);
+        runner = new AnomalyDetectorProfileRunner(client, xContentRegistry(), hashRing, requiredSamples, transportService, adTaskManager);
 
         doAnswer(invocation -> {
             Object[] args = invocation.getArguments();
