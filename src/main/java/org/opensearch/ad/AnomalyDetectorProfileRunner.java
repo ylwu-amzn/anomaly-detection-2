@@ -47,7 +47,6 @@ import org.opensearch.action.ActionListener;
 import org.opensearch.action.get.GetRequest;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
-import org.opensearch.ad.cluster.HashRing;
 import org.opensearch.ad.common.exception.ResourceNotFoundException;
 import org.opensearch.ad.constant.CommonErrorMessages;
 import org.opensearch.ad.constant.CommonName;
@@ -67,9 +66,11 @@ import org.opensearch.ad.transport.ProfileResponse;
 import org.opensearch.ad.transport.RCFPollingAction;
 import org.opensearch.ad.transport.RCFPollingRequest;
 import org.opensearch.ad.transport.RCFPollingResponse;
+import org.opensearch.ad.util.DiscoveryNodeFilterer;
 import org.opensearch.ad.util.ExceptionUtil;
 import org.opensearch.ad.util.MultiResponsesDelegateActionListener;
 import org.opensearch.client.Client;
+import org.opensearch.cluster.node.DiscoveryNode;
 import org.opensearch.common.xcontent.LoggingDeprecationHandler;
 import org.opensearch.common.xcontent.NamedXContentRegistry;
 import org.opensearch.common.xcontent.XContentParser;
@@ -87,14 +88,16 @@ public class AnomalyDetectorProfileRunner extends AbstractProfileRunner {
     private final Logger logger = LogManager.getLogger(AnomalyDetectorProfileRunner.class);
     private Client client;
     private NamedXContentRegistry xContentRegistry;
-    private final HashRing hashRing;
+    // private final HashRing hashRing;
+    private DiscoveryNodeFilterer nodeFilter;
     private final TransportService transportService;
     private final ADTaskManager adTaskManager;
 
     public AnomalyDetectorProfileRunner(
         Client client,
         NamedXContentRegistry xContentRegistry,
-        HashRing hashRing,
+        DiscoveryNodeFilterer nodeFilter,
+        // HashRing hashRing,
         long requiredSamples,
         TransportService transportService,
         ADTaskManager adTaskManager
@@ -102,7 +105,8 @@ public class AnomalyDetectorProfileRunner extends AbstractProfileRunner {
         super(requiredSamples);
         this.client = client;
         this.xContentRegistry = xContentRegistry;
-        this.hashRing = hashRing;
+        this.nodeFilter = nodeFilter;
+        // this.hashRing = hashRing;
         if (requiredSamples <= 0) {
             throw new IllegalArgumentException("required samples should be a positive number, but was " + requiredSamples);
         }
@@ -358,14 +362,17 @@ public class AnomalyDetectorProfileRunner extends AbstractProfileRunner {
         boolean forMultiEntityDetector,
         MultiResponsesDelegateActionListener<DetectorProfile> listener
     ) {
+        DiscoveryNode[] dataNodes = nodeFilter.getEligibleDataNodes();
+        ProfileRequest profileRequest = new ProfileRequest(detector.getDetectorId(), profiles, forMultiEntityDetector, dataNodes);
+        client.execute(ProfileAction.INSTANCE, profileRequest, onModelResponse(detector, profiles, job, listener));// get init progress
         // TODO: check with kaituo
         // DiscoveryNode[] dataNodes = hashRing.getNodesWithSameLocalAdVersion();
         // ProfileRequest profileRequest = new ProfileRequest(detector.getDetectorId(), profiles, forMultiEntityDetector, dataNodes);
         // client.execute(ProfileAction.INSTANCE, profileRequest, onModelResponse(detector, profiles, job, listener));// get init progress
-        hashRing.getNodesWithSameLocalAdVersion(dataNodes -> {
-            ProfileRequest profileRequest = new ProfileRequest(detector.getDetectorId(), profiles, forMultiEntityDetector, dataNodes);
-            client.execute(ProfileAction.INSTANCE, profileRequest, onModelResponse(detector, profiles, job, listener));// get init progress
-        }, listener);
+        // hashRing.getNodesWithSameLocalAdVersion(dataNodes -> {
+        // ProfileRequest profileRequest = new ProfileRequest(detector.getDetectorId(), profiles, forMultiEntityDetector, dataNodes);
+        // client.execute(ProfileAction.INSTANCE, profileRequest, onModelResponse(detector, profiles, job, listener));// get init progress
+        // }, listener);
 
     }
 

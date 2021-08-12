@@ -49,7 +49,7 @@ public class ADVersionUtil {
         }
         return adVersion != null && adVersion.after(Version.V_1_0_0);
         // if (adVersion == null || adVersion.onOrBefore(Version.V_1_0_0)) {
-        // throw new ADVersionConflictException("Can't forward AD task request to node running old AD version " + remoteAdVersion);
+        // throw new ADVersionException("Can't forward AD task request to node running old AD version " + remoteAdVersion);
         // }
     }
 
@@ -59,7 +59,7 @@ public class ADVersionUtil {
         }
         return adVersion != null && adVersion.onOrBefore(Version.V_1_0_0);
         // if (adVersion == null || adVersion.onOrBefore(Version.V_1_0_0)) {
-        // throw new ADVersionConflictException("Can't forward AD task request to node running old AD version " + remoteAdVersion);
+        // throw new ADVersionException("Can't forward AD task request to node running old AD version " + remoteAdVersion);
         // }
     }
 }

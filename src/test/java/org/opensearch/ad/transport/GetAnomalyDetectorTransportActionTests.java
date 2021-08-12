@@ -43,7 +43,6 @@ import org.mockito.Mockito;
 import org.opensearch.action.ActionListener;
 import org.opensearch.action.support.ActionFilters;
 import org.opensearch.ad.TestHelpers;
-import org.opensearch.ad.cluster.HashRing;
 import org.opensearch.ad.constant.CommonName;
 import org.opensearch.ad.model.ADTask;
 import org.opensearch.ad.model.AnomalyDetector;
@@ -53,6 +52,7 @@ import org.opensearch.ad.model.EntityProfile;
 import org.opensearch.ad.model.InitProgressProfile;
 import org.opensearch.ad.settings.AnomalyDetectorSettings;
 import org.opensearch.ad.task.ADTaskManager;
+import org.opensearch.ad.util.DiscoveryNodeFilterer;
 import org.opensearch.ad.util.RestHandlerUtils;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.io.stream.BytesStreamOutput;
@@ -93,7 +93,8 @@ public class GetAnomalyDetectorTransportActionTests extends OpenSearchSingleNode
         adTaskManager = mock(ADTaskManager.class);
         action = new GetAnomalyDetectorTransportAction(
             Mockito.mock(TransportService.class),
-            Mockito.mock(HashRing.class),
+            Mockito.mock(DiscoveryNodeFilterer.class),
+            // Mockito.mock(HashRing.class),
             Mockito.mock(ActionFilters.class),
             clusterService,
             client(),

@@ -66,7 +66,7 @@ ext {
     isSnapshot = "true" == System.getProperty("build.snapshot", "true")
 }
 
-version = "1.0.1.0"
+version = "${opensearchVersion}.0"
 
 apply plugin: 'java'
 apply plugin: 'idea'
@@ -353,7 +353,16 @@ List<String> jacocoExclusions = [
         'org.opensearch.ad.transport.AnomalyDetectorJobTransportAction',
         'org.opensearch.ad.transport.CronNodeRequest',
         'org.opensearch.ad.transport.DeleteAnomalyResultsTransportAction',
-        'org.opensearch.ad.transport.GetAnomalyDetectorResponse'
+        'org.opensearch.ad.transport.GetAnomalyDetectorResponse',
+        'org.opensearch.ad.common.exception.ADVersionException',
+        'org.opensearch.ad.cluster.ADVersionUtil',
+        'org.opensearch.ad.cluster.HashRing',
+        'org.opensearch.ad.cluster.ADDataMigrator',
+        'org.opensearch.ad.transport.ADBatchAnomalyResultRequest',
+        'org.opensearch.ad.transport.RCFResultResponse',
+        'org.opensearch.ad.transport.ADTaskProfileResponse',
+        'org.opensearch.ad.transport.ADBatchTaskRemoteExecutionTransportAction',
+        'org.opensearch.ad.feature.SearchFeatureDao'
 ]
 
 jacocoTestCoverageVerification {

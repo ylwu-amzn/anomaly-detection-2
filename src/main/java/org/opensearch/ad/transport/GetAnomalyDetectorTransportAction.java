@@ -61,7 +61,6 @@ import org.opensearch.action.support.HandledTransportAction;
 import org.opensearch.ad.AnomalyDetectorProfileRunner;
 import org.opensearch.ad.EntityProfileRunner;
 import org.opensearch.ad.Name;
-import org.opensearch.ad.cluster.HashRing;
 import org.opensearch.ad.model.ADTask;
 import org.opensearch.ad.model.ADTaskType;
 import org.opensearch.ad.model.AnomalyDetector;
@@ -72,6 +71,7 @@ import org.opensearch.ad.model.Entity;
 import org.opensearch.ad.model.EntityProfileName;
 import org.opensearch.ad.settings.AnomalyDetectorSettings;
 import org.opensearch.ad.task.ADTaskManager;
+import org.opensearch.ad.util.DiscoveryNodeFilterer;
 import org.opensearch.ad.util.RestHandlerUtils;
 import org.opensearch.client.Client;
 import org.opensearch.cluster.service.ClusterService;
@@ -103,15 +103,17 @@ public class GetAnomalyDetectorTransportAction extends HandledTransportAction<Ge
     private final Set<EntityProfileName> allEntityProfileTypes;
     private final Set<EntityProfileName> defaultEntityProfileTypes;
     private final NamedXContentRegistry xContentRegistry;
+    private final DiscoveryNodeFilterer nodeFilter;
     private final TransportService transportService;
     private volatile Boolean filterByEnabled;
     private final ADTaskManager adTaskManager;
-    private final HashRing hashRing;
+    // private final HashRing hashRing;
 
     @Inject
     public GetAnomalyDetectorTransportAction(
         TransportService transportService,
-        HashRing hashRing,
+        DiscoveryNodeFilterer nodeFilter,
+        // HashRing hashRing,
         ActionFilters actionFilters,
         ClusterService clusterService,
         Client client,
@@ -136,11 +138,12 @@ public class GetAnomalyDetectorTransportAction extends HandledTransportAction<Ge
         this.defaultEntityProfileTypes = new HashSet<EntityProfileName>(defaultEntityProfiles);
 
         this.xContentRegistry = xContentRegistry;
+        this.nodeFilter = nodeFilter;
         filterByEnabled = AnomalyDetectorSettings.FILTER_BY_BACKEND_ROLES.get(settings);
         clusterService.getClusterSettings().addSettingsUpdateConsumer(FILTER_BY_BACKEND_ROLES, it -> filterByEnabled = it);
         this.transportService = transportService;
         this.adTaskManager = adTaskManager;
-        this.hashRing = hashRing;
+        // this.hashRing = hashRing;
     }
 
     @Override
@@ -219,7 +222,8 @@ public class GetAnomalyDetectorTransportAction extends HandledTransportAction<Ge
                     AnomalyDetectorProfileRunner profileRunner = new AnomalyDetectorProfileRunner(
                         client,
                         xContentRegistry,
-                        hashRing,
+                        nodeFilter,
+                        // hashRing,
                         AnomalyDetectorSettings.NUM_MIN_SAMPLES,
                         transportService,
                         adTaskManager

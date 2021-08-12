@@ -2243,7 +2243,8 @@ public class ADTaskManager {
      */
     public void maintainRunningHistoricalTasks(TransportService transportService, String requestId, int size) {
         // request id could be null, `+ ""` is for backward compatibility consideration
-        // Find owning node with highest AD version to make sure we only have 1 node maintain running historical tasks.
+        // Find owning node with highest AD version to make sure we only have 1 node maintain running historical tasks
+        // and we use the latest logic.
         Optional<DiscoveryNode> owningNode = hashRing.getOwningNodeWithHighestAdVersion(requestId + "");
         if (!owningNode.isPresent() || !clusterService.localNode().getId().equals(owningNode.get().getId())) {
             return;

@@ -35,7 +35,7 @@ import org.opensearch.Version;
 import org.opensearch.action.ActionRequest;
 import org.opensearch.action.ActionRequestValidationException;
 import org.opensearch.ad.cluster.ADVersionUtil;
-import org.opensearch.ad.common.exception.ADVersionConflictException;
+import org.opensearch.ad.common.exception.ADVersionException;
 import org.opensearch.ad.constant.CommonErrorMessages;
 import org.opensearch.ad.model.ADTask;
 import org.opensearch.ad.model.ADTaskAction;
@@ -78,7 +78,7 @@ public class ForwardADTaskRequest extends ActionRequest {
         this.user = user;
         this.adTaskAction = adTaskAction;
         if (!ADVersionUtil.versionCompatibleWithLocalNode(remoteAdVersion)) {
-            throw new ADVersionConflictException("Can't forward AD task request to node running AD version " + remoteAdVersion);
+            throw new ADVersionException("Can't forward AD task request to node running AD version " + remoteAdVersion);
         }
     }
 
@@ -104,7 +104,7 @@ public class ForwardADTaskRequest extends ActionRequest {
         }
         this.adTaskAction = in.readEnum(ADTaskAction.class);
         if (in.available() == 0) { // Old version on or before 1.0 will send less fields.
-            throw new ADVersionConflictException("Can't process ForwardADTaskRequest of old version");
+            throw new ADVersionException("Can't process ForwardADTaskRequest of old version");
         }
         if (in.readBoolean()) {
             this.adTask = new ADTask(in);

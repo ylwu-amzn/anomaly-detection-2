@@ -72,7 +72,6 @@ import org.opensearch.ad.transport.ProfileAction;
 import org.opensearch.ad.transport.ProfileRequest;
 import org.opensearch.ad.transport.handler.AnomalyIndexHandler;
 import org.opensearch.client.Client;
-import org.opensearch.cluster.node.DiscoveryNode;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.xcontent.LoggingDeprecationHandler;
 import org.opensearch.common.xcontent.NamedXContentRegistry;
@@ -524,21 +523,22 @@ public class AnomalyDetectorJobRunner implements ScheduledJobRunner {
         if (response.isHCDetector() != null
             && response.isHCDetector()
             && !adTaskManager.skipUpdateHCRealtimeTask(detectorId, response.getError())) {
-            DiscoveryNode[] dataNodes = hashRing.getEligibleDataNodes();
-            Set<DetectorProfileName> profiles = new HashSet<>();
-            profiles.add(DetectorProfileName.INIT_PROGRESS);
-            ProfileRequest profileRequest = new ProfileRequest(detectorId, profiles, true, dataNodes);
-            client.execute(ProfileAction.INSTANCE, profileRequest, ActionListener.wrap(r -> {
-                log.debug("Update latest realtime task for HC detector {}, total updates: {}", detectorId, r.getTotalUpdates());
-                updateLatestRealtimeTask(
-                    jobParameter,
-                    detectorId,
-                    null,
-                    r.getTotalUpdates(),
-                    response.getDetectorIntervalInMinutes(),
-                    response.getError()
-                );
-            }, e -> { log.error("Failed to get init progress profile for " + detectorId, e); }));
+            hashRing.getAllEligibleDataNodesWithKnownAdVersion(dataNodes -> {
+                Set<DetectorProfileName> profiles = new HashSet<>();
+                profiles.add(DetectorProfileName.INIT_PROGRESS);
+                ProfileRequest profileRequest = new ProfileRequest(detectorId, profiles, true, dataNodes);
+                client.execute(ProfileAction.INSTANCE, profileRequest, ActionListener.wrap(r -> {
+                    log.debug("Update latest realtime task for HC detector {}, total updates: {}", detectorId, r.getTotalUpdates());
+                    updateLatestRealtimeTask(
+                        jobParameter,
+                        detectorId,
+                        null,
+                        r.getTotalUpdates(),
+                        response.getDetectorIntervalInMinutes(),
+                        response.getError()
+                    );
+                }, e -> { log.error("Failed to get init progress profile for " + detectorId, e); }));
+            }, ActionListener.wrap(r -> {}, e -> log.error("Failed to get all eligible data nodes", e)));
         } else {
             log.debug("Update latest realtime task for SINGLE detector {}, total updates: {}", detectorId, response.getRcfTotalUpdates());
             updateLatestRealtimeTask(

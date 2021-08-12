@@ -14,13 +14,13 @@ package org.opensearch.ad.common.exception;
 /**
  * AD version incompatible exception.
  */
-public class ADVersionConflictException extends AnomalyDetectionException {
+public class ADVersionException extends AnomalyDetectionException {
 
-    public ADVersionConflictException(String message) {
+    public ADVersionException(String message) {
         super(message);
     }
 
-    public ADVersionConflictException(String anomalyDetectorId, String message) {
+    public ADVersionException(String anomalyDetectorId, String message) {
         super(anomalyDetectorId, message);
     }
 }

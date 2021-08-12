@@ -94,9 +94,16 @@ public class ADClusterEventListener implements ClusterStateListener {
         }
 
         try {
-            // if (!hashRing.isFirstClusterEventTriggered()) {
-            // hashRing.buildCirclesOnAdVersions();
-            // }
+            if (!hashRing.isAdVersionHashRingInited()) {
+                hashRing
+                    .buildCirclesOnAdVersions(
+                        ActionListener
+                            .wrap(
+                                r -> { LOG.info("Init AD version hash ring successfully"); },
+                                e -> { LOG.error("Failed to init AD version hash ring"); }
+                            )
+                    );
+            }
             Delta delta = event.nodesDelta();
 
             // Check whether it was a data node that was removed
