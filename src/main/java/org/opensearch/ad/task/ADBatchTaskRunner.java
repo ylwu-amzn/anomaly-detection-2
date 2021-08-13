@@ -40,7 +40,6 @@ import static org.opensearch.ad.model.ADTask.WORKER_NODE_FIELD;
 import static org.opensearch.ad.settings.AnomalyDetectorSettings.BATCH_TASK_PIECE_INTERVAL_SECONDS;
 import static org.opensearch.ad.settings.AnomalyDetectorSettings.BATCH_TASK_PIECE_SIZE;
 import static org.opensearch.ad.settings.AnomalyDetectorSettings.MAX_BATCH_TASK_PER_NODE;
-import static org.opensearch.ad.settings.AnomalyDetectorSettings.MAX_PAGE_SIZE_FOR_HISTORICAL_ANALYSIS;
 import static org.opensearch.ad.settings.AnomalyDetectorSettings.MAX_RUNNING_ENTITIES_PER_DETECTOR_FOR_HISTORICAL_ANALYSIS;
 import static org.opensearch.ad.settings.AnomalyDetectorSettings.MAX_TOP_ENTITIES_FOR_HISTORICAL_ANALYSIS;
 import static org.opensearch.ad.settings.AnomalyDetectorSettings.MAX_TOP_ENTITIES_LIMIT_FOR_HISTORICAL_ANALYSIS;
@@ -316,23 +315,23 @@ public class ADBatchTaskRunner {
                 adTask.getDetectionDateRange().getStartTime().toEpochMilli(),
                 MAX_TOP_ENTITIES_LIMIT_FOR_HISTORICAL_ANALYSIS
             );
-            long interval = adTask.getDetector().getDetectorIntervalInMilliseconds();
+            long detectorInterval = adTask.getDetector().getDetectorIntervalInMilliseconds();
             logger
                 .debug(
                     "start to search top entities at {}, data start time: {}, data end time: {}, interval: {}",
                     System.currentTimeMillis(),
                     dataStartTime,
                     dataEndTime,
-                    interval
+                    detectorInterval
                 );
             if (adTask.getDetector().isMultiCategoryDetector()) {
                 searchTopEntitiesForMultiCategoryHC(
                     adTask,
                     priorityTracker,
                     dataEndTime,
-                    Math.max((dataEndTime - dataStartTime) / MAX_TOP_ENTITY_SEARCH_BUCKETS, interval),
+                    Math.max((dataEndTime - dataStartTime) / MAX_TOP_ENTITY_SEARCH_BUCKETS, detectorInterval),
                     dataStartTime,
-                    dataStartTime + interval,
+                    dataStartTime + detectorInterval,
                     internalHCListener
                 );
             } else {
@@ -340,9 +339,9 @@ public class ADBatchTaskRunner {
                     adTask,
                     priorityTracker,
                     dataEndTime,
-                    Math.max((dataEndTime - dataStartTime) / MAX_TOP_ENTITY_SEARCH_BUCKETS, interval),
+                    Math.max((dataEndTime - dataStartTime) / MAX_TOP_ENTITY_SEARCH_BUCKETS, detectorInterval),
                     dataStartTime,
-                    dataStartTime + interval,
+                    dataStartTime + detectorInterval,
                     internalHCListener
                 );
             }
@@ -353,7 +352,7 @@ public class ADBatchTaskRunner {
         ADTask adTask,
         PriorityTracker priorityTracker,
         long detectionEndTime,
-        long interval,
+        long bucketInterval,
         long dataStartTime,
         long dataEndTime,
         ActionListener<String> internalHCListener
@@ -368,9 +367,9 @@ public class ADBatchTaskRunner {
                     adTask,
                     priorityTracker,
                     detectionEndTime,
-                    interval,
+                    bucketInterval,
                     dataEndTime,
-                    dataEndTime + interval,
+                    dataEndTime + bucketInterval,
                     internalHCListener
                 );
             } else {
@@ -391,14 +390,16 @@ public class ADBatchTaskRunner {
             logger.error("Failed to get top entities for detector " + adTask.getDetectorId(), e);
             internalHCListener.onFailure(e);
         });
+
+        int minimumDocCount = Math.min((int) (bucketInterval / adTask.getDetector().getDetectorIntervalInMilliseconds()), 1);
         searchFeatureDao
             .getHighestCountEntities(
                 adTask.getDetector(),
                 dataStartTime,
                 dataEndTime,
                 MAX_TOP_ENTITIES_LIMIT_FOR_HISTORICAL_ANALYSIS,
-                1,
-                MAX_PAGE_SIZE_FOR_HISTORICAL_ANALYSIS,
+                minimumDocCount,
+                MAX_TOP_ENTITIES_LIMIT_FOR_HISTORICAL_ANALYSIS,
                 topEntitiesListener
             );
     }
@@ -426,7 +427,7 @@ public class ADBatchTaskRunner {
         String topEntitiesAgg = "topEntities";
         AggregationBuilder aggregation = new TermsAggregationBuilder(topEntitiesAgg)
             .field(adTask.getDetector().getCategoryField().get(0))
-            .size(MAX_PAGE_SIZE_FOR_HISTORICAL_ANALYSIS);
+            .size(MAX_TOP_ENTITIES_LIMIT_FOR_HISTORICAL_ANALYSIS);
         sourceBuilder.aggregation(aggregation).size(0);
         SearchRequest searchRequest = new SearchRequest();
         searchRequest.source(sourceBuilder);
@@ -789,12 +790,6 @@ public class ADBatchTaskRunner {
                 adTaskManager.cleanDetectorCache(adTask, transportService, () -> handleException(adTask, e));
             } else {
                 adTaskManager.entityTaskDone(adTask, e, transportService);
-                threadPool
-                    .schedule(
-                        () -> startNewEntityTaskLane(adTask, transportService),
-                        TimeValue.timeValueSeconds(SLEEP_TIME_FOR_NEXT_ENTITY_TASK_IN_MILLIS),
-                        AD_BATCH_TASK_THREAD_POOL_NAME
-                    );
                 handleException(adTask, e);
             }
         });

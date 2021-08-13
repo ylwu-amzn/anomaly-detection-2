@@ -459,7 +459,6 @@ public final class AnomalyDetectorSettings {
         );
 
     // Maximum number of entities we support for historical analysis.
-    public static final int MAX_PAGE_SIZE_FOR_HISTORICAL_ANALYSIS = 10_000;
     public static final int MAX_TOP_ENTITIES_LIMIT_FOR_HISTORICAL_ANALYSIS = 10_000;
     public static final Setting<Integer> MAX_TOP_ENTITIES_FOR_HISTORICAL_ANALYSIS = Setting
         .intSetting(
@@ -763,4 +762,15 @@ public final class AnomalyDetectorSettings {
 
     // preview timeout in terms of milliseconds
     public static final long PREVIEW_TIMEOUT_IN_MILLIS = 60_000;
+
+    // ======================================
+    // cleanup resouce setting
+    // ======================================
+    public static final Setting<Boolean> DELETE_AD_RESULT_WHEN_DELETE_DETECTOR = Setting
+        .boolSetting(
+            "plugins.anomaly_detection.delete_anomaly_result_when_delete_detector",
+            false,
+            Setting.Property.NodeScope,
+            Setting.Property.Dynamic
+        );
 }
