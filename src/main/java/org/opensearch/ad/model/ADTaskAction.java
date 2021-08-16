@@ -39,6 +39,10 @@ public enum ADTaskAction {
     PUSH_BACK_ENTITY,
     // Clean stale entities in running entity queue, for example the work node crashed and fail to remove entity
     CLEAN_STALE_RUNNING_ENTITIES,
+    // Scale entity task lane
+    SCALE_ENTITY_TASK_LANE,
     // Check if there is available task slot
-    CHECK_TASK_SLOT
+    APPLY_FOR_TASK_SLOTS,
+    // Check current task slot state and scale
+    SCALE_TASK_SLOTS,
 }

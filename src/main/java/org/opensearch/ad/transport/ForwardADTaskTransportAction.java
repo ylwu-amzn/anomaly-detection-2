@@ -33,7 +33,6 @@ import static org.opensearch.ad.model.ADTask.TASK_PROGRESS_FIELD;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Semaphore;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -41,7 +40,6 @@ import org.opensearch.OpenSearchStatusException;
 import org.opensearch.action.ActionListener;
 import org.opensearch.action.support.ActionFilters;
 import org.opensearch.action.support.HandledTransportAction;
-import org.opensearch.ad.common.exception.AnomalyDetectionException;
 import org.opensearch.ad.model.ADTask;
 import org.opensearch.ad.model.ADTaskAction;
 import org.opensearch.ad.model.ADTaskState;
@@ -62,6 +60,7 @@ public class ForwardADTaskTransportAction extends HandledTransportAction<Forward
     private final TransportService transportService;
     private final ADTaskManager adTaskManager;
     private final ADTaskCacheManager adTaskCacheManager;
+    private final Semaphore scaleEntityTaskLane;
 
     @Inject
     public ForwardADTaskTransportAction(
@@ -74,6 +73,7 @@ public class ForwardADTaskTransportAction extends HandledTransportAction<Forward
         this.adTaskManager = adTaskManager;
         this.transportService = transportService;
         this.adTaskCacheManager = adTaskCacheManager;
+        this.scaleEntityTaskLane = new Semaphore(1);
     }
 
     @Override
@@ -88,9 +88,13 @@ public class ForwardADTaskTransportAction extends HandledTransportAction<Forward
         String entityValue = adTaskManager.convertEntityToString(adTask);
 
         switch (adTaskAction) {
-            case CHECK_TASK_SLOT:
+            case APPLY_FOR_TASK_SLOTS:
                 logger.info("111111111111111111111111111111: received check task slot action");
-                adTaskManager.checkTaskSlots(detector, detectionDateRange, user, transportService, listener);
+                adTaskManager.checkTaskSlots(adTask, detector, detectionDateRange, user, ADTaskAction.START, transportService, listener);
+                break;
+            case SCALE_TASK_SLOTS:
+                logger.info("7777777777777777777777777777777777777777 check if we can scale task slots ");
+                adTaskManager.checkTaskSlots(adTask, detector, detectionDateRange, user, ADTaskAction.SCALE_ENTITY_TASK_LANE, transportService, listener);
                 break;
             case START:
                 // Start historical analysis for detector
@@ -115,6 +119,23 @@ public class ForwardADTaskTransportAction extends HandledTransportAction<Forward
                         adTaskManager.setHCDetectorTaskDone(adTask, state, listener);
                     } else {
                         logger.debug("Run next entity for detector " + detectorId);
+                        adTaskCacheManager.refreshHCDetectorTaskSlot(detectorId);
+                        if (adTaskCacheManager.getEntityTaskLanes(detectorId) <= 0 && adTaskCacheManager.isDetectorTaskSlotScalable(detectorId) ) {
+                            logger.info("7777777777777777777777777777777777777777 we start to scale entity task lane ------------------------");
+                            if (scaleEntityTaskLane.tryAcquire(1)) {
+                                try {
+                                    adTaskManager.forwardScaleTaskSlotRequestToLeadNode(adTask, transportService, ActionListener.runAfter(listener, () -> {
+                                        logger.info("7777777777777777777777777777777777777777 start to release semaphor scaleEntityTaskLane");
+                                        scaleEntityTaskLane.release();
+                                    }));
+                                } catch (Exception e) {
+                                    logger.error("7777777777777777777777777777777777777777 eeeee", e);
+                                    scaleEntityTaskLane.release();
+                                }
+
+                            }
+
+                        }
                         adTaskManager.runNextEntityForHCADHistorical(adTask, listener);
                         adTaskManager
                             .updateADHCDetectorTask(
@@ -164,6 +185,22 @@ public class ForwardADTaskTransportAction extends HandledTransportAction<Forward
                     logger.warn("Can only push back entity task");
                     listener.onFailure(new IllegalArgumentException("Can only push back entity task"));
                 }
+                break;
+            case SCALE_ENTITY_TASK_LANE:
+                // Push back entity to pending entities queue and run next entity.
+                logger.info("7777777777777777777777777777777777777777 scale entity task lane ");
+                Integer newApprovedTaskSlots = request.getApprovedTaskSLots();
+//                int detectorTaskSlots = adTaskCacheManager.getDetectorTaskSlots(detectorId);
+                if (newApprovedTaskSlots != null && newApprovedTaskSlots > 0) {
+                    int newSlots = Math.min(newApprovedTaskSlots, adTaskCacheManager.detectorTaskSlotScalableDelta(detectorId));
+                    if (newSlots > 0) {
+                        logger.info("7777777777777777777777777777777777777777 newSlots is {} ", newSlots);
+                        adTaskCacheManager.setAllowedRunningEntities(detectorId, newSlots);
+                        adTaskCacheManager.addDetectorTaskSlots(detectorId, newSlots);
+                    }
+                }
+                logger.info("7777777777777777777777777777777777777777 scale entity task lane  done    ....aaa");
+                listener.onResponse(new AnomalyDetectorJobResponse(detector.getDetectorId(), 0, 0, 0, RestStatus.OK));
                 break;
             case CANCEL:
                 // Cancel HC detector's historical analysis.

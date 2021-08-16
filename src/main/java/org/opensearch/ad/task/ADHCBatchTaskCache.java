@@ -125,6 +125,10 @@ public class ADHCBatchTaskCache {
         return this.entityTaskLanes.getAndDecrement();
     }
 
+    public int getEntityTaskLanes() {
+        return this.entityTaskLanes.get();
+    }
+
     public void setTopEntitiesInited(boolean inited) {
         this.topEntitiesInited = inited;
     }
@@ -193,6 +197,10 @@ public class ADHCBatchTaskCache {
 
     public int getRunningEntityCount() {
         return this.runningEntities.size();
+    }
+
+    public int getUnfinishedEntityCount() {
+        return this.runningEntities.size() + this.tempEntities.size() + this.pendingEntities.size();
     }
 
     public int getTempEntityCount() {

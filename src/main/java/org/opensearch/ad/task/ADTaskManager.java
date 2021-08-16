@@ -139,7 +139,6 @@ import org.opensearch.ad.transport.ADBatchAnomalyResultAction;
 import org.opensearch.ad.transport.ADBatchAnomalyResultRequest;
 import org.opensearch.ad.transport.ADCancelTaskAction;
 import org.opensearch.ad.transport.ADCancelTaskRequest;
-import org.opensearch.ad.transport.ADStatsNodeResponse;
 import org.opensearch.ad.transport.ADStatsNodesAction;
 import org.opensearch.ad.transport.ADStatsRequest;
 import org.opensearch.ad.transport.ADTaskProfileAction;
@@ -339,9 +338,11 @@ public class ADTaskManager {
      * @param transportService transport service
      * @param listener action listener
      */
-    public void checkTaskSlots(AnomalyDetector detector,
+    public void checkTaskSlots(ADTask adTask,
+            AnomalyDetector detector,
                                 DetectionDateRange detectionDateRange,
                                 User user,
+                                ADTaskAction targetActionOfTaskSlotChecking,
                                 TransportService transportService,
                                 ActionListener<AnomalyDetectorJobResponse> listener) {
         if (!checkingTaskSlot.tryAcquire(1)){
@@ -370,6 +371,12 @@ public class ADTaskManager {
                 int maxAvailableAdTaskSlots = maxAdTaskSlots - totalUsedTaskSlots;
                 this.taskSlots.set(maxAvailableAdTaskSlots); //TODO: don't need this line, remove taskSlots
 
+                if (ADTaskAction.SCALE_ENTITY_TASK_LANE == targetActionOfTaskSlotChecking) {
+                    logger.info("7777777777777777777777777777777777777777 LEAD NODE:  maxAvailableAdTaskSlots: {} ------------------------", maxAvailableAdTaskSlots);
+                    forwardToCoordinatingNode(adTask, detector, detectionDateRange, user, targetActionOfTaskSlotChecking, transportService, wrappedActionListener, maxAvailableAdTaskSlots);
+                    return;
+                }
+
                 long dataStartTime = detectionDateRange.getStartTime().toEpochMilli();
                 long dataEndTime = detectionDateRange.getEndTime().toEpochMilli();
 
@@ -382,12 +389,11 @@ public class ADTaskManager {
                                         ActionListener.wrap(topEntities -> {
                                             int approvedTaskSlots = Math.min(maxAvailableAdTaskSlots, topEntities.size());
                                             // Send task to run on coordinating node
-                                            startHistoricalAnalysis(detector, detectionDateRange, user, approvedTaskSlots, transportService, wrappedActionListener);
+                                            forwardToCoordinatingNode(adTask, detector, detectionDateRange, user, targetActionOfTaskSlotChecking, transportService, wrappedActionListener, approvedTaskSlots);
                                         }, e -> {
                                             logger.error("Failed to get top entities for " + detector.getDetectorId(), e);
                                             wrappedActionListener.onFailure(e);})
                                 );
-
                     } else {
                         logger.info("1111111111111111111111111111111111111111: this is a multi entity detector");
                         RangeQueryBuilder rangeQueryBuilder = new RangeQueryBuilder(detector.getTimeField()).gte(dataStartTime).lte(dataEndTime).format("epoch_millis");
@@ -405,19 +411,36 @@ public class ADTaskManager {
                             logger.info("111111111111111111111111111111: topEntitiesSize : {}, maxAvailableAdTaskSlots: {}, approvedTaskSlots: {}",
                                     topEntitiesSize, maxAvailableAdTaskSlots, approvedTaskSlots);
                             // Send task to run on coordinating node
-                            startHistoricalAnalysis(detector, detectionDateRange, user, approvedTaskSlots, transportService, wrappedActionListener);
+                            forwardToCoordinatingNode(adTask, detector, detectionDateRange, user, targetActionOfTaskSlotChecking, transportService, wrappedActionListener, approvedTaskSlots);
+//                            startHistoricalAnalysis(detector, detectionDateRange, user, approvedTaskSlots, transportService, wrappedActionListener);
 //                            wrappedActionListener.onResponse(maxRunningEntities);
                         }, ex -> {wrappedActionListener.onFailure(ex);}));
                     }
                 } else {
                     // Send task to run on coordinating node
-                    startHistoricalAnalysis(detector, detectionDateRange, user, 1, transportService, wrappedActionListener);
+                    forwardToCoordinatingNode(adTask, detector, detectionDateRange, user, targetActionOfTaskSlotChecking, transportService, wrappedActionListener, 1);
+//                    startHistoricalAnalysis(detector, detectionDateRange, user, 1, transportService, wrappedActionListener);
                 }
             }, exception -> {
                 logger.error("Failed to get node's task stats", exception);
                 wrappedActionListener.onFailure(exception);
             }));
         }, wrappedActionListener);
+    }
+
+    private void forwardToCoordinatingNode(ADTask adTask, AnomalyDetector detector, DetectionDateRange detectionDateRange, User user, ADTaskAction targetActionOfTaskSlotChecking, TransportService transportService, ActionListener<AnomalyDetectorJobResponse> wrappedActionListener, int approvedTaskSlots) {
+        switch (targetActionOfTaskSlotChecking) {
+            case START:
+                startHistoricalAnalysis(detector, detectionDateRange, user, approvedTaskSlots, transportService, wrappedActionListener);
+                break;
+            case SCALE_ENTITY_TASK_LANE:
+                logger.info("7777777777777777777777777777777777777777 forward to coordinating node :  SCALE_ENTITY_TASK_LANE ------------------------");
+                scaleTaskLaneOnCoordinatingNode(adTask, transportService, wrappedActionListener);
+                break;
+            default:
+                wrappedActionListener.onFailure(new AnomalyDetectionException("Unknown task action " + targetActionOfTaskSlotChecking));
+                break;
+        }
     }
 
     /**
@@ -569,12 +592,50 @@ public class ADTaskManager {
                             .sendRequest(
                                     node.get(),
                                     ForwardADTaskAction.NAME,
-                                    new ForwardADTaskRequest(detector, detectionDateRange, user, ADTaskAction.CHECK_TASK_SLOT, null, hashRing.getAdVersion(clusterService.localNode().getId())),
+                                    new ForwardADTaskRequest(detector, detectionDateRange, user, ADTaskAction.APPLY_FOR_TASK_SLOTS, null, hashRing.getAdVersion(clusterService.localNode().getId())),
                                     transportRequestOptions,
                                     new ActionListenerResponseHandler<>(listener, AnomalyDetectorJobResponse::new)
                             );
                 }, listener);
+    }
 
+    public void forwardScaleTaskSlotRequestToLeadNode(
+            ADTask adTask,
+            TransportService transportService,
+            ActionListener<AnomalyDetectorJobResponse> listener
+    ) {
+        hashRing.getOwningNodeWithSameLocalAdVersion("aa",
+                node -> {
+                    if (!node.isPresent()) {
+                        listener.onFailure(new AnomalyDetectionException("Can't find lead node"));
+                        return;
+                    }
+                    logger.info("111111111111111111111111111111: forward scale task slots to lead node: " + node.get().getId() + ", " + node.get().getAddress());
+                    transportService
+                            .sendRequest(
+                                    node.get(),
+                                    ForwardADTaskAction.NAME,
+                                    new ForwardADTaskRequest(adTask, ADTaskAction.SCALE_TASK_SLOTS),
+                                    transportRequestOptions,
+                                    new ActionListenerResponseHandler<>(listener, AnomalyDetectorJobResponse::new)
+                            );
+                }, listener);
+    }
+
+    protected void scaleTaskLaneOnCoordinatingNode(
+            ADTask adTask,
+            TransportService transportService,
+            ActionListener<AnomalyDetectorJobResponse> listener
+    ) {
+        DiscoveryNode coordinatingNode = getCoordinatingNode(adTask);
+        transportService
+                .sendRequest(
+                        coordinatingNode,
+                        ForwardADTaskAction.NAME,
+                        new ForwardADTaskRequest(adTask, ADTaskAction.SCALE_ENTITY_TASK_LANE),
+                        transportRequestOptions,
+                        new ActionListenerResponseHandler<>(listener, AnomalyDetectorJobResponse::new)
+                );
     }
 
     private DiscoveryNode getCoordinatingNode(ADTask adTask) {
@@ -2646,4 +2707,6 @@ public class ADTaskManager {
     public int getLocalADTaskUsedSlot() {
         return adTaskCacheManager.getTotalADTaskUsedSlots();
     }
+    
+
 }

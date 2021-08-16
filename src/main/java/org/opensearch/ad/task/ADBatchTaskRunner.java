@@ -275,6 +275,7 @@ public class ADBatchTaskRunner {
                 // soft limit to control how many entities to run in parallel per HC detector.
                 int maxRunningEntities = Math
                         .min(totalEntities, Math.min(numberOfEligibleDataNodes * maxAdBatchTaskPerNode, maxRunningEntitiesPerDetector));
+                adTaskCacheManager.setDetectorTaskLaneLimit(detectorId, maxRunningEntities);
                 maxRunningEntities = Math.min(maxRunningEntities, adTaskCacheManager.getDetectorTaskSlots(detectorId));
                 logger.info("22222222223333333333 ylwudebug100 totalEntities: {}, numberOfEligibleDataNodes: {}, maxAdBatchTaskPerNode: {}, maxRunningEntitiesPerDetector: {}, maxRunningEntities: {}, getDetectorTaskSlots: {}",
                         totalEntities, numberOfEligibleDataNodes, maxAdBatchTaskPerNode, maxRunningEntitiesPerDetector, maxRunningEntities, adTaskCacheManager.getDetectorTaskSlots(detectorId));
@@ -699,10 +700,6 @@ public class ADBatchTaskRunner {
                     // soft limit to control how many entities to run in parallel per HC detector.
                     int maxRunningEntities = Math
                             .min(adTaskCacheManager.getTopEntityCount(detectorId), Math.min(numberOfEligibleDataNodes * maxAdBatchTaskPerNode, maxRunningEntitiesPerDetector));
-                    logger.info("1111111111111111111111111111111111111111 totalEntities: {}, numberOfEligibleDataNodes: {}, maxAdBatchTaskPerNode: {}, maxRunningEntitiesPerDetector: {}",
-                            numberOfEligibleDataNodes, maxRunningEntities);
-                    logger.info("1111111111111111111111111111111111111111 numberOfEligibleDataNodes: {}, maxRunningEntities {}",
-                            numberOfEligibleDataNodes, maxRunningEntities);
                     forwardOrExecuteADTask(adTask, transportService, internalHCDelegatedListener);
                     // As we have started one entity task, need to minus 1 for max allowed running entities.
                     adTaskCacheManager.setAllowedRunningEntities(adTask.getDetectorId(), maxRunningEntities - 1);

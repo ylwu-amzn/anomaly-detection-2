@@ -94,7 +94,7 @@ public class ADTaskCacheManager {
     // This field is to cache all realtime tasks. Key is detector id
     private Map<String, ADRealtimeTaskCache> realtimeTaskCaches;
 
-    private Map<String, Integer> detectorTaskSlots;
+    private Map<String, ADTaskSlotLimit> detectorTaskSlotLimit;
 
     /**
      * Constructor to create AD task cache manager.
@@ -115,7 +115,7 @@ public class ADTaskCacheManager {
         this.realtimeTaskCaches = new ConcurrentHashMap<>();
         this.deletedDetectorTasks = new ConcurrentLinkedQueue<>();
         this.deletedDetectors = new ConcurrentLinkedQueue<>();
-        this.detectorTaskSlots = new ConcurrentHashMap<>();
+        this.detectorTaskSlotLimit = new ConcurrentHashMap<>();
     }
 
     /**
@@ -397,7 +397,7 @@ public class ADTaskCacheManager {
         } else {
             logger.info("Detector is not in AD task coordinating node cache");
         }
-        detectorTaskSlots.remove(detectorId);
+        detectorTaskSlotLimit.remove(detectorId);
     }
 
     /**
@@ -598,12 +598,66 @@ public class ADTaskCacheManager {
     public void setAllowedRunningEntities(String detectorId, int allowedRunningEntities) {
         getExistingHCTaskCache(detectorId).setEntityTaskLanes(allowedRunningEntities);
     }
-    public void setDetectorTaskSLots(String detectorId, int taskSlots) {
-        this.detectorTaskSlots.put(detectorId, taskSlots);
+
+    public synchronized void setDetectorTaskSLots(String detectorId, int taskSlots) {
+        ADTaskSlotLimit adTaskSlotLimit = detectorTaskSlotLimit.computeIfAbsent(detectorId, key -> new ADTaskSlotLimit(taskSlots, taskSlots));
+        adTaskSlotLimit.setDetectorTaskSlots(taskSlots);
+//        this.detectorTaskSlotLimit.put(detectorId, taskSlots);
+    }
+
+    public synchronized void addDetectorTaskSlots(String detectorId, int newTaskSlots) {
+        ADTaskSlotLimit adTaskSlotLimit = detectorTaskSlotLimit.get(detectorId);
+        if (adTaskSlotLimit != null) {
+            adTaskSlotLimit.setDetectorTaskSlots(adTaskSlotLimit.getDetectorTaskSlots() + newTaskSlots);
+        }
+    }
+
+    public synchronized void setDetectorTaskLaneLimit(String detectorId, int taskLaneLimit) {
+        ADTaskSlotLimit adTaskSlotLimit = detectorTaskSlotLimit.get(detectorId);
+        if (adTaskSlotLimit != null) {
+            adTaskSlotLimit.setDetectorTaskLaneLimit(taskLaneLimit);
+        }
+//        this.detectorTaskSlotLimit.put(detectorId, taskSlots);
     }
 
     public int getDetectorTaskSlots(String detectorId) {
-        return detectorTaskSlots.getOrDefault(detectorId, 0);
+        ADTaskSlotLimit taskSlotLimit = detectorTaskSlotLimit.get(detectorId);
+        if (taskSlotLimit != null) {
+            return taskSlotLimit.getDetectorTaskSlots();
+        }
+        return 0;
+    }
+
+    public boolean isDetectorTaskSlotScalable(String detectorId) {
+        ADTaskSlotLimit taskSlotLimit = detectorTaskSlotLimit.get(detectorId);
+        ADHCBatchTaskCache taskCache = hcTaskCaches.get(detectorId);
+        if (taskSlotLimit != null && taskCache != null) {
+            return taskSlotLimit.getDetectorTaskSlots() < taskSlotLimit.getDetectorTaskLaneLimit() && taskCache.getUnfinishedEntityCount() > taskSlotLimit.getDetectorTaskSlots();
+        }
+        return false;
+    }
+
+    public int detectorTaskSlotScalableDelta(String detectorId) {
+        ADTaskSlotLimit taskSlotLimit = detectorTaskSlotLimit.get(detectorId);
+        ADHCBatchTaskCache taskCache = hcTaskCaches.get(detectorId);
+        if (taskSlotLimit != null && taskCache != null) {
+            return Math.min(taskSlotLimit.getDetectorTaskLaneLimit() - taskSlotLimit.getDetectorTaskSlots(), taskCache.getUnfinishedEntityCount() - taskSlotLimit.getDetectorTaskSlots());
+//            return taskSlotLimit.getDetectorTaskSlots() < taskSlotLimit.getDetectorTaskLaneLimit() && taskCache.getUnfinishedEntityCount() > taskSlotLimit.getDetectorTaskSlots();
+        }
+        return 0;
+    }
+
+    public synchronized void refreshHCDetectorTaskSlot(String detectorId) {
+        ADHCBatchTaskCache batchTaskCache = hcTaskCaches.get(detectorId);
+        int taskSlots = this.getDetectorTaskSlots(detectorId);
+        if (batchTaskCache != null) {
+            int unfinishedEntityCount = batchTaskCache.getUnfinishedEntityCount();
+            if (taskSlots > unfinishedEntityCount) {
+                this.detectorTaskSlotLimit.get(detectorId).setDetectorTaskSlots(unfinishedEntityCount);
+//                this.detectorTaskSlotLimit.put(detectorId, unfinishedEntityCount);
+                logger.info("6666666666666666666666666666666666666666 refresh detector task slots as {}, for detector: {}", unfinishedEntityCount, detectorId);
+            }
+        }
     }
 
     /**
@@ -614,6 +668,10 @@ public class ADTaskCacheManager {
      */
     public synchronized int getAndDecreaseEntityTaskLanes(String detectorId) {
         return getExistingHCTaskCache(detectorId).getAndDecreaseEntityTaskLanes();
+    }
+
+    public synchronized int getEntityTaskLanes(String detectorId) {
+        return getExistingHCTaskCache(detectorId).getEntityTaskLanes();
     }
 
     private ADHCBatchTaskCache getExistingHCTaskCache(String detectorId) {
@@ -999,8 +1057,8 @@ public class ADTaskCacheManager {
 
     public int getTotalADTaskUsedSlots() {
         int totalADTaskUsedSlots = 0;
-        for (Map.Entry<String, Integer> entry: detectorTaskSlots.entrySet()) {
-            totalADTaskUsedSlots += entry.getValue();
+        for (Map.Entry<String, ADTaskSlotLimit> entry: detectorTaskSlotLimit.entrySet()) {
+            totalADTaskUsedSlots += entry.getValue().getDetectorTaskSlots();
         }
         return totalADTaskUsedSlots;
 //        return detectorTaskSlots.entrySet().stream().mapToInt(entry -> entry.getValue()).sum();
