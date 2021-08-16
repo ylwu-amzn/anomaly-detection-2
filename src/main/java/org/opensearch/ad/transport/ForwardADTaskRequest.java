@@ -51,18 +51,22 @@ public class ForwardADTaskRequest extends ActionRequest {
     private DetectionDateRange detectionDateRange;
     private List<String> staleRunningEntities;
     private User user;
+    private Integer approvedTaskSLots;
     private ADTaskAction adTaskAction;
+//    private Integer maxRunningEntities;
 
     public ForwardADTaskRequest(
         AnomalyDetector detector,
         DetectionDateRange detectionDateRange,
         User user,
         ADTaskAction adTaskAction,
+        Integer approvedTaskSLots,
         Version remoteAdVersion
     ) {
         this.detector = detector;
         this.detectionDateRange = detectionDateRange;
         this.user = user;
+        this.approvedTaskSLots = approvedTaskSLots;
         this.adTaskAction = adTaskAction;
         if (!ADVersionUtil.versionCompatible(remoteAdVersion)) {
             throw new ADVersionException("Can't forward AD task request to node running AD version " + remoteAdVersion);
@@ -99,6 +103,8 @@ public class ForwardADTaskRequest extends ActionRequest {
             this.detectionDateRange = new DetectionDateRange(in);
         }
         this.staleRunningEntities = in.readOptionalStringList();
+        approvedTaskSLots = in.readOptionalInt();
+//        this.maxRunningEntities = in.readOptionalInt();
     }
 
     @Override
@@ -126,6 +132,7 @@ public class ForwardADTaskRequest extends ActionRequest {
             out.writeBoolean(false);
         }
         out.writeOptionalStringCollection(staleRunningEntities);
+        out.writeOptionalInt(approvedTaskSLots);
     }
 
     @Override
@@ -167,5 +174,9 @@ public class ForwardADTaskRequest extends ActionRequest {
 
     public List<String> getStaleRunningEntities() {
         return staleRunningEntities;
+    }
+
+    public Integer getApprovedTaskSLots() {
+        return approvedTaskSLots;
     }
 }

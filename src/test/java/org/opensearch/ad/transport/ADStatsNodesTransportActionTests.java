@@ -120,8 +120,8 @@ public class ADStatsNodesTransportActionTests extends OpenSearchIntegTestCase {
             mock(TransportService.class),
             mock(ActionFilters.class),
             adStats,
-            jvmService
-        );
+            jvmService,
+            adTaskManager);
     }
 
     @Test

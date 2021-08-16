@@ -32,6 +32,8 @@ import static org.opensearch.ad.model.ADTask.TASK_PROGRESS_FIELD;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -39,6 +41,7 @@ import org.opensearch.OpenSearchStatusException;
 import org.opensearch.action.ActionListener;
 import org.opensearch.action.support.ActionFilters;
 import org.opensearch.action.support.HandledTransportAction;
+import org.opensearch.ad.common.exception.AnomalyDetectionException;
 import org.opensearch.ad.model.ADTask;
 import org.opensearch.ad.model.ADTaskAction;
 import org.opensearch.ad.model.ADTaskState;
@@ -47,6 +50,7 @@ import org.opensearch.ad.model.DetectionDateRange;
 import org.opensearch.ad.task.ADTaskCacheManager;
 import org.opensearch.ad.task.ADTaskManager;
 import org.opensearch.common.inject.Inject;
+import org.opensearch.commons.authuser.User;
 import org.opensearch.rest.RestStatus;
 import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
@@ -79,13 +83,19 @@ public class ForwardADTaskTransportAction extends HandledTransportAction<Forward
         DetectionDateRange detectionDateRange = request.getDetectionDateRange();
         String detectorId = detector.getDetectorId();
         ADTask adTask = request.getAdTask();
+        User user = request.getUser();
 
         String entityValue = adTaskManager.convertEntityToString(adTask);
 
         switch (adTaskAction) {
+            case CHECK_TASK_SLOT:
+                logger.info("111111111111111111111111111111: received check task slot action");
+                adTaskManager.checkTaskSlots(detector, detectionDateRange, user, transportService, listener);
+                break;
             case START:
                 // Start historical analysis for detector
-                adTaskManager.startHistoricalAnalysisTask(detector, detectionDateRange, request.getUser(), transportService, listener);
+                Integer approvedTaskSLots = request.getApprovedTaskSLots();
+                adTaskManager.startHistoricalAnalysisTask(detector, detectionDateRange, user, approvedTaskSLots, transportService, listener);
                 break;
             case FINISHED:
                 // Historical analysis finished, so we need to remove detector cache. Only single entity detectors use this.

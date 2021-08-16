@@ -269,13 +269,15 @@ public class ADBatchTaskRunner {
             logger.info("total top entities: {}", totalEntities);
             hashRing.getNodesWithSameLocalAdVersion(dataNodes -> {
                 int numberOfEligibleDataNodes = dataNodes.length;
+                String detectorId = adTask.getDetectorId();
                 // maxAdBatchTaskPerNode means how many task can run on per data node, which is hard limitation per node.
                 // maxRunningEntitiesPerDetector means how many entities can run per detector on whole cluster, which is
                 // soft limit to control how many entities to run in parallel per HC detector.
                 int maxRunningEntities = Math
                         .min(totalEntities, Math.min(numberOfEligibleDataNodes * maxAdBatchTaskPerNode, maxRunningEntitiesPerDetector));
-                logger.info("22222222223333333333 ylwudebug100 totalEntities: {}, numberOfEligibleDataNodes: {}, maxAdBatchTaskPerNode: {}, maxRunningEntitiesPerDetector: {}, maxRunningEntities: {}",
-                        totalEntities, numberOfEligibleDataNodes, maxAdBatchTaskPerNode, maxRunningEntitiesPerDetector, maxRunningEntities);
+                maxRunningEntities = Math.min(maxRunningEntities, adTaskCacheManager.getDetectorTaskSlots(detectorId));
+                logger.info("22222222223333333333 ylwudebug100 totalEntities: {}, numberOfEligibleDataNodes: {}, maxAdBatchTaskPerNode: {}, maxRunningEntitiesPerDetector: {}, maxRunningEntities: {}, getDetectorTaskSlots: {}",
+                        totalEntities, numberOfEligibleDataNodes, maxAdBatchTaskPerNode, maxRunningEntitiesPerDetector, maxRunningEntities, adTaskCacheManager.getDetectorTaskSlots(detectorId));
                 forwardOrExecuteADTask(adTask, transportService, listener);
                 // As we have started one entity task, need to minus 1 for max allowed running entities.
                 adTaskCacheManager.setAllowedRunningEntities(adTask.getDetectorId(), maxRunningEntities - 1);

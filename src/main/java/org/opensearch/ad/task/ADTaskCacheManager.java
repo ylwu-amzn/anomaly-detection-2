@@ -94,6 +94,8 @@ public class ADTaskCacheManager {
     // This field is to cache all realtime tasks. Key is detector id
     private Map<String, ADRealtimeTaskCache> realtimeTaskCaches;
 
+    private Map<String, Integer> detectorTaskSlots;
+
     /**
      * Constructor to create AD task cache manager.
      *
@@ -113,6 +115,7 @@ public class ADTaskCacheManager {
         this.realtimeTaskCaches = new ConcurrentHashMap<>();
         this.deletedDetectorTasks = new ConcurrentLinkedQueue<>();
         this.deletedDetectors = new ConcurrentLinkedQueue<>();
+        this.detectorTaskSlots = new ConcurrentHashMap<>();
     }
 
     /**
@@ -394,6 +397,7 @@ public class ADTaskCacheManager {
         } else {
             logger.info("Detector is not in AD task coordinating node cache");
         }
+        detectorTaskSlots.remove(detectorId);
     }
 
     /**
@@ -593,6 +597,13 @@ public class ADTaskCacheManager {
      */
     public void setAllowedRunningEntities(String detectorId, int allowedRunningEntities) {
         getExistingHCTaskCache(detectorId).setEntityTaskLanes(allowedRunningEntities);
+    }
+    public void setDetectorTaskSLots(String detectorId, int taskSlots) {
+        this.detectorTaskSlots.put(detectorId, taskSlots);
+    }
+
+    public int getDetectorTaskSlots(String detectorId) {
+        return detectorTaskSlots.getOrDefault(detectorId, 0);
     }
 
     /**
@@ -984,5 +995,14 @@ public class ADTaskCacheManager {
      */
     public synchronized void updateDetectorTaskState(String detectorId, String newState) {
         this.getOrCreateHCTaskCache(detectorId).setDetectorTaskState(newState);
+    }
+
+    public int getTotalADTaskUsedSlots() {
+        int totalADTaskUsedSlots = 0;
+        for (Map.Entry<String, Integer> entry: detectorTaskSlots.entrySet()) {
+            totalADTaskUsedSlots += entry.getValue();
+        }
+        return totalADTaskUsedSlots;
+//        return detectorTaskSlots.entrySet().stream().mapToInt(entry -> entry.getValue()).sum();
     }
 }
