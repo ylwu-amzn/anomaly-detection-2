@@ -57,7 +57,6 @@ import static org.opensearch.ad.model.AnomalyDetector.ANOMALY_DETECTORS_INDEX;
 import static org.opensearch.ad.model.AnomalyDetectorJob.ANOMALY_DETECTOR_JOB_INDEX;
 import static org.opensearch.ad.model.AnomalyResult.TASK_ID_FIELD;
 import static org.opensearch.ad.settings.AnomalyDetectorSettings.BATCH_TASK_PIECE_INTERVAL_SECONDS;
-import static org.opensearch.ad.settings.AnomalyDetectorSettings.DELETE_AD_RESULT_WHEN_DELETE_DETECTOR;
 import static org.opensearch.ad.settings.AnomalyDetectorSettings.MAX_OLD_AD_TASK_DOCS;
 import static org.opensearch.ad.settings.AnomalyDetectorSettings.MAX_OLD_AD_TASK_DOCS_PER_DETECTOR;
 import static org.opensearch.ad.settings.AnomalyDetectorSettings.NUM_MIN_SAMPLES;
@@ -197,7 +196,6 @@ public class ADTaskManager {
     private final HashRing hashRing;
     private volatile Integer maxOldAdTaskDocsPerDetector;
     private volatile Integer pieceIntervalSeconds;
-    private volatile boolean deleteADResultWhenDeleteDetector;
     private volatile TransportRequestOptions transportRequestOptions;
     private final ThreadPool threadPool;
     private static int DEFAULT_MAINTAIN_INTERVAL_IN_SECONDS = 5;
@@ -230,11 +228,6 @@ public class ADTaskManager {
 
         this.pieceIntervalSeconds = BATCH_TASK_PIECE_INTERVAL_SECONDS.get(settings);
         clusterService.getClusterSettings().addSettingsUpdateConsumer(BATCH_TASK_PIECE_INTERVAL_SECONDS, it -> pieceIntervalSeconds = it);
-
-        this.deleteADResultWhenDeleteDetector = DELETE_AD_RESULT_WHEN_DELETE_DETECTOR.get(settings);
-        clusterService
-            .getClusterSettings()
-            .addSettingsUpdateConsumer(DELETE_AD_RESULT_WHEN_DELETE_DETECTOR, it -> deleteADResultWhenDeleteDetector = it);
 
         transportRequestOptions = TransportRequestOptions
             .builder()
@@ -1562,9 +1555,6 @@ public class ADTaskManager {
     }
 
     private void deleteADResultOfDetector(String detectorId) {
-        if (!deleteADResultWhenDeleteDetector) {
-            return;
-        }
         DeleteByQueryRequest deleteADResultsRequest = new DeleteByQueryRequest(ALL_AD_RESULTS_INDEX_PATTERN);
         deleteADResultsRequest.setQuery(new TermQueryBuilder(DETECTOR_ID_FIELD, detectorId));
         client
@@ -1871,15 +1861,19 @@ public class ADTaskManager {
         String detectorTaskId = adTask.isEntityTask() ? adTask.getParentTaskId() : adTask.getTaskId();
 
         logger.info("Historical HC detector done with state: {}. Remove from cache, detector id:{}", state.name(), detectorId);
-        this.removeDetectorFromCache(detectorId);
+//        this.removeDetectorFromCache(detectorId);
 
         ActionListener<UpdateResponse> wrappedListener = ActionListener
-            .wrap(
-                response -> {
-                    logger.info("Historical HC detector done with state: {}. Remove from cache, detector id:{}", state.name(), detectorId);
-                },
-                e -> { logger.error("Failed to update task: " + taskId, e); }
-            );
+                .wrap(
+                        response -> {
+                            logger.info("Historical HC detector done with state: {}. Remove from cache, detector id:{}", state.name(), detectorId);
+                            this.removeDetectorFromCache(detectorId);
+                        },
+                        e -> {
+                            logger.error("Failed to update task: " + taskId, e);
+                            this.removeDetectorFromCache(detectorId);
+                        }
+                );
 
         if (state == ADTaskState.FINISHED) {
             this.countEntityTasksByState(detectorTaskId, ImmutableList.of(ADTaskState.FINISHED), ActionListener.wrap(r -> {
@@ -1997,7 +1991,8 @@ public class ADTaskManager {
     ) {
         Boolean updating = adTaskCacheManager.isDetectorTaskUpdating(detectorId);
         if (updating == null) {
-            logger.info("HC detector task updating flag removed", detectorId, taskId);
+            logger.info("HC detector task updating flag removed", detectorId, taskId);// who removed this flag?
+            listener.onFailure(new AnomalyDetectionException("Can't update HC detector"));
             return;
         }
         if (!updating) {
@@ -2068,8 +2063,15 @@ public class ADTaskManager {
 
         String localNodeId = clusterService.localNode().getId();
         if (adTaskCacheManager.isHCTaskRunning(detectorId)) {
+            logger.info("1111111111111111111111111111111111111111 HC task running for detector {}", detectorId);
             detectorTaskProfile = new ADTaskProfile();
             if (adTaskCacheManager.isHCTaskCoordinatingNode(detectorId)) {
+                logger.info("1111111111111111111111111111111111111111 this node is coordinating node : {}, for detector: {}",
+                        localNodeId, detectorId);
+                logger.info("111111111111111111 adTaskCacheManager.getTopEntityCount(detectorId): {}", adTaskCacheManager.getTopEntityCount(detectorId));
+                logger.info("111111111111111111 adTaskCacheManager.getPendingEntityCount(detectorId): {}", adTaskCacheManager.getPendingEntityCount(detectorId));
+                logger.info("111111111111111111 adTaskCacheManager.getRunningEntityCount(detectorId): {}", adTaskCacheManager.getRunningEntityCount(detectorId));
+                logger.info("111111111111111111 adTaskCacheManager.getRunningEntities(detectorId): {}", adTaskCacheManager.getRunningEntities(detectorId));
                 detectorTaskProfile.setNodeId(localNodeId);
                 detectorTaskProfile.setTotalEntitiesCount(adTaskCacheManager.getTopEntityCount(detectorId));
                 detectorTaskProfile.setPendingEntitiesCount(adTaskCacheManager.getPendingEntityCount(detectorId));
@@ -2097,6 +2099,8 @@ public class ADTaskManager {
                 detectorTaskProfile.setEntityTaskProfiles(entityTaskProfiles);
             }
         } else {
+            logger.info("1111111111111111111111111111111111111111 the tasksOfDetector : {}, for detector: {}",
+                    tasksOfDetector.size(), detectorId);
             if (tasksOfDetector.size() > 1) {
                 String error = "Multiple tasks are running for detector: "
                     + detectorId

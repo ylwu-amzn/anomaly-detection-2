@@ -169,7 +169,16 @@ public final class RestHandlerUtils {
      */
     public static <T> ActionListener wrapRestActionListener(ActionListener<T> actionListener, String generalErrorMessage) {
         return ActionListener.<T>wrap(r -> { actionListener.onResponse(r); }, e -> {
+            logger.error("Failed yyyyyyyyy", e);
             Throwable cause = e.getCause();
+            logger
+                    .info(
+                            "Exception class isss: {}, is this OpenSearchStatusException: {}, cuase calss iss: {}, is this returnable: {}",
+                            e.getClass(),
+                            e instanceof OpenSearchStatusException,
+                            cause != null ? cause.getClass() : "",
+                            isProperExceptionToReturn(e)
+                    );
             if (isProperExceptionToReturn(e)) {
                 actionListener.onFailure(e);
             } else if (isProperExceptionToReturn(cause)) {
@@ -179,9 +188,12 @@ public final class RestHandlerUtils {
                 actionListener.onFailure(exception);
             } else {
                 RestStatus status = isBadRequest(e) ? BAD_REQUEST : INTERNAL_SERVER_ERROR;
-                String errorMessage = isBadRequest(e) || isBadRequest(e.getCause()) || e instanceof AnomalyDetectionException
-                    ? e.getMessage()
-                    : generalErrorMessage;
+                String errorMessage = generalErrorMessage;
+                if (isBadRequest(e) || e instanceof AnomalyDetectionException) {
+                    errorMessage = e.getMessage();
+                } else if (cause != null && (isBadRequest(cause) || cause instanceof AnomalyDetectionException)) {
+                    errorMessage = cause.getMessage();
+                }
                 actionListener.onFailure(new OpenSearchStatusException(errorMessage, status));
             }
         });

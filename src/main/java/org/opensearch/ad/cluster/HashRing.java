@@ -421,6 +421,7 @@ public class HashRing {
 
     /**
      * Get all eligible data nodes which AD version known in AD version based hash ring.
+     * TODO:// avoid use management thread pool
      * @param function consumer function
      * @param listener action listener
      * @param <T> action listener response type

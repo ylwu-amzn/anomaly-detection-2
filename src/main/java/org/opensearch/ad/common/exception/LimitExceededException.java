@@ -26,6 +26,12 @@
 
 package org.opensearch.ad.common.exception;
 
+import org.opensearch.common.io.stream.StreamInput;
+import org.opensearch.common.io.stream.StreamOutput;
+
+import java.io.IOException;
+import java.io.InputStream;
+
 /**
  * This exception is thrown when a user/system limit is exceeded.
  */
@@ -51,6 +57,10 @@ public class LimitExceededException extends EndRunException {
         super(message, true);
     }
 
+    public LimitExceededException(StreamInput in) throws IOException {
+        super(in);
+    }
+
     /**
      * Constructor with error message.
      *
@@ -72,4 +82,11 @@ public class LimitExceededException extends EndRunException {
         super(anomalyDetectorId, message, stopNow);
         this.countedInStats(false);
     }
+
+    @Override
+    public void writeTo(StreamOutput out) throws IOException {
+        super.writeTo(out);
+    }
+
+
 }

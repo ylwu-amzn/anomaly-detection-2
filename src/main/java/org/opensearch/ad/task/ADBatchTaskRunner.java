@@ -40,6 +40,7 @@ import static org.opensearch.ad.model.ADTask.WORKER_NODE_FIELD;
 import static org.opensearch.ad.settings.AnomalyDetectorSettings.BATCH_TASK_PIECE_INTERVAL_SECONDS;
 import static org.opensearch.ad.settings.AnomalyDetectorSettings.BATCH_TASK_PIECE_SIZE;
 import static org.opensearch.ad.settings.AnomalyDetectorSettings.MAX_BATCH_TASK_PER_NODE;
+import static org.opensearch.ad.settings.AnomalyDetectorSettings.MAX_PAGE_SIZE_FOR_HISTORICAL_ANALYSIS;
 import static org.opensearch.ad.settings.AnomalyDetectorSettings.MAX_RUNNING_ENTITIES_PER_DETECTOR_FOR_HISTORICAL_ANALYSIS;
 import static org.opensearch.ad.settings.AnomalyDetectorSettings.MAX_TOP_ENTITIES_FOR_HISTORICAL_ANALYSIS;
 import static org.opensearch.ad.settings.AnomalyDetectorSettings.MAX_TOP_ENTITIES_LIMIT_FOR_HISTORICAL_ANALYSIS;
@@ -133,7 +134,6 @@ public class ADBatchTaskRunner {
     private final ThreadPool threadPool;
     private final Client client;
     private final ADStats adStats;
-    private final DiscoveryNodeFilterer nodeFilter;
     private final ClusterService clusterService;
     private final FeatureManager featureManager;
     private final ADCircuitBreakerService adCircuitBreakerService;
@@ -160,7 +160,6 @@ public class ADBatchTaskRunner {
         ThreadPool threadPool,
         ClusterService clusterService,
         Client client,
-        DiscoveryNodeFilterer nodeFilter,
         ADCircuitBreakerService adCircuitBreakerService,
         FeatureManager featureManager,
         ADTaskManager adTaskManager,
@@ -175,7 +174,6 @@ public class ADBatchTaskRunner {
         this.clusterService = clusterService;
         this.client = client;
         this.anomalyResultBulkIndexHandler = anomalyResultBulkIndexHandler;
-        this.nodeFilter = nodeFilter;
         this.adStats = adStats;
         this.adCircuitBreakerService = adCircuitBreakerService;
         this.adTaskManager = adTaskManager;
@@ -269,16 +267,19 @@ public class ADBatchTaskRunner {
             adTaskCacheManager.setTopEntityInited(adTask.getDetectorId());
             int totalEntities = adTaskCacheManager.getPendingEntityCount(adTask.getDetectorId());
             logger.info("total top entities: {}", totalEntities);
-            int numberOfEligibleDataNodes = nodeFilter.getNumberOfEligibleDataNodes();
-
-            // maxAdBatchTaskPerNode means how many task can run on per data node, which is hard limitation per node.
-            // maxRunningEntitiesPerDetector means how many entities can run per detector on whole cluster, which is
-            // soft limit to control how many entities to run in parallel per HC detector.
-            int maxRunningEntities = Math
-                .min(totalEntities, Math.min(numberOfEligibleDataNodes * maxAdBatchTaskPerNode, maxRunningEntitiesPerDetector));
-            forwardOrExecuteADTask(adTask, transportService, listener);
-            // As we have started one entity task, need to minus 1 for max allowed running entities.
-            adTaskCacheManager.setAllowedRunningEntities(adTask.getDetectorId(), maxRunningEntities - 1);
+            hashRing.getNodesWithSameLocalAdVersion(dataNodes -> {
+                int numberOfEligibleDataNodes = dataNodes.length;
+                // maxAdBatchTaskPerNode means how many task can run on per data node, which is hard limitation per node.
+                // maxRunningEntitiesPerDetector means how many entities can run per detector on whole cluster, which is
+                // soft limit to control how many entities to run in parallel per HC detector.
+                int maxRunningEntities = Math
+                        .min(totalEntities, Math.min(numberOfEligibleDataNodes * maxAdBatchTaskPerNode, maxRunningEntitiesPerDetector));
+                logger.info("22222222223333333333 ylwudebug100 totalEntities: {}, numberOfEligibleDataNodes: {}, maxAdBatchTaskPerNode: {}, maxRunningEntitiesPerDetector: {}, maxRunningEntities: {}",
+                        totalEntities, numberOfEligibleDataNodes, maxAdBatchTaskPerNode, maxRunningEntitiesPerDetector, maxRunningEntities);
+                forwardOrExecuteADTask(adTask, transportService, listener);
+                // As we have started one entity task, need to minus 1 for max allowed running entities.
+                adTaskCacheManager.setAllowedRunningEntities(adTask.getDetectorId(), maxRunningEntities - 1);
+            }, listener);
         }, e -> {
             logger.debug("Failed to run task " + adTask.getTaskId(), e);
             if (adTask.getTaskType().equals(ADTaskType.HISTORICAL_HC_DETECTOR.name())) {
@@ -315,23 +316,23 @@ public class ADBatchTaskRunner {
                 adTask.getDetectionDateRange().getStartTime().toEpochMilli(),
                 MAX_TOP_ENTITIES_LIMIT_FOR_HISTORICAL_ANALYSIS
             );
-            long detectorInterval = adTask.getDetector().getDetectorIntervalInMilliseconds();
+            long interval = adTask.getDetector().getDetectorIntervalInMilliseconds();
             logger
                 .debug(
                     "start to search top entities at {}, data start time: {}, data end time: {}, interval: {}",
                     System.currentTimeMillis(),
                     dataStartTime,
                     dataEndTime,
-                    detectorInterval
+                    interval
                 );
             if (adTask.getDetector().isMultiCategoryDetector()) {
                 searchTopEntitiesForMultiCategoryHC(
                     adTask,
                     priorityTracker,
                     dataEndTime,
-                    Math.max((dataEndTime - dataStartTime) / MAX_TOP_ENTITY_SEARCH_BUCKETS, detectorInterval),
+                    Math.max((dataEndTime - dataStartTime) / MAX_TOP_ENTITY_SEARCH_BUCKETS, interval),
                     dataStartTime,
-                    dataStartTime + detectorInterval,
+                    dataStartTime + interval,
                     internalHCListener
                 );
             } else {
@@ -339,9 +340,9 @@ public class ADBatchTaskRunner {
                     adTask,
                     priorityTracker,
                     dataEndTime,
-                    Math.max((dataEndTime - dataStartTime) / MAX_TOP_ENTITY_SEARCH_BUCKETS, detectorInterval),
+                    Math.max((dataEndTime - dataStartTime) / MAX_TOP_ENTITY_SEARCH_BUCKETS, interval),
                     dataStartTime,
-                    dataStartTime + detectorInterval,
+                    dataStartTime + interval,
                     internalHCListener
                 );
             }
@@ -352,7 +353,7 @@ public class ADBatchTaskRunner {
         ADTask adTask,
         PriorityTracker priorityTracker,
         long detectionEndTime,
-        long bucketInterval,
+        long interval,
         long dataStartTime,
         long dataEndTime,
         ActionListener<String> internalHCListener
@@ -367,9 +368,9 @@ public class ADBatchTaskRunner {
                     adTask,
                     priorityTracker,
                     detectionEndTime,
-                    bucketInterval,
+                    interval,
                     dataEndTime,
-                    dataEndTime + bucketInterval,
+                    dataEndTime + interval,
                     internalHCListener
                 );
             } else {
@@ -390,16 +391,14 @@ public class ADBatchTaskRunner {
             logger.error("Failed to get top entities for detector " + adTask.getDetectorId(), e);
             internalHCListener.onFailure(e);
         });
-
-        int minimumDocCount = Math.min((int) (bucketInterval / adTask.getDetector().getDetectorIntervalInMilliseconds()), 1);
         searchFeatureDao
             .getHighestCountEntities(
                 adTask.getDetector(),
                 dataStartTime,
                 dataEndTime,
                 MAX_TOP_ENTITIES_LIMIT_FOR_HISTORICAL_ANALYSIS,
-                minimumDocCount,
-                MAX_TOP_ENTITIES_LIMIT_FOR_HISTORICAL_ANALYSIS,
+                1,
+                MAX_PAGE_SIZE_FOR_HISTORICAL_ANALYSIS,
                 topEntitiesListener
             );
     }
@@ -427,7 +426,7 @@ public class ADBatchTaskRunner {
         String topEntitiesAgg = "topEntities";
         AggregationBuilder aggregation = new TermsAggregationBuilder(topEntitiesAgg)
             .field(adTask.getDetector().getCategoryField().get(0))
-            .size(MAX_TOP_ENTITIES_LIMIT_FOR_HISTORICAL_ANALYSIS);
+            .size(MAX_PAGE_SIZE_FOR_HISTORICAL_ANALYSIS);
         sourceBuilder.aggregation(aggregation).size(0);
         SearchRequest searchRequest = new SearchRequest();
         searchRequest.source(sourceBuilder);
@@ -614,6 +613,7 @@ public class ADBatchTaskRunner {
             }
             startNewEntityTaskLane(adTask, transportService);
         }, e -> {
+            logger.error("22222222223333333333ylwudebug101, failed to dispatch task to worker node " + adTask.getTaskId(), e);
             listener.onFailure(e);
             handleException(adTask, e);
 
@@ -621,12 +621,15 @@ public class ADBatchTaskRunner {
                 // When reach this line, it means entity task failed to start on worker node
                 // Sleep some time before polling next entity task.
                 adTaskManager.entityTaskDone(adTask, e, transportService);
-                threadPool
-                    .schedule(
-                        () -> startNewEntityTaskLane(adTask, transportService),
-                        TimeValue.timeValueSeconds(SLEEP_TIME_FOR_NEXT_ENTITY_TASK_IN_MILLIS),
-                        AD_BATCH_TASK_THREAD_POOL_NAME
-                    );
+                if (adTaskCacheManager.getAndDecreaseEntityTaskLanes(adTask.getDetectorId()) > 0) {
+                    logger.error("22222222223333333333ylwudebug101, start new task lane " + adTask.getTaskId(), e);
+                    threadPool
+                            .schedule(
+                                    () -> startNewEntityTaskLane(adTask, transportService),
+                                    TimeValue.timeValueSeconds(SLEEP_TIME_FOR_NEXT_ENTITY_TASK_IN_MILLIS),
+                                    AD_BATCH_TASK_THREAD_POOL_NAME
+                            );
+                }
             }
         });
 
@@ -665,10 +668,44 @@ public class ADBatchTaskRunner {
     }
 
     // start new entity task lane
-    private void startNewEntityTaskLane(ADTask adTask, TransportService transportService) {
+    private synchronized void startNewEntityTaskLane(ADTask adTask, TransportService transportService) {
         if (ADTaskType.HISTORICAL_HC_ENTITY.name().equals(adTask.getTaskType())
             && adTaskCacheManager.getAndDecreaseEntityTaskLanes(adTask.getDetectorId()) > 0) {
             forwardOrExecuteADTask(adTask, transportService, getInternalHCDelegatedListener(adTask));
+        }
+    }
+
+    // start new entity task lane
+
+    /**
+     * Start new entity task lane if AD task type is {@link ADTaskType#HISTORICAL_HC_ENTITY}.
+     * Check running entities and temp entities, if the sum is less than max available
+     * @param adTask AD task
+     * @param transportService transport service
+     */
+    private void startNewEntityTaskLaneA(ADTask adTask, TransportService transportService) {
+        ActionListener<ADBatchAnomalyResultResponse> internalHCDelegatedListener = getInternalHCDelegatedListener(adTask);
+        if (ADTaskType.HISTORICAL_HC_ENTITY.name().equals(adTask.getTaskType())) {
+            if (adTaskCacheManager.getAndDecreaseEntityTaskLanes(adTask.getDetectorId()) > 0) {
+                forwardOrExecuteADTask(adTask, transportService, internalHCDelegatedListener);
+            }else {
+                hashRing.getNodesWithSameLocalAdVersion(dataNodes -> {
+                    int numberOfEligibleDataNodes = dataNodes.length;
+                    String detectorId = adTask.getDetectorId();
+                    // maxAdBatchTaskPerNode means how many task can run on per data node, which is hard limitation per node.
+                    // maxRunningEntitiesPerDetector means how many entities can run per detector on whole cluster, which is
+                    // soft limit to control how many entities to run in parallel per HC detector.
+                    int maxRunningEntities = Math
+                            .min(adTaskCacheManager.getTopEntityCount(detectorId), Math.min(numberOfEligibleDataNodes * maxAdBatchTaskPerNode, maxRunningEntitiesPerDetector));
+                    logger.info("1111111111111111111111111111111111111111 totalEntities: {}, numberOfEligibleDataNodes: {}, maxAdBatchTaskPerNode: {}, maxRunningEntitiesPerDetector: {}",
+                            numberOfEligibleDataNodes, maxRunningEntities);
+                    logger.info("1111111111111111111111111111111111111111 numberOfEligibleDataNodes: {}, maxRunningEntities {}",
+                            numberOfEligibleDataNodes, maxRunningEntities);
+                    forwardOrExecuteADTask(adTask, transportService, internalHCDelegatedListener);
+                    // As we have started one entity task, need to minus 1 for max allowed running entities.
+                    adTaskCacheManager.setAllowedRunningEntities(adTask.getDetectorId(), maxRunningEntities - 1);
+                }, internalHCDelegatedListener);
+            }
         }
     }
 
@@ -692,7 +729,7 @@ public class ADBatchTaskRunner {
                         .append(adTask.getDetectorId());
                     String errorMessage = errorMessageBuilder.toString();
                     logger.warn(errorMessage + ", task id " + adTask.getTaskId() + ", " + adTask.getTaskType());
-                    listener.onFailure(new LimitExceededException(adTask.getDetectorId(), errorMessage));
+                    listener.onFailure(new LimitExceededException(adTask.getDetectorId(), errorMessage));// all node memory exceed limit
                     return;
                 }
                 candidateNodeResponse = candidateNodeResponse
@@ -705,7 +742,7 @@ public class ADBatchTaskRunner {
                         .append(adTask.getDetectorId());
                     String errorMessage = errorMessageBuilder.toString();
                     logger.warn(errorMessage + ", task id " + adTask.getTaskId() + ", " + adTask.getTaskType());
-                    listener.onFailure(new LimitExceededException(adTask.getDetectorId(), errorMessage));
+                    listener.onFailure(new LimitExceededException(adTask.getDetectorId(), errorMessage));// all node batch task count exceed limit
                     return;
                 }
                 Optional<ADStatsNodeResponse> targetNode = candidateNodeResponse
@@ -790,6 +827,12 @@ public class ADBatchTaskRunner {
                 adTaskManager.cleanDetectorCache(adTask, transportService, () -> handleException(adTask, e));
             } else {
                 adTaskManager.entityTaskDone(adTask, e, transportService);
+//                threadPool
+//                    .schedule(
+//                        () -> startNewEntityTaskLane(adTask, transportService),
+//                        TimeValue.timeValueSeconds(SLEEP_TIME_FOR_NEXT_ENTITY_TASK_IN_MILLIS),
+//                        AD_BATCH_TASK_THREAD_POOL_NAME
+//                    );//TODO:// do we really need this?
                 handleException(adTask, e);
             }
         });

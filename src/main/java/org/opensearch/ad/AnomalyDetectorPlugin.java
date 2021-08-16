@@ -712,7 +712,6 @@ public class AnomalyDetectorPlugin extends Plugin implements ActionPlugin, Scrip
             threadPool,
             clusterService,
             client,
-            nodeFilter,
             adCircuitBreakerService,
             featureManager,
             adTaskManager,
@@ -879,9 +878,7 @@ public class AnomalyDetectorPlugin extends Plugin implements ActionPlugin, Scrip
                 AnomalyDetectorSettings.MAX_ENTITIES_PER_QUERY,
                 AnomalyDetectorSettings.MAX_ENTITIES_FOR_PREVIEW,
                 AnomalyDetectorSettings.MAX_CONCURRENT_PREVIEW,
-                AnomalyDetectorSettings.PAGE_SIZE,
-                // clean resource
-                AnomalyDetectorSettings.DELETE_AD_RESULT_WHEN_DELETE_DETECTOR
+                AnomalyDetectorSettings.PAGE_SIZE
             );
         return unmodifiableList(
             Stream

@@ -50,6 +50,7 @@ import java.util.stream.Collectors;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.opensearch.ad.MemoryTracker;
+import org.opensearch.ad.common.exception.AnomalyDetectionException;
 import org.opensearch.ad.common.exception.DuplicateTaskException;
 import org.opensearch.ad.common.exception.LimitExceededException;
 import org.opensearch.ad.ml.ThresholdingModel;
@@ -158,7 +159,9 @@ public class ADTaskCacheManager {
         logger.debug("add detector in running detector cache, detectorId: " + detectorId);
         this.detectors.add(detectorId);
         if (ADTaskType.HISTORICAL_HC_DETECTOR.name().equals(taskType)) {
-            this.hcTaskCaches.put(detectorId, new ADHCBatchTaskCache());
+            ADHCBatchTaskCache adhcBatchTaskCache = new ADHCBatchTaskCache();
+            adhcBatchTaskCache.setIsCoordinatingNode(true);
+            this.hcTaskCaches.put(detectorId, adhcBatchTaskCache);
         }
     }
 
@@ -378,11 +381,18 @@ public class ADTaskCacheManager {
      * @param detectorId detector id
      */
     public void removeDetector(String detectorId) {
+        if (hcTaskCaches.containsKey(detectorId)) {
+            if (hasEntity(detectorId)) {
+                throw new AnomalyDetectionException("Can't remove detector from cache as there is running entity tasks");
+            }
+            hcTaskCaches.get(detectorId).clear();
+            hcTaskCaches.remove(detectorId);
+        }
         if (detectors.contains(detectorId)) {
             detectors.remove(detectorId);
-            logger.debug("Removed detector from AD task coordinating node cache, detectorId: " + detectorId);
+            logger.info("Removed detector from AD task coordinating node cache, detectorId: " + detectorId);
         } else {
-            logger.debug("Detector is not in AD task coordinating node cache");
+            logger.info("Detector is not in AD task coordinating node cache");
         }
     }
 
@@ -522,7 +532,7 @@ public class ADTaskCacheManager {
      * @param detectorId detector id
      */
     public void setTopEntityInited(String detectorId) {
-        getHCTaskCache(detectorId).setTopEntitiesInited(true);
+        getOrCreateHCTaskCache(detectorId).setTopEntitiesInited(true);
     }
 
     /**
@@ -552,7 +562,12 @@ public class ADTaskCacheManager {
      * @return total top entity count
      */
     public Integer getTopEntityCount(String detectorId) {
-        return hcTaskCaches.containsKey(detectorId) ? hcTaskCaches.get(detectorId).getTopEntityCount() : 0;
+        ADHCBatchTaskCache batchTaskCache = hcTaskCaches.get(detectorId);
+        if (batchTaskCache != null) {
+            return batchTaskCache.getTopEntityCount();
+        } else {
+            return 0;
+        }
     }
 
     /**
@@ -606,10 +621,10 @@ public class ADTaskCacheManager {
      * @param entities list of entities
      */
     public void addPendingEntities(String detectorId, List<String> entities) {
-        getHCTaskCache(detectorId).addEntities(entities);
+        getOrCreateHCTaskCache(detectorId).addEntities(entities);
     }
 
-    private ADHCBatchTaskCache getHCTaskCache(String detectorId) {
+    private ADHCBatchTaskCache getOrCreateHCTaskCache(String detectorId) {
         return hcTaskCaches.computeIfAbsent(detectorId, id -> new ADHCBatchTaskCache());
     }
 
@@ -619,12 +634,15 @@ public class ADTaskCacheManager {
      * @return true if find detector id in any entity task or HC cache
      */
     public boolean isHCTaskRunning(String detectorId) {
+        if (isHCTaskCoordinatingNode(detectorId)) {
+            return true;
+        }
         Optional<ADBatchTaskCache> entityTask = this.taskCaches
             .values()
             .stream()
             .filter(cache -> Objects.equals(detectorId, cache.getDetectorId()) && cache.getEntity() != null)
             .findFirst();
-        return hcTaskCaches.containsKey(detectorId) || entityTask.isPresent();
+        return entityTask.isPresent();
     }
 
     /**
@@ -633,7 +651,7 @@ public class ADTaskCacheManager {
      * @return true if find detector id in HC cache
      */
     public boolean isHCTaskCoordinatingNode(String detectorId) {
-        return hcTaskCaches.containsKey(detectorId);
+        return hcTaskCaches.containsKey(detectorId) && hcTaskCaches.get(detectorId).isCoordinatingNode();
     }
 
     /**
@@ -643,7 +661,7 @@ public class ADTaskCacheManager {
      * @param count top entity count
      */
     public void setTopEntityCount(String detectorId, Integer count) {
-        ADHCBatchTaskCache hcTaskCache = getHCTaskCache(detectorId);
+        ADHCBatchTaskCache hcTaskCache = getOrCreateHCTaskCache(detectorId);
         hcTaskCache.setTopEntityCount(count);
     }
 
@@ -751,7 +769,7 @@ public class ADTaskCacheManager {
      * @param detectorId detector id
      * @return true if detector still has entity in cache
      */
-    public boolean hasEntity(String detectorId) {
+    public synchronized boolean hasEntity(String detectorId) {
         return hcTaskCaches.containsKey(detectorId) && hcTaskCaches.get(detectorId).hasEntity();
     }
 
@@ -965,6 +983,6 @@ public class ADTaskCacheManager {
      * @param newState new state
      */
     public synchronized void updateDetectorTaskState(String detectorId, String newState) {
-        this.getHCTaskCache(detectorId).setDetectorTaskState(newState);
+        this.getOrCreateHCTaskCache(detectorId).setDetectorTaskState(newState);
     }
 }
