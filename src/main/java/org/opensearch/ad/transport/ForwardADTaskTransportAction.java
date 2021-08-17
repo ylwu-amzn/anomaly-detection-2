@@ -30,6 +30,7 @@ import static org.opensearch.ad.model.ADTask.ERROR_FIELD;
 import static org.opensearch.ad.model.ADTask.STATE_FIELD;
 import static org.opensearch.ad.model.ADTask.TASK_PROGRESS_FIELD;
 
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Semaphore;
@@ -56,11 +57,13 @@ import org.opensearch.transport.TransportService;
 import com.google.common.collect.ImmutableMap;
 
 public class ForwardADTaskTransportAction extends HandledTransportAction<ForwardADTaskRequest, AnomalyDetectorJobResponse> {
-    private final Logger logger = LogManager.getLogger(ForwardADTaskTransportAction.class);
+    private static final Logger logger = LogManager.getLogger(ForwardADTaskTransportAction.class);
     private final TransportService transportService;
     private final ADTaskManager adTaskManager;
     private final ADTaskCacheManager adTaskCacheManager;
     private final Semaphore scaleEntityTaskLane;
+    private final Instant lastScaleEntityTaskLaneTime;
+    private static final int SCALE_ENTITY_TASK_LANE_INTERVAL_IN_MILLIS = 10_1000; // 10 seconds
 
     @Inject
     public ForwardADTaskTransportAction(
@@ -74,6 +77,8 @@ public class ForwardADTaskTransportAction extends HandledTransportAction<Forward
         this.transportService = transportService;
         this.adTaskCacheManager = adTaskCacheManager;
         this.scaleEntityTaskLane = new Semaphore(1);
+        this.lastScaleEntityTaskLaneTime = Instant.now();
+        logger.info("7777777777777777777777777777777777777777 step 1: get entity task lane task id, lastScaleEntityTaskLaneTime: {}", lastScaleEntityTaskLaneTime.toEpochMilli());
     }
 
     @Override
@@ -120,21 +125,25 @@ public class ForwardADTaskTransportAction extends HandledTransportAction<Forward
                     } else {
                         logger.debug("Run next entity for detector " + detectorId);
                         adTaskCacheManager.refreshHCDetectorTaskSlot(detectorId);
-                        if (adTaskCacheManager.getEntityTaskLanes(detectorId) <= 0 && adTaskCacheManager.isDetectorTaskSlotScalable(detectorId) ) {
-                            logger.info("7777777777777777777777777777777777777777 step 1: get entity task lane task id : {}", adTask.getTaskId());
-                            if (scaleEntityTaskLane.tryAcquire(1)) {
-                                try {
-                                    adTaskManager.forwardScaleTaskSlotRequestToLeadNode(adTask, transportService,
-                                        ActionListener.runAfter(listener, () -> {
-                                          logger.info("7777777777777777777777777777777777777777 step 2: release semaphor scaleEntityTaskLane");
-                                          scaleEntityTaskLane.release();
-                                    }));
-                                } catch (Exception e) {
-                                    logger.error("7777777777777777777777777777777777777777 step 2-1: failed to forward scale task ", e);
-                                    scaleEntityTaskLane.release();
+                        if (adTaskCacheManager.getAvailableEntityTaskLanes(detectorId) <= 0 && adTaskCacheManager.isDetectorTaskSlotScalable(detectorId) ) {
+                            boolean lastScaleTimeExpired = lastScaleEntityTaskLaneTime.plusMillis(SCALE_ENTITY_TASK_LANE_INTERVAL_IN_MILLIS).isBefore(Instant.now());
+                            logger.info("7777777777777777777777777777777777777777 step 1: get entity task lane task id : {}, lastScaleTimeExpired: {}", adTask.getTaskId(), lastScaleTimeExpired);
+                            if (lastScaleTimeExpired) {
+                                if (!scaleEntityTaskLane.tryAcquire()) {
+                                    logger.info("7777777777777777777777777777777777777777 can't get scaleEntityTaskLane semaphore");
+                                } else {
+                                    try {
+                                        adTaskManager.forwardScaleTaskSlotRequestToLeadNode(adTask, transportService,
+                                                ActionListener.runAfter(listener, () -> {
+                                                    logger.info("7777777777777777777777777777777777777777 step 2: release semaphor scaleEntityTaskLane, new entity task lanes: {}", adTaskCacheManager.getAvailableEntityTaskLanes(detectorId));
+                                                    scaleEntityTaskLane.release();
+                                                }));
+                                    } catch (Exception e) {
+                                        logger.error("7777777777777777777777777777777777777777 step 2-1: failed to forward scale task ", e);
+                                    } finally {
+                                        scaleEntityTaskLane.release();
+                                    }
                                 }
-                            } else {
-                                logger.info("7777777777777777777777777777777777777777 can't get scaleEntityTaskLane semaphore");
                             }
                         }
                         adTaskManager.runNextEntityForHCADHistorical(adTask, listener);

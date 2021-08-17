@@ -141,6 +141,7 @@ public class ADTaskProfileTests extends OpenSearchSingleNodeTestCase {
             randomInt(),
             randomInt(),
             randomInt(),
+            randomInt(),
             ImmutableList.of(randomAlphaOfLength(5))
         );
         ADTaskProfileNodeResponse nodeResponse = new ADTaskProfileNodeResponse(node, profile, Version.CURRENT);

@@ -671,7 +671,7 @@ public class ADTaskCacheManager {
         return getExistingHCTaskCache(detectorId).getAndDecreaseEntityTaskLanes();
     }
 
-    public synchronized int getEntityTaskLanes(String detectorId) {
+    public synchronized int getAvailableEntityTaskLanes(String detectorId) {
         return getExistingHCTaskCache(detectorId).getEntityTaskLanes();
     }
 

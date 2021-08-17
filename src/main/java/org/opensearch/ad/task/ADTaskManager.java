@@ -1272,6 +1272,7 @@ public class ADTaskManager {
                             detectorTaskProfile.setModelSizeInBytes(taskProfile.getModelSizeInBytes());
                             detectorTaskProfile.setNodeId(taskProfile.getNodeId());
                             detectorTaskProfile.setTotalEntitiesCount(taskProfile.getTotalEntitiesCount());
+                            detectorTaskProfile.setDetectorTaskSlots(taskProfile.getDetectorTaskSlots());
                             detectorTaskProfile.setPendingEntitiesCount(taskProfile.getPendingEntitiesCount());
                             detectorTaskProfile.setRunningEntitiesCount(taskProfile.getRunningEntitiesCount());
                             detectorTaskProfile.setRunningEntities(taskProfile.getRunningEntities());
@@ -2314,6 +2315,7 @@ public class ADTaskManager {
                 logger.info("111111111111111111 adTaskCacheManager.getRunningEntityCount(detectorId): {}", adTaskCacheManager.getRunningEntityCount(detectorId));
                 logger.info("111111111111111111 adTaskCacheManager.getRunningEntities(detectorId): {}", adTaskCacheManager.getRunningEntities(detectorId));
                 detectorTaskProfile.setNodeId(localNodeId);
+                detectorTaskProfile.setDetectorTaskSlots(adTaskCacheManager.getDetectorTaskSlots(detectorId));
                 detectorTaskProfile.setTotalEntitiesCount(adTaskCacheManager.getTopEntityCount(detectorId));
                 detectorTaskProfile.setPendingEntitiesCount(adTaskCacheManager.getPendingEntityCount(detectorId));
                 detectorTaskProfile.setRunningEntitiesCount(adTaskCacheManager.getRunningEntityCount(detectorId));

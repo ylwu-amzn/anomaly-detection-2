@@ -223,7 +223,7 @@ public class ADBatchTaskRunner {
         boolean isHCDetector = adTask.getDetector().isMultientityDetector();
         if (isHCDetector && !adTaskCacheManager.topEntityInited(adTask.getDetectorId())) {
             // Initialize top entities for HC detector
-            adTaskCacheManager.add(adTask);
+//            adTaskCacheManager.add(adTask);//TODO: check if we can remove this line
             threadPool.executor(AD_BATCH_TASK_THREAD_POOL_NAME).execute(() -> {
                 ActionListener<ADBatchAnomalyResultResponse> hcDelegatedListener = getInternalHCDelegatedListener(adTask);
                 ActionListener<String> topEntitiesListener = getTopEntitiesListener(adTask, transportService, hcDelegatedListener);
@@ -286,7 +286,7 @@ public class ADBatchTaskRunner {
         }, e -> {
             logger.debug("Failed to run task " + adTask.getTaskId(), e);
             if (adTask.getTaskType().equals(ADTaskType.HISTORICAL_HC_DETECTOR.name())) {
-                adTaskCacheManager.remove(adTask.getTaskId());
+//                adTaskCacheManager.remove(adTask.getTaskId());//TODO: check if we can remove this line
                 adTaskManager.entityTaskDone(adTask, e, transportService);
             }
         });
@@ -379,7 +379,7 @@ public class ADBatchTaskRunner {
             } else {
                 logger.debug("finish searching top entities at " + System.currentTimeMillis());
                 // remove HC detector level task from cache
-                adTaskCacheManager.remove(adTask.getTaskId());
+//                adTaskCacheManager.remove(adTask.getTaskId());//TODO: check if we can remove this line
                 List<String> topNEntities = priorityTracker.getTopNEntities(maxTopEntitiesPerHcDetector);
                 if (topNEntities.size() == 0) {
                     logger.error("There is no entity found for detector " + adTask.getDetectorId());
@@ -457,7 +457,7 @@ public class ADBatchTaskRunner {
             } else {
                 logger.debug("finish searching top entities at " + System.currentTimeMillis());
                 // remove HC detector level task from cache
-                adTaskCacheManager.remove(adTask.getTaskId());
+//                adTaskCacheManager.remove(adTask.getTaskId());//TODO: check if we can remove this line
                 List<String> topNEntities = priorityTracker.getTopNEntities(maxTopEntitiesPerHcDetector);
                 if (topNEntities.size() == 0) {
                     logger.error("There is no entity found for detector " + adTask.getDetectorId());
@@ -676,36 +676,6 @@ public class ADBatchTaskRunner {
             && adTaskCacheManager.getAndDecreaseEntityTaskLanes(adTask.getDetectorId()) > 0) {
             logger.info("777777777777777777777777777 start new task lane for detector {}", adTask.getDetectorId());
             forwardOrExecuteADTask(adTask, transportService, getInternalHCDelegatedListener(adTask));
-        }
-    }
-
-    // start new entity task lane
-
-    /**
-     * Start new entity task lane if AD task type is {@link ADTaskType#HISTORICAL_HC_ENTITY}.
-     * Check running entities and temp entities, if the sum is less than max available
-     * @param adTask AD task
-     * @param transportService transport service
-     */
-    private void startNewEntityTaskLaneA(ADTask adTask, TransportService transportService) {
-        ActionListener<ADBatchAnomalyResultResponse> internalHCDelegatedListener = getInternalHCDelegatedListener(adTask);
-        if (ADTaskType.HISTORICAL_HC_ENTITY.name().equals(adTask.getTaskType())) {
-            if (adTaskCacheManager.getAndDecreaseEntityTaskLanes(adTask.getDetectorId()) > 0) {
-                forwardOrExecuteADTask(adTask, transportService, internalHCDelegatedListener);
-            }else {
-                hashRing.getNodesWithSameLocalAdVersion(dataNodes -> {
-                    int numberOfEligibleDataNodes = dataNodes.length;
-                    String detectorId = adTask.getDetectorId();
-                    // maxAdBatchTaskPerNode means how many task can run on per data node, which is hard limitation per node.
-                    // maxRunningEntitiesPerDetector means how many entities can run per detector on whole cluster, which is
-                    // soft limit to control how many entities to run in parallel per HC detector.
-                    int maxRunningEntities = Math
-                            .min(adTaskCacheManager.getTopEntityCount(detectorId), Math.min(numberOfEligibleDataNodes * maxAdBatchTaskPerNode, maxRunningEntitiesPerDetector));
-                    forwardOrExecuteADTask(adTask, transportService, internalHCDelegatedListener);
-                    // As we have started one entity task, need to minus 1 for max allowed running entities.
-                    adTaskCacheManager.setAllowedRunningEntities(adTask.getDetectorId(), maxRunningEntities - 1);
-                }, internalHCDelegatedListener);
-            }
         }
     }
 
