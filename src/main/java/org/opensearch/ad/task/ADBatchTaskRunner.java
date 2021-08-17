@@ -674,6 +674,7 @@ public class ADBatchTaskRunner {
     private synchronized void startNewEntityTaskLane(ADTask adTask, TransportService transportService) {
         if (ADTaskType.HISTORICAL_HC_ENTITY.name().equals(adTask.getTaskType())
             && adTaskCacheManager.getAndDecreaseEntityTaskLanes(adTask.getDetectorId()) > 0) {
+            logger.info("777777777777777777777777777 start new task lane for detector {}", adTask.getDetectorId());
             forwardOrExecuteADTask(adTask, transportService, getInternalHCDelegatedListener(adTask));
         }
     }
@@ -1276,7 +1277,7 @@ public class ADBatchTaskRunner {
                             ActionListener
                                 .wrap(
                                     r -> { adTaskCacheManager.updateDetectorTaskState(detectorId, newState); },
-                                    e -> { logger.debug("Failed to update detector level task " + detectorTaskId, e); }
+                                    e -> { logger.error("Failed to update detector level task " + detectorTaskId, e); }
                                 )
                         );
                 }

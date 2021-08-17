@@ -89,11 +89,11 @@ public class ForwardADTaskTransportAction extends HandledTransportAction<Forward
 
         switch (adTaskAction) {
             case APPLY_FOR_TASK_SLOTS:
-                logger.info("111111111111111111111111111111: received check task slot action");
+                logger.info("111111111111111111111111111111[LEAD NODE]: received check task slot action");
                 adTaskManager.checkTaskSlots(adTask, detector, detectionDateRange, user, ADTaskAction.START, transportService, listener);
                 break;
             case SCALE_TASK_SLOTS:
-                logger.info("7777777777777777777777777777777777777777 check if we can scale task slots ");
+                logger.info("7777777777777777777777777777777777777777[LEAD NODE] check if we can scale task slots ");
                 adTaskManager.checkTaskSlots(adTask, detector, detectionDateRange, user, ADTaskAction.SCALE_ENTITY_TASK_LANE, transportService, listener);
                 break;
             case START:
@@ -121,20 +121,21 @@ public class ForwardADTaskTransportAction extends HandledTransportAction<Forward
                         logger.debug("Run next entity for detector " + detectorId);
                         adTaskCacheManager.refreshHCDetectorTaskSlot(detectorId);
                         if (adTaskCacheManager.getEntityTaskLanes(detectorId) <= 0 && adTaskCacheManager.isDetectorTaskSlotScalable(detectorId) ) {
-                            logger.info("7777777777777777777777777777777777777777 we start to scale entity task lane ------------------------");
+                            logger.info("7777777777777777777777777777777777777777 step 1: get entity task lane task id : {}", adTask.getTaskId());
                             if (scaleEntityTaskLane.tryAcquire(1)) {
                                 try {
-                                    adTaskManager.forwardScaleTaskSlotRequestToLeadNode(adTask, transportService, ActionListener.runAfter(listener, () -> {
-                                        logger.info("7777777777777777777777777777777777777777 start to release semaphor scaleEntityTaskLane");
-                                        scaleEntityTaskLane.release();
+                                    adTaskManager.forwardScaleTaskSlotRequestToLeadNode(adTask, transportService,
+                                        ActionListener.runAfter(listener, () -> {
+                                          logger.info("7777777777777777777777777777777777777777 step 2: release semaphor scaleEntityTaskLane");
+                                          scaleEntityTaskLane.release();
                                     }));
                                 } catch (Exception e) {
-                                    logger.error("7777777777777777777777777777777777777777 eeeee", e);
+                                    logger.error("7777777777777777777777777777777777777777 step 2-1: failed to forward scale task ", e);
                                     scaleEntityTaskLane.release();
                                 }
-
+                            } else {
+                                logger.info("7777777777777777777777777777777777777777 can't get scaleEntityTaskLane semaphore");
                             }
-
                         }
                         adTaskManager.runNextEntityForHCADHistorical(adTask, listener);
                         adTaskManager
@@ -188,18 +189,19 @@ public class ForwardADTaskTransportAction extends HandledTransportAction<Forward
                 break;
             case SCALE_ENTITY_TASK_LANE:
                 // Push back entity to pending entities queue and run next entity.
-                logger.info("7777777777777777777777777777777777777777 scale entity task lane ");
                 Integer newApprovedTaskSlots = request.getApprovedTaskSLots();
+                logger.info("7777777777777777777777777777777777777777SCALE_ENTITY_TASK_LANE scale entity task lane newApprovedTaskSlots {}", newApprovedTaskSlots);
 //                int detectorTaskSlots = adTaskCacheManager.getDetectorTaskSlots(detectorId);
                 if (newApprovedTaskSlots != null && newApprovedTaskSlots > 0) {
                     int newSlots = Math.min(newApprovedTaskSlots, adTaskCacheManager.detectorTaskSlotScalableDelta(detectorId));
+                    logger.info("7777777777777777777777777777777777777777SCALE_ENTITY_TASK_LANE newSlots is {} ", newSlots);
                     if (newSlots > 0) {
-                        logger.info("7777777777777777777777777777777777777777 newSlots is {} ", newSlots);
                         adTaskCacheManager.setAllowedRunningEntities(detectorId, newSlots);
                         adTaskCacheManager.addDetectorTaskSlots(detectorId, newSlots);
+                        logger.info("7777777777777777777777777777777777777777SCALE_ENTITY_TASK_LANE finish setting allowed runing entities and task slots");
                     }
                 }
-                logger.info("7777777777777777777777777777777777777777 scale entity task lane  done    ....aaa");
+                logger.info("7777777777777777777777777777777777777777SCALE_ENTITY_TASK_LANE scale entity task lane  done    ....aaa");
                 listener.onResponse(new AnomalyDetectorJobResponse(detector.getDetectorId(), 0, 0, 0, RestStatus.OK));
                 break;
             case CANCEL:

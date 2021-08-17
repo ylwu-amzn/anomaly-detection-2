@@ -213,7 +213,7 @@ public class ADTaskManager {
     private static int DEFAULT_MAINTAIN_INTERVAL_IN_SECONDS = 5;
     private final SearchFeatureDao searchFeatureDao;
     private final Semaphore checkingTaskSlot;
-    private final AtomicInteger taskSlots;
+//    private final AtomicInteger taskSlots;
 
     private volatile Integer maxAdBatchTaskPerNode;
     private volatile Integer maxRunningEntitiesPerDetector;
@@ -277,7 +277,7 @@ public class ADTaskManager {
             );
         this.threadPool = threadPool;
         this.checkingTaskSlot = new Semaphore(1);
-        this.taskSlots = new AtomicInteger(0);
+//        this.taskSlots = new AtomicInteger(0);
     }
 
     /**
@@ -345,34 +345,42 @@ public class ADTaskManager {
                                 ADTaskAction targetActionOfTaskSlotChecking,
                                 TransportService transportService,
                                 ActionListener<AnomalyDetectorJobResponse> listener) {
+        String detectorId = detector.getDetectorId();
         if (!checkingTaskSlot.tryAcquire(1)){
+            logger.info("22222222222222222222222222222222222222222222222222: detectorId: {}, can't acquire checking task slot semaphore, ", detectorId);
             listener.onFailure(new LimitExceededException("another historical analysis is running"));
             return;
         }
         ActionListener<AnomalyDetectorJobResponse> wrappedActionListener = ActionListener.runAfter(listener, () -> {
-            logger.info("111111111111111111111111111: release checkingTaskSlot");
+            logger.info("22222222222222222222222222222222222222222222222222: detectorId: {}, release checkingTaskSlot", detectorId);
             checkingTaskSlot.release(1);
         });
         hashRing.getNodesWithSameLocalAdVersion(nodes -> {
             int maxAdTaskSlots = nodes.length * maxAdBatchTaskPerNode;
-            logger.info("111111111111111111111111111: maxAdTaskSlots {}  , maxRunningEntitiesPerDetector: {}", maxAdTaskSlots, maxRunningEntitiesPerDetector);
+            logger.info("22222222222222222222222222222222222222222222222222: detectorId: {}, maxAdTaskSlots {}  , maxRunningEntitiesPerDetector: {}, detectorId: {}",
+                    detectorId, maxAdTaskSlots, maxRunningEntitiesPerDetector);
 //            int maxRunningEntitiesPerDetector = MAX_RUNNING_ENTITIES_PER_DETECTOR_FOR_HISTORICAL_ANALYSIS.get(settings);
 
             ADStatsRequest adStatsRequest = new ADStatsRequest(nodes);
             adStatsRequest.addAll(ImmutableSet.of(AD_BATCH_TASK_USED_SLOT_COUNT.getName()));
             client.execute(ADStatsNodesAction.INSTANCE, adStatsRequest, ActionListener.wrap(adStatsResponse -> {
                 int totalUsedTaskSlots = adStatsResponse.getNodes().stream().mapToInt(stat -> (int) stat.getStatsMap().get(AD_BATCH_TASK_USED_SLOT_COUNT.getName())).sum();
-                logger.info("111111111111111111111111111: total used task slots {}", totalUsedTaskSlots);
+                logger.info("22222222222222222222222222222222222222222222222222: detectorId: {}, total used task slots {}, detectorId: {}",
+                        detectorId, totalUsedTaskSlots);
                 if (totalUsedTaskSlots >= maxAdTaskSlots) {
-                    logger.warn("111111111111111111111111111: Total used task slots is more than max task slots, totalUsedTaskSlots: {}, maxAdTaskSlots: {}", totalUsedTaskSlots, maxAdTaskSlots);
+                    logger.warn("22222222222222222222222222222222222222222222222222: detectorId: {}, Total used task slots is more than max task slots, totalUsedTaskSlots: {}, maxAdTaskSlots: {}, detectorId: {}",
+                            detectorId, totalUsedTaskSlots, maxAdTaskSlots);
                     wrappedActionListener.onFailure(new LimitExceededException("Total used task slots is more than max task slots"));
                     return;
                 }
                 int maxAvailableAdTaskSlots = maxAdTaskSlots - totalUsedTaskSlots;
-                this.taskSlots.set(maxAvailableAdTaskSlots); //TODO: don't need this line, remove taskSlots
+                logger.warn("22222222222222222222222222222222222222222222222222: detectorId: {}, maxAvailableAdTaskSlots: {}",
+                        detectorId, maxAvailableAdTaskSlots);
+//                this.taskSlots.set(maxAvailableAdTaskSlots); //TODO: don't need this line, remove taskSlots
 
                 if (ADTaskAction.SCALE_ENTITY_TASK_LANE == targetActionOfTaskSlotChecking) {
-                    logger.info("7777777777777777777777777777777777777777 LEAD NODE:  maxAvailableAdTaskSlots: {} ------------------------", maxAvailableAdTaskSlots);
+                    logger.info("22222222222222222222222222222222222222222222222222: detectorId: {},  maxAvailableAdTaskSlots: {} ------------------------",
+                            detectorId, maxAvailableAdTaskSlots);
                     forwardToCoordinatingNode(adTask, detector, detectionDateRange, user, targetActionOfTaskSlotChecking, transportService, wrappedActionListener, maxAvailableAdTaskSlots);
                     return;
                 }
@@ -382,7 +390,7 @@ public class ADTaskManager {
 
                 if (detector.isMultientityDetector()) {
                     if (detector.isMultiCategoryDetector()) {
-                        logger.info("1111111111111111111111111111111111111111: this is a multi category detector");
+                        logger.info("22222222222222222222222222222222222222222222222222: detectorId: {}, this is a multi category detector", detectorId);
                         searchFeatureDao.getHighestCountEntities(detector, dataStartTime, dataEndTime,
                                 maxRunningEntitiesPerDetector, 1,
                                         maxRunningEntitiesPerDetector,
@@ -395,21 +403,21 @@ public class ADTaskManager {
                                             wrappedActionListener.onFailure(e);})
                                 );
                     } else {
-                        logger.info("1111111111111111111111111111111111111111: this is a multi entity detector");
+                        logger.info("22222222222222222222222222222222222222222222222222: detectorId: {}, this is a multi entity detector", detectorId);
                         RangeQueryBuilder rangeQueryBuilder = new RangeQueryBuilder(detector.getTimeField()).gte(dataStartTime).lte(dataEndTime).format("epoch_millis");
                         BoolQueryBuilder boolQueryBuilder = new BoolQueryBuilder().filter(rangeQueryBuilder);
                         String topEntitiesAgg = "topEntities";
                         TermsAggregationBuilder agg = new TermsAggregationBuilder(topEntitiesAgg).field(detector.getCategoryField().get(0)).size(maxRunningEntitiesPerDetector);
                         SearchSourceBuilder sourceBuilder = new SearchSourceBuilder().query(boolQueryBuilder).aggregation(agg).size(0);
-                        logger.info("111111111111111111111111111111: queryaa : " + sourceBuilder);
+                        logger.info("22222222222222222222222222222222222222222222222222: detectorId: {}, queryaa : {}", detectorId, sourceBuilder);
                         SearchRequest searchRequest = new SearchRequest().source(sourceBuilder).indices(detector.getIndices().toArray(new String[0]));
                         client.search(searchRequest, ActionListener.wrap(res -> {
                             StringTerms stringTerms = res.getAggregations().get(topEntitiesAgg);
                             List<StringTerms.Bucket> buckets = stringTerms.getBuckets();
                             int topEntitiesSize = buckets.size();
                             int approvedTaskSlots = Math.min(maxAvailableAdTaskSlots, topEntitiesSize);
-                            logger.info("111111111111111111111111111111: topEntitiesSize : {}, maxAvailableAdTaskSlots: {}, approvedTaskSlots: {}",
-                                    topEntitiesSize, maxAvailableAdTaskSlots, approvedTaskSlots);
+                            logger.info("22222222222222222222222222222222222222222222222222: detectorId: {}, topEntitiesSize : {}, maxAvailableAdTaskSlots: {}, approvedTaskSlots: {}",
+                                    detectorId, topEntitiesSize, maxAvailableAdTaskSlots, approvedTaskSlots);
                             // Send task to run on coordinating node
                             forwardToCoordinatingNode(adTask, detector, detectionDateRange, user, targetActionOfTaskSlotChecking, transportService, wrappedActionListener, approvedTaskSlots);
 //                            startHistoricalAnalysis(detector, detectionDateRange, user, approvedTaskSlots, transportService, wrappedActionListener);
@@ -422,7 +430,7 @@ public class ADTaskManager {
 //                    startHistoricalAnalysis(detector, detectionDateRange, user, 1, transportService, wrappedActionListener);
                 }
             }, exception -> {
-                logger.error("Failed to get node's task stats", exception);
+                logger.error("22222222222222222222222222222222222222222222222222: detectorId: "+detectorId+", Failed to get node's task stats", exception);
                 wrappedActionListener.onFailure(exception);
             }));
         }, wrappedActionListener);
@@ -434,8 +442,8 @@ public class ADTaskManager {
                 startHistoricalAnalysis(detector, detectionDateRange, user, approvedTaskSlots, transportService, wrappedActionListener);
                 break;
             case SCALE_ENTITY_TASK_LANE:
-                logger.info("7777777777777777777777777777777777777777 forward to coordinating node :  SCALE_ENTITY_TASK_LANE ------------------------");
-                scaleTaskLaneOnCoordinatingNode(adTask, transportService, wrappedActionListener);
+                logger.info("7777777777777777777777777777777777777777[Lead node] forward to coordinating node :  SCALE_ENTITY_TASK_LANE ------------------------");
+                scaleTaskLaneOnCoordinatingNode(adTask, approvedTaskSlots, transportService, wrappedActionListener);
                 break;
             default:
                 wrappedActionListener.onFailure(new AnomalyDetectionException("Unknown task action " + targetActionOfTaskSlotChecking));
@@ -624,6 +632,7 @@ public class ADTaskManager {
 
     protected void scaleTaskLaneOnCoordinatingNode(
             ADTask adTask,
+            int approvedTaskSlot,
             TransportService transportService,
             ActionListener<AnomalyDetectorJobResponse> listener
     ) {
@@ -632,7 +641,7 @@ public class ADTaskManager {
                 .sendRequest(
                         coordinatingNode,
                         ForwardADTaskAction.NAME,
-                        new ForwardADTaskRequest(adTask, ADTaskAction.SCALE_ENTITY_TASK_LANE),
+                        new ForwardADTaskRequest(adTask, approvedTaskSlot, ADTaskAction.SCALE_ENTITY_TASK_LANE),
                         transportRequestOptions,
                         new ActionListenerResponseHandler<>(listener, AnomalyDetectorJobResponse::new)
                 );

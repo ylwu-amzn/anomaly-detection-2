@@ -77,6 +77,11 @@ public class ForwardADTaskRequest extends ActionRequest {
         this(adTask, adTaskAction, null);
     }
 
+    public ForwardADTaskRequest(ADTask adTask, Integer approvedTaskSLots, ADTaskAction adTaskAction) {
+        this(adTask, adTaskAction, null);
+        this.approvedTaskSLots = approvedTaskSLots;
+    }
+
     public ForwardADTaskRequest(ADTask adTask, ADTaskAction adTaskAction, List<String> staleRunningEntities) {
         this.adTask = adTask;
         this.adTaskAction = adTaskAction;

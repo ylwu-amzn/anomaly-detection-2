@@ -136,7 +136,7 @@ public class ADTaskCacheManager {
         if (!adTask.isEntityTask() && containsTaskOfDetector(detectorId)) {
             throw new DuplicateTaskException(DETECTOR_IS_RUNNING);
         }
-        checkRunningTaskLimit();
+        checkRunningTaskLimit(adTask);
         long neededCacheSize = calculateADTaskCacheSize(adTask);
         if (!memoryTracker.canAllocateReserved(neededCacheSize)) {
             throw new LimitExceededException("No enough memory to run detector");
@@ -174,9 +174,9 @@ public class ADTaskCacheManager {
      * If executing task count exceeds limitation, will throw
      * {@link LimitExceededException}
      */
-    public void checkRunningTaskLimit() {
+    public void checkRunningTaskLimit(ADTask adTask) {
         if (size() >= maxAdBatchTaskPerNode) {
-            String error = EXCEED_HISTORICAL_ANALYSIS_LIMIT + ": " + maxAdBatchTaskPerNode;
+            String error = EXCEED_HISTORICAL_ANALYSIS_LIMIT + ": " + maxAdBatchTaskPerNode + ", detector " + adTask.getTaskId();
             throw new LimitExceededException(error);
         }
     }
@@ -610,6 +610,7 @@ public class ADTaskCacheManager {
         if (adTaskSlotLimit != null) {
             adTaskSlotLimit.setDetectorTaskSlots(adTaskSlotLimit.getDetectorTaskSlots() + newTaskSlots);
         }
+        logger.info("7777777777777777777777777777777777777777 adTaskSlotLimit.getDetectorTaskSlots: {}", adTaskSlotLimit.getDetectorTaskSlots());
     }
 
     public synchronized void setDetectorTaskLaneLimit(String detectorId, int taskLaneLimit) {
