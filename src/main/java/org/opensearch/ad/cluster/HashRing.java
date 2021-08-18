@@ -257,6 +257,7 @@ public class HashRing {
             if (allAddedNodes.size() == 0) {
                 actionListener.onResponse(true);
                 LOG.info("No newly added nodes, return");
+                adVersionCircleInProgress.release();
                 return;
             }
 
@@ -315,7 +316,8 @@ public class HashRing {
                 actionListener.onFailure(e);
                 LOG.error("Fail to get node info to build AD version hash ring", e);
             }));
-        } finally {
+        } catch (Exception e) {
+            LOG.error("Failed to build AD version circles", e);
             adVersionCircleInProgress.release();
         }
     }

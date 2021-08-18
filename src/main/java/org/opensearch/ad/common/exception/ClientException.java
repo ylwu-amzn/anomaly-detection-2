@@ -26,12 +26,6 @@
 
 package org.opensearch.ad.common.exception;
 
-import org.opensearch.common.io.stream.StreamInput;
-import org.opensearch.common.io.stream.StreamOutput;
-
-import java.io.IOException;
-import java.io.InputStream;
-
 /**
  * All exception visible to AD transport layer's client is under ClientException.
  */
@@ -51,14 +45,5 @@ public class ClientException extends AnomalyDetectionException {
 
     public ClientException(String anomalyDetectorId, Throwable cause) {
         super(anomalyDetectorId, cause);
-    }
-
-    public ClientException(StreamInput in) throws IOException {
-        super(in);
-    }
-
-    @Override
-    public void writeTo(StreamOutput out) throws IOException {
-        super.writeTo(out);
     }
 }

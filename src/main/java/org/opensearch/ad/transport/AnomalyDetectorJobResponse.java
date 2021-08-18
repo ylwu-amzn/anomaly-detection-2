@@ -42,7 +42,6 @@ public class AnomalyDetectorJobResponse extends ActionResponse implements ToXCon
     private final long seqNo;
     private final long primaryTerm;
     private final RestStatus restStatus;
-//    private Integer approvedTaskSlots;
 
     public AnomalyDetectorJobResponse(StreamInput in) throws IOException {
         super(in);
@@ -51,9 +50,6 @@ public class AnomalyDetectorJobResponse extends ActionResponse implements ToXCon
         seqNo = in.readLong();
         primaryTerm = in.readLong();
         restStatus = in.readEnum(RestStatus.class);
-//        if (in.available() > 0) {
-//            approvedTaskSlots = in.readInt();
-//        }
     }
 
     public AnomalyDetectorJobResponse(String id, long version, long seqNo, long primaryTerm, RestStatus restStatus) {
@@ -68,14 +64,6 @@ public class AnomalyDetectorJobResponse extends ActionResponse implements ToXCon
         return id;
     }
 
-//    public Integer getApprovedTaskSlots() {
-//        return approvedTaskSlots;
-//    }
-//
-//    public void setApprovedTaskSlots(Integer approvedTaskSlots) {
-//        this.approvedTaskSlots = approvedTaskSlots;
-//    }
-
     @Override
     public void writeTo(StreamOutput out) throws IOException {
         out.writeString(id);
@@ -83,9 +71,6 @@ public class AnomalyDetectorJobResponse extends ActionResponse implements ToXCon
         out.writeLong(seqNo);
         out.writeLong(primaryTerm);
         out.writeEnum(restStatus);
-//        if (approvedTaskSlots != null) {
-//            out.writeInt(approvedTaskSlots);
-//        }
     }
 
     @Override

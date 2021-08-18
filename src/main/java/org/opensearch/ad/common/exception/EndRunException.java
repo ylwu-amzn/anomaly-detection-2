@@ -26,12 +26,6 @@
 
 package org.opensearch.ad.common.exception;
 
-import org.opensearch.common.io.stream.StreamInput;
-import org.opensearch.common.io.stream.StreamOutput;
-
-import java.io.IOException;
-import java.io.InputStream;
-
 /**
  * Exception for failures that might impact the customer.
  *
@@ -54,10 +48,6 @@ public class EndRunException extends ClientException {
         this.endNow = endNow;
     }
 
-    public EndRunException(StreamInput in) throws IOException {
-        super(in);
-    }
-
     /**
      * @return true for "unrecoverable issue". We want to terminate the detector run immediately.
      *         false for "maybe unrecoverable issue but worth retrying a few more times." We want
@@ -65,10 +55,5 @@ public class EndRunException extends ClientException {
      */
     public boolean isEndNow() {
         return endNow;
-    }
-
-    @Override
-    public void writeTo(StreamOutput out) throws IOException {
-        super.writeTo(out);
     }
 }

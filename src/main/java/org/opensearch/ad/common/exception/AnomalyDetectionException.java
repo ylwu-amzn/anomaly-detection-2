@@ -26,17 +26,10 @@
 
 package org.opensearch.ad.common.exception;
 
-import org.opensearch.OpenSearchException;
-import org.opensearch.common.io.stream.StreamInput;
-import org.opensearch.common.io.stream.StreamOutput;
-
-import java.io.IOException;
-import java.io.InputStream;
-
 /**
  * Base exception for exceptions thrown from Anomaly Detection.
  */
-public class AnomalyDetectionException extends OpenSearchException {
+public class AnomalyDetectionException extends RuntimeException {
 
     private String anomalyDetectorId;
     // countedInStats will be used to tell whether the exception should be
@@ -45,10 +38,6 @@ public class AnomalyDetectionException extends OpenSearchException {
 
     public AnomalyDetectionException(String message) {
         super(message);
-    }
-
-    public AnomalyDetectionException(StreamInput in) throws IOException {
-        super(in);
     }
 
     /**
@@ -113,10 +102,5 @@ public class AnomalyDetectionException extends OpenSearchException {
         sb.append(' ');
         sb.append(super.toString());
         return sb.toString();
-    }
-
-    @Override
-    public void writeTo(StreamOutput out) throws IOException {
-        super.writeTo(out);
     }
 }

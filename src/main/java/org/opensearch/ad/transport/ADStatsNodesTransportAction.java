@@ -32,14 +32,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.opensearch.action.FailedNodeException;
 import org.opensearch.action.support.ActionFilters;
 import org.opensearch.action.support.nodes.TransportNodesAction;
 import org.opensearch.ad.stats.ADStats;
 import org.opensearch.ad.stats.InternalStatNames;
-import org.opensearch.ad.task.ADBatchTaskRunner;
 import org.opensearch.ad.task.ADTaskManager;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.inject.Inject;
@@ -54,14 +51,14 @@ import org.opensearch.transport.TransportService;
 public class ADStatsNodesTransportAction extends
     TransportNodesAction<ADStatsRequest, ADStatsNodesResponse, ADStatsNodeRequest, ADStatsNodeResponse> {
 
-    private final Logger logger = LogManager.getLogger(ADStatsNodesTransportAction.class);
     private ADStats adStats;
     private final JvmService jvmService;
     private final ADTaskManager adTaskManager;
 
     /**
      * Constructor
-     *  @param threadPool ThreadPool to use
+     *
+     * @param threadPool ThreadPool to use
      * @param clusterService ClusterService
      * @param transportService TransportService
      * @param actionFilters Action Filters
@@ -71,13 +68,14 @@ public class ADStatsNodesTransportAction extends
      */
     @Inject
     public ADStatsNodesTransportAction(
-            ThreadPool threadPool,
-            ClusterService clusterService,
-            TransportService transportService,
-            ActionFilters actionFilters,
-            ADStats adStats,
-            JvmService jvmService,
-            ADTaskManager adTaskManager) {
+        ThreadPool threadPool,
+        ClusterService clusterService,
+        TransportService transportService,
+        ActionFilters actionFilters,
+        ADStats adStats,
+        JvmService jvmService,
+        ADTaskManager adTaskManager
+    ) {
         super(
             ADStatsNodesAction.NAME,
             threadPool,
@@ -128,9 +126,7 @@ public class ADStatsNodesTransportAction extends
         }
 
         if (statsToBeRetrieved.contains(InternalStatNames.AD_BATCH_TASK_USED_SLOT_COUNT.getName())) {
-            logger.info("111111111111111111111111111111: get AD batch task sued slot count");
             int usedSlot = adTaskManager.getLocalADTaskUsedSlot();
-            logger.info("111111111111111111111111111111: get AD batch task sued slot count " + usedSlot);
             statValues.put(InternalStatNames.AD_BATCH_TASK_USED_SLOT_COUNT.getName(), usedSlot);
         }
 

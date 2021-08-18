@@ -172,13 +172,13 @@ public final class RestHandlerUtils {
             logger.error("Failed yyyyyyyyy", e);
             Throwable cause = e.getCause();
             logger
-                    .info(
-                            "Exception class isss: {}, is this OpenSearchStatusException: {}, cuase calss iss: {}, is this returnable: {}",
-                            e.getClass(),
-                            e instanceof OpenSearchStatusException,
-                            cause != null ? cause.getClass() : "",
-                            isProperExceptionToReturn(e)
-                    );
+                .info(
+                    "Exception class isss: {}, is this OpenSearchStatusException: {}, cuase calss iss: {}, is this returnable: {}",
+                    e.getClass(),
+                    e instanceof OpenSearchStatusException,
+                    cause != null ? cause.getClass() : "",
+                    isProperExceptionToReturn(e)
+                );
             if (isProperExceptionToReturn(e)) {
                 actionListener.onFailure(e);
             } else if (isProperExceptionToReturn(cause)) {

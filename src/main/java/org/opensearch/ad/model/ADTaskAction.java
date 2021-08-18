@@ -26,7 +26,15 @@
 
 package org.opensearch.ad.model;
 
+/**
+ * AD task action enum. Have 2 classes of task actions:
+ * 1. AD task actions which executed on coordinating node.
+ * 2. Task slot actions which executed on lead node.
+ */
 public enum ADTaskAction {
+    // ======================================
+    // Actions executed on coordinating node
+    // ======================================
     // Start historical analysis for detector
     START,
     // Historical analysis finished
@@ -41,8 +49,12 @@ public enum ADTaskAction {
     CLEAN_STALE_RUNNING_ENTITIES,
     // Scale entity task lane
     SCALE_ENTITY_TASK_LANE,
+
+    // ======================================
+    // Actions executed on lead node
+    // ======================================
     // Check if there is available task slot
     APPLY_FOR_TASK_SLOTS,
     // Check current task slot state and scale
-    SCALE_TASK_SLOTS,
+    CHECK_AVAILABLE_TASK_SLOTS,
 }
