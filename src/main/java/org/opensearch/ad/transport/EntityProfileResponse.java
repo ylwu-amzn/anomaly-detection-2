@@ -49,7 +49,9 @@ public class EntityProfileResponse extends ActionResponse implements ToXContentO
     private final Boolean isActive;
     private final long lastActiveMs;
     private final long totalUpdates;
-    private final ModelProfileOnNode modelProfile;
+    @Deprecated
+    private final ModelProfile oldModelProfile;
+    private final ModelProfileOnNode modelProfile; // AD 1.0 is ModelProfile
 
     public static class Builder {
         private Boolean isActive = null;

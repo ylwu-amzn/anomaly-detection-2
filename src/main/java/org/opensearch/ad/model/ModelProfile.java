@@ -45,9 +45,10 @@ import org.opensearch.common.xcontent.XContentBuilder;
  */
 public class ModelProfile implements Writeable, ToXContentObject {
     private final String modelId;
+    private final long modelSizeInBytes;
+    // private final String nodeId; // why this field removed in AD 1.1
     // added since Opensearch 1.1
     private final Entity entity;
-    private final long modelSizeInBytes;
 
     public ModelProfile(String modelId, Entity entity, long modelSizeInBytes) {
         super();

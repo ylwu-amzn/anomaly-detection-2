@@ -139,8 +139,7 @@ public class HashRing {
      * @param listener action listener
      */
     public void buildCirclesOnAdVersions(DiscoveryNodes.Delta delta, ActionListener<Boolean> listener) {
-        if (!adVersionCircleInProgress.tryAcquire()) {
-            LOG.info("AD version hash ring change in progress, return.");
+        if (!tryAcquireAdVersionCircleInProgress()) {
             listener.onResponse(false);
             return;
         }
@@ -160,8 +159,7 @@ public class HashRing {
      * @param actionListener action listener
      */
     public void buildCirclesOnAdVersions(ActionListener<Boolean> actionListener) {
-        if (!adVersionCircleInProgress.tryAcquire()) {
-            LOG.info("AD version hash ring change in progress, return.");
+        if (!tryAcquireAdVersionCircleInProgress()) {
             actionListener.onResponse(false);
             return;
         }
@@ -242,7 +240,7 @@ public class HashRing {
                 LOG.info("No newly added nodes, return");
                 // rebuild AD version hash ring with cooldown.
                 rebuildAdVersionCirclesWithCooldown();
-                adVersionCircleInProgress.release();
+                releaseAdVersionCircleInProgress();
                 return;
             }
 
@@ -285,9 +283,7 @@ public class HashRing {
                 // rebuild AD version hash ring with cooldown after all new node added.
                 rebuildAdVersionCirclesWithCooldown();
 
-                if (!dataMigrator.isMigrated()
-                    && adVersionCircles.size() > 0
-                    && adVersionCircles.lastEntry().getKey().after(Version.V_1_0_0)) {
+                if (!dataMigrator.isMigrated() && adVersionCircles.size() > 0 && adVersionCircles.lastEntry().getKey().after(Version.V_1_0_0)) {
                     // Find owning node with highest AD version to make sure the data migration logic be compatible to
                     // latest AD version when upgrade.
                     Optional<DiscoveryNode> owningNode = getOwningNodeWithHighestAdVersion(DEFAULT_HASH_RING_MODEL_ID);
@@ -298,18 +294,32 @@ public class HashRing {
                         dataMigrator.skipMigration();
                     }
                 }
-                adVersionCircleInProgress.release();
+                releaseAdVersionCircleInProgress();
                 adVersionHashRingInited.set(true);
                 actionListener.onResponse(true);
             }, e -> {
-                adVersionCircleInProgress.release();
+                releaseAdVersionCircleInProgress();
                 actionListener.onFailure(e);
                 LOG.error("Fail to get node info to build AD version hash ring", e);
             }));
         } catch (Exception e) {
             LOG.error("Failed to build AD version circles", e);
-            adVersionCircleInProgress.release();
+            releaseAdVersionCircleInProgress();
             actionListener.onFailure(e);
+        }
+    }
+
+    private boolean tryAcquireAdVersionCircleInProgress() {
+        boolean acquired = adVersionCircleInProgress.tryAcquire();
+        if (!acquired) {
+            LOG.info("AD version hash ring change in progress.");
+        }
+        return acquired;
+    }
+
+    private void releaseAdVersionCircleInProgress() {
+        if (adVersionCircleInProgress.availablePermits() == 0) {
+            adVersionCircleInProgress.release();
         }
     }
 
@@ -323,7 +333,7 @@ public class HashRing {
             // but this is the only place to consume/poll the event and there is only
             // one thread poll it as we are using adVersionCircleInProgress semaphore(1)
             // to control only 1 thread build hash ring.
-            while (size-- > 0) {
+            while(size-- > 0) {
                 Boolean poll = nodeChangeEvents.poll();
                 if (poll == null) {
                     break;

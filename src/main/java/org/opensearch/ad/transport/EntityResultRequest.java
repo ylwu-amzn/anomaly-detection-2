@@ -47,11 +47,15 @@ import org.opensearch.common.io.stream.StreamOutput;
 import org.opensearch.common.xcontent.ToXContentObject;
 import org.opensearch.common.xcontent.XContentBuilder;
 
+// TODO: create mc HC detector successfully on new node, then its job runs on old node.
+// owning node send this request to worker node.
+
+// New node only send this request to new node. Old node can sedn request to new node.
 public class EntityResultRequest extends ActionRequest implements ToXContentObject {
     private static final Logger LOG = LogManager.getLogger(EntityResultRequest.class);
     private String detectorId;
     // changed from Map<String, double[]> to Map<Entity, double[]>
-    private Map<Entity, double[]> entities;
+    private Map<Entity, double[]> entities; // AD 1.0:  Map<String, double[]>
     private long start;
     private long end;
 
@@ -73,7 +77,7 @@ public class EntityResultRequest extends ActionRequest implements ToXContentObje
                 // we don't know the category field name as we don't have access to detector config object
                 // so we put empty string as the category field name for now. Will handle the case
                 // in EntityResultTransportAciton.
-                entities.put(Entity.createSingleAttributeEntity(CommonName.EMPTY_FIELD, entry.getKey()), entry.getValue());
+                entities.put(Entity.createSingleAttributeEntity(CommonName.EMPTY_FIELD, entry.getKey()), entry.getValue()); //emtpty field id
             }
         }
 

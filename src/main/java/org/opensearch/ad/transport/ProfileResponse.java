@@ -60,7 +60,7 @@ public class ProfileResponse extends BaseNodesResponse<ProfileNodeResponse> impl
     static final String MODEL_COUNT = CommonName.MODEL_COUNT;
 
     // changed from ModelProfile to ModelProfileOnNode since Opensearch 1.1
-    private ModelProfileOnNode[] modelProfile;
+    private ModelProfileOnNode[] modelProfile; // AD 1.0 : ModelProfile,
     private int shingleSize;
     private String coordinatingNode;
     private long totalSizeInBytes;

@@ -43,7 +43,7 @@ import org.opensearch.common.xcontent.XContentBuilder;
 /**
  * Profile response on a node
  */
-public class ProfileNodeResponse extends BaseNodeResponse implements ToXContentFragment {
+public class ProfileNodeResponse extends BaseNodeResponse implements ToXContentFragment { // Will this profile node request send to all data nodes?
     private Map<String, Long> modelSize;
     private int shingleSize;
     private long activeEntities;

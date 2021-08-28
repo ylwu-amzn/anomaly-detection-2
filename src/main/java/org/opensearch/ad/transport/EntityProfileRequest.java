@@ -49,9 +49,14 @@ public class EntityProfileRequest extends ActionRequest implements ToXContentObj
     public static final String ENTITY = "entity";
     public static final String PROFILES = "profiles";
     private String adID;
-    // changed from String to Entity since 1.1
-    private Entity entityValue;
+    @Deprecated
+    private String entityValue;
     private Set<EntityProfileName> profilesToCollect;
+    // changed from String to Entity since 1.1
+    private Entity entityValue2; // How about add a new filed and keep the deprecated one.
+
+    // Use hash ring to find owning node, only send request to entity owning node.
+    // Only API call from user will send out this request.
 
     public EntityProfileRequest(StreamInput in) throws IOException {
         super(in);
