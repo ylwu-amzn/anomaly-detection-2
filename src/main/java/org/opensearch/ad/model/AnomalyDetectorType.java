@@ -29,7 +29,12 @@ package org.opensearch.ad.model;
 public enum AnomalyDetectorType {
     SINGLE_ENTITY,
     MULTI_ENTITY,
-    // TODO: remove HISTORICAL_SINGLE_ENTITY and HISTORICAL_MULTI_ENTITY
+    @Deprecated
+    REALTIME_SINGLE_ENTITY,
+    @Deprecated
+    REALTIME_MULTI_ENTITY,
+    @Deprecated
     HISTORICAL_SINGLE_ENTITY,
+    @Deprecated
     HISTORICAL_MULTI_ENTITY
 }

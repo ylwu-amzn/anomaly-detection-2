@@ -68,8 +68,11 @@ import org.opensearch.common.collect.ImmutableOpenMap;
 import org.opensearch.common.xcontent.ToXContent;
 import org.opensearch.common.xcontent.XContentBuilder;
 import org.opensearch.index.query.MatchAllQueryBuilder;
+import org.opensearch.index.query.TermQueryBuilder;
 import org.opensearch.plugins.Plugin;
 import org.opensearch.rest.RestStatus;
+import org.opensearch.search.SearchHit;
+import org.opensearch.search.SearchHits;
 import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.test.OpenSearchIntegTestCase;
 
@@ -117,6 +120,9 @@ public abstract class ADIntegTestCase extends OpenSearchIntegTestCase {
     }
 
     public String createADTask(ADTask adTask) throws IOException {
+        if (adTask.getTaskId() != null) {
+            return indexDoc(CommonName.DETECTION_STATE_INDEX, adTask.getTaskId(), adTask.toXContent(jsonBuilder(), XCONTENT_WITH_TYPE));
+        }
         return indexDoc(CommonName.DETECTION_STATE_INDEX, adTask.toXContent(jsonBuilder(), XCONTENT_WITH_TYPE));
     }
 
@@ -171,6 +177,16 @@ public abstract class ADIntegTestCase extends OpenSearchIntegTestCase {
         return indexResponse.getId();
     }
 
+    public String indexDoc(String indexName, String id, XContentBuilder source) {
+        IndexRequest indexRequest = new IndexRequest(indexName)
+            .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
+            .source(source)
+            .id(id);
+        IndexResponse indexResponse = client().index(indexRequest).actionGet(timeout);
+        assertEquals(RestStatus.CREATED, indexResponse.status());
+        return indexResponse.getId();
+    }
+
     public String indexDoc(String indexName, Map<String, ?> source) {
         IndexRequest indexRequest = new IndexRequest(indexName).setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE).source(source);
         IndexResponse indexResponse = client().index(indexRequest).actionGet(timeout);
@@ -211,6 +227,22 @@ public abstract class ADIntegTestCase extends OpenSearchIntegTestCase {
         searchSourceBuilder.query(new MatchAllQueryBuilder()).size(0);
         request.indices(indexName).source(searchSourceBuilder);
         SearchResponse searchResponse = client().search(request).actionGet(timeout);
+        return searchResponse.getHits().getTotalHits().value;
+    }
+
+    public long countDocs(String indexName, String detectorId) throws IOException {
+        SearchRequest request = new SearchRequest();
+        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+        searchSourceBuilder.query(new TermQueryBuilder("detector_id", detectorId)).size(10);
+        request.indices(indexName).source(searchSourceBuilder);
+        SearchResponse searchResponse = client().search(request).actionGet(timeout);
+        SearchHits hits = searchResponse.getHits();
+        Iterator<SearchHit> iterator = hits.iterator();
+        System.out.println(" total ssssize; " + searchResponse.getHits().getTotalHits().value);
+        while (iterator.hasNext()) {
+            SearchHit next = iterator.next();
+            System.out.println("Entitty: " + next.toString());
+        }
         return searchResponse.getHits().getTotalHits().value;
     }
 

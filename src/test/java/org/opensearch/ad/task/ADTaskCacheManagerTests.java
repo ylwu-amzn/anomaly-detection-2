@@ -50,6 +50,7 @@ import org.opensearch.ad.MemoryTracker;
 import org.opensearch.ad.TestHelpers;
 import org.opensearch.ad.common.exception.DuplicateTaskException;
 import org.opensearch.ad.common.exception.LimitExceededException;
+import org.opensearch.ad.mock.model.MockSimpleLog;
 import org.opensearch.ad.model.ADTask;
 import org.opensearch.ad.model.ADTaskState;
 import org.opensearch.ad.model.ADTaskType;
@@ -367,5 +368,9 @@ public class ADTaskCacheManagerTests extends OpenSearchTestCase {
         adTaskCacheManager.add(detectorId, adTask);
         assertTrue(adTaskCacheManager.tryAcquireTaskUpdatingSemaphore(detectorId));
         assertFalse(adTaskCacheManager.tryAcquireTaskUpdatingSemaphore(detectorId));
+    }
+
+    public void testAabc() {
+        System.out.println(MockSimpleLog.INDEX_MAPPING);
     }
 }

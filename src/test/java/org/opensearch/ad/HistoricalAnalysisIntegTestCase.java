@@ -184,7 +184,7 @@ public abstract class HistoricalAnalysisIntegTestCase extends ADIntegTestCase {
         BoolQueryBuilder query = new BoolQueryBuilder();
         query.filter(new TermQueryBuilder(DETECTOR_ID_FIELD, detectorId));
         if (isLatest != null) {
-            query.filter(new TermQueryBuilder(IS_LATEST_FIELD, false));
+            query.filter(new TermQueryBuilder(IS_LATEST_FIELD, isLatest));
         }
         SearchRequest searchRequest = new SearchRequest();
         SearchSourceBuilder sourceBuilder = new SearchSourceBuilder();
