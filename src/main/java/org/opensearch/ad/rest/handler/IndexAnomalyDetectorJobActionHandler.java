@@ -47,7 +47,6 @@ import org.opensearch.action.get.GetResponse;
 import org.opensearch.action.index.IndexRequest;
 import org.opensearch.action.index.IndexResponse;
 import org.opensearch.action.support.WriteRequest;
-import org.opensearch.ad.constant.CommonErrorMessages;
 import org.opensearch.ad.indices.AnomalyDetectionIndices;
 import org.opensearch.ad.model.ADTaskState;
 import org.opensearch.ad.model.ADTaskType;
@@ -216,14 +215,16 @@ public class IndexAnomalyDetectorJobActionHandler {
                     adTaskManager.getAndExecuteOnLatestDetectorLevelTask(detectorId, ADTaskType.REALTIME_TASK_TYPES, (adTask) -> {
                         if (!adTask.isPresent() || adTask.get().isDone()) {
                             try {
-                                indexAnomalyDetectorJob(newJob, () -> { adTaskManager.executeAnomalyDetector(detector, null, job.getUser(), listener); });
+                                indexAnomalyDetectorJob(
+                                    newJob,
+                                    () -> { adTaskManager.executeAnomalyDetector(detector, null, job.getUser(), listener); }
+                                );
                             } catch (IOException e) {
                                 String message = "Failed to start realtime job for detector " + job.getName();
                                 logger.error(message, e);
                                 listener.onFailure(new OpenSearchStatusException(message, RestStatus.INTERNAL_SERVER_ERROR));
                             }
                         } else {
-                            logger.info("aaaaaaaaaa 1111111");
                             listener.onFailure(new OpenSearchStatusException(DETECTOR_IS_RUNNING, RestStatus.BAD_REQUEST));
                         }
                     }, transportService, true, listener);

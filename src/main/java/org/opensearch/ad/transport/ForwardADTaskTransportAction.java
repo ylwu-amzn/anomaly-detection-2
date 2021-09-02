@@ -112,7 +112,7 @@ public class ForwardADTaskTransportAction extends HandledTransportAction<Forward
                 }, e -> listener.onFailure(e)));
                 break;
             case FINISHED:
-                logger.debug("Received FINISHED action for detector {}, detectionDateRange", detectorId);
+                logger.debug("Received FINISHED action for detector {}", detectorId);
                 // Historical analysis finished, so we need to remove detector cache. Only single entity detectors use this.
                 adTaskCacheManager.removeHistoricalTaskCache(detectorId);
                 adTaskCacheManager.removeRealtimeTaskCache(detectorId);

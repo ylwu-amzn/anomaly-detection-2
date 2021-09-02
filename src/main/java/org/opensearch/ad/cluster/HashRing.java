@@ -299,7 +299,7 @@ public class HashRing {
                 // rebuild AD version hash ring with cooldown after all new node added.
                 rebuildCirclesForRealtimeAD();
 
-                if (!dataMigrator.isMigrated() && circles.size() > 0 && circles.lastEntry().getKey().after(Version.V_1_0_0)) {
+                if (!dataMigrator.isMigrated() && circles.size() > 0 && circles.lastEntry().getKey().onOrAfter(Version.V_1_1_0)) {
                     // Find owning node with highest AD version to make sure the data migration logic be compatible to
                     // latest AD version when upgrade.
                     Optional<DiscoveryNode> owningNode = getOwningNodeWithHighestAdVersion(DEFAULT_HASH_RING_MODEL_ID);
@@ -527,13 +527,11 @@ public class HashRing {
         String ipAddress = getIpAddress(address);
         DiscoveryNode[] eligibleDataNodes = nodeFilter.getEligibleDataNodes();
 
-        // can't handle this edge case for mixed cluster with AD1.0 and Version after 1.1:
+        // Can't handle this edge case for BWC of AD1.0: mixed cluster with AD1.0 and Version after 1.1.
         // Start multiple OpenSearch processes on same IP, some run AD 1.0, some run new AD
         // on or after 1.1. As we ignore port number in transport address, just look for node
         // with IP like "127.0.0.1", so it's possible that we get wrong node as all nodes have
         // same IP.
-        // If there is multiple nodes with same IP, then we check if these nodes' AD version is the same,
-        // if not, we can choose the node with lowest version.
         for (DiscoveryNode node : eligibleDataNodes) {
             if (getIpAddress(node.getAddress()).equals(ipAddress)) {
                 return Optional.ofNullable(node);
@@ -549,7 +547,7 @@ public class HashRing {
      * @return IP address
      */
     private String getIpAddress(TransportAddress address) {
-        // Remove port number as it may change, just use ip to look for node
+        // Ignore port number as it may change, just use ip to look for node
         return address.toString().split(":")[0];
     }
 

@@ -37,7 +37,6 @@ import java.util.Map;
 import org.apache.http.entity.ContentType;
 import org.apache.http.nio.entity.NStringEntity;
 import org.junit.Assert;
-import org.junit.Ignore;
 import org.opensearch.ad.AnomalyDetectorPlugin;
 import org.opensearch.ad.AnomalyDetectorRestTestCase;
 import org.opensearch.ad.TestHelpers;
@@ -1176,8 +1175,7 @@ public class AnomalyDetectorRestApiIT extends AnomalyDetectorRestTestCase {
         assertTrue(e.getMessage().contains("Can't start detector job as no enabled features configured"));
     }
 
-    @Ignore
-    public void testDeleteAnomalyDetectorWhileRunning() throws Exception {
+    public void testDeleteAnomalyDetectorWhileRunningA() throws Exception {
         AnomalyDetector detector = createRandomAnomalyDetector(true, true, client());
         Assert.assertNotNull(detector.getDetectorId());
         Instant now = Instant.now();
@@ -1190,7 +1188,8 @@ public class AnomalyDetectorRestApiIT extends AnomalyDetectorRestTestCase {
 
         // Deleting detector should fail while its running
         Exception exception = expectThrows(IOException.class, () -> { deleteAnomalyDetector(detector.getDetectorId(), client()); });
-        Assert.assertTrue(exception.getMessage().contains("Detector job is running"));
+        exception.printStackTrace();
+        Assert.assertTrue(exception.getMessage().contains("Detector is running"));
     }
 
     public void testBackwardCompatibilityWithOpenDistro() throws IOException {
