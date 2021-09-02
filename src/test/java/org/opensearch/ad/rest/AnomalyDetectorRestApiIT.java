@@ -1113,7 +1113,6 @@ public class AnomalyDetectorRestApiIT extends AnomalyDetectorRestTestCase {
         assertEquals("Incorrect profile status", RestStatus.OK, TestHelpers.restStatus(profileResponse));
     }
 
-    @Ignore
     public void testAllProfileAnomalyDetector() throws Exception {
         AnomalyDetector detector = createRandomAnomalyDetector(true, true, client());
 
@@ -1121,7 +1120,6 @@ public class AnomalyDetectorRestApiIT extends AnomalyDetectorRestTestCase {
         assertEquals("Incorrect profile status", RestStatus.OK, TestHelpers.restStatus(profileResponse));
     }
 
-    @Ignore
     public void testCustomizedProfileAnomalyDetector() throws Exception {
         AnomalyDetector detector = createRandomAnomalyDetector(true, true, client());
 

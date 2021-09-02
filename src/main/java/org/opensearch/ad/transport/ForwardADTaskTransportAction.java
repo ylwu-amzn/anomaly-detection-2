@@ -106,15 +106,16 @@ public class ForwardADTaskTransportAction extends HandledTransportAction<Forward
             case START:
                 // Start historical analysis for detector
                 logger.debug("Received START action for detector {}", detectorId);
-                adTaskManager.startHistoricalAnalysisTask(detector, detectionDateRange, user, transportService, ActionListener.wrap(r -> {
+                adTaskManager.startDetector(detector, detectionDateRange, user, transportService, ActionListener.wrap(r -> {
                     adTaskCacheManager.setDetectorTaskSlots(detector.getDetectorId(), availableTaskSlots);
                     listener.onResponse(r);
                 }, e -> listener.onFailure(e)));
                 break;
             case FINISHED:
-                logger.debug("Received FINISHED action for detector {}", detectorId);
+                logger.debug("Received FINISHED action for detector {}, detectionDateRange", detectorId);
                 // Historical analysis finished, so we need to remove detector cache. Only single entity detectors use this.
-                adTaskManager.removeDetectorFromCache(request.getDetector().getDetectorId());
+                adTaskCacheManager.removeHistoricalTaskCache(detectorId);
+                adTaskCacheManager.removeRealtimeTaskCache(detectorId);
                 listener.onResponse(new AnomalyDetectorJobResponse(detector.getDetectorId(), 0, 0, 0, RestStatus.OK));
                 break;
             case NEXT_ENTITY:

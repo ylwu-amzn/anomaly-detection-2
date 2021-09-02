@@ -381,7 +381,7 @@ public class ADTaskCacheManager {
      *
      * @param detectorId detector id
      */
-    public void removeDetector(String detectorId) {
+    public void removeHistoricalTaskCache(String detectorId) {
         ADHCBatchTaskCache taskCache = hcTaskCaches.get(detectorId);
         if (taskCache != null) {
             // this will happen only on coordinating node. When worker nodes left,
