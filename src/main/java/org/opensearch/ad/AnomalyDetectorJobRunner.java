@@ -541,7 +541,7 @@ public class AnomalyDetectorJobRunner implements ScheduledJobRunner {
                 );
             }, e -> { log.error("Failed to update latest realtime task for " + detectorId, e); }));
         } else {
-            log.debug("Update latest realtime task for SINGLE detector {}, total updates: {}", detectorId, response.getRcfTotalUpdates());
+            log.info("aaaaaaaaaaaaaaaaa Update latest realtime task for SINGLE detector {}, total updates: {}", detectorId, response.getRcfTotalUpdates());
             updateLatestRealtimeTask(
                 jobParameter,
                 detectorId,
@@ -643,8 +643,9 @@ public class AnomalyDetectorJobRunner implements ScheduledJobRunner {
         Long detectorIntervalInMinutes,
         String error
     ) {
+        log.info("aaaaaaaaaaaaaaaaa start to update latest realtime task in AD job runner ..........");
         adTaskManager
-            .updateLatestRealtimeTask(detectorId, taskState, rcfTotalUpdates, detectorIntervalInMinutes, error, ActionListener.wrap(r -> {
+            .updateLatestRealtimeTaskOnCoordinatingNode(detectorId, taskState, rcfTotalUpdates, detectorIntervalInMinutes, error, ActionListener.wrap(r -> {
                 log
                     .info(
                         "Updated latest realtime task successfully for detector {}, taskState: {},"
@@ -656,6 +657,7 @@ public class AnomalyDetectorJobRunner implements ScheduledJobRunner {
                     );
             }, e -> {
                 if ((e instanceof ResourceNotFoundException) && e.getMessage().contains(CAN_NOT_FIND_LATEST_TASK)) {
+                    log.info("aaaaaaaaaaaaaaaaa create AD realtime task for detector {}", detectorId);
                     adTaskManager.createRealtimeTask((AnomalyDetectorJob) job);
                 } else {
                     log.error("Failed to update latest realtime task for detector " + detectorId, e);

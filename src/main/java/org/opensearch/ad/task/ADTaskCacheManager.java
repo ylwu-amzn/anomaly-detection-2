@@ -49,11 +49,13 @@ import java.util.stream.Collectors;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.opensearch.action.ActionListener;
 import org.opensearch.ad.MemoryTracker;
 import org.opensearch.ad.common.exception.DuplicateTaskException;
 import org.opensearch.ad.common.exception.LimitExceededException;
 import org.opensearch.ad.ml.ThresholdingModel;
 import org.opensearch.ad.model.ADTask;
+import org.opensearch.ad.model.ADTaskState;
 import org.opensearch.ad.model.ADTaskType;
 import org.opensearch.ad.model.AnomalyDetector;
 import org.opensearch.ad.model.Entity;
@@ -63,6 +65,7 @@ import org.opensearch.common.settings.Settings;
 
 import com.amazon.randomcutforest.RandomCutForest;
 import com.google.common.collect.ImmutableList;
+import org.opensearch.transport.TransportService;
 
 public class ADTaskCacheManager {
     private final Logger logger = LogManager.getLogger(ADTaskCacheManager.class);
@@ -1023,6 +1026,8 @@ public class ADTaskCacheManager {
             if (newError != null && !newError.equals(realtimeTaskCache.getError())) {
                 errorChanged = true;
             }
+            logger.info("aaaaaaaaaaaaaaaaa ------------ stateChanged: {}, initProgressChanged: {}, errorChanged:{}",
+                    stateChanged, initProgressChanged, errorChanged);
             if (stateChanged || initProgressChanged || errorChanged) {
                 return true;
             }
@@ -1034,7 +1039,10 @@ public class ADTaskCacheManager {
 
     /**
      * Update realtime task cache with new field values. If realtime task cache exist, update it
-     * directly; otherwise create new realtime task cache.
+     * directly; otherwise will do nothing. Then next job run will try to init realtime task cache
+     * and try to update realtime task cache again.
+     * Check {@link ADTaskManager#initRealtimeTaskCacheAndCleanupOldCache(String, TransportService, ActionListener)},
+     * {@link ADTaskManager#updateLatestRealtimeTaskOnCoordinatingNode(String, String, Long, Long, String, ActionListener)}
      *
      * @param detectorId detector id
      * @param newState new task state
@@ -1042,8 +1050,10 @@ public class ADTaskCacheManager {
      * @param newError new error
      */
     public void updateRealtimeTaskCache(String detectorId, String newState, Float newInitProgress, String newError) {
-        if (realtimeTaskCaches.containsKey(detectorId)) {
-            ADRealtimeTaskCache realtimeTaskCache = realtimeTaskCaches.get(detectorId);
+        ADRealtimeTaskCache realtimeTaskCache = realtimeTaskCaches.get(detectorId);
+        boolean taskDone = !ADTaskState.NOT_ENDED_STATES.contains(newState);
+
+        if (realtimeTaskCache != null) {
             if (newState != null) {
                 realtimeTaskCache.setState(newState);
             }
@@ -1053,10 +1063,19 @@ public class ADTaskCacheManager {
             if (newError != null) {
                 realtimeTaskCache.setError(newError);
             }
-            logger.debug("update realtime task cache successfully");
-        } else {
+            logger.info("aaaaaaaaaaaaaaaaa update realtime task cache successfully");
+            if (taskDone) {
+                logger.info("aaaaaaaaaaaaaaaaa 11111111111111111111111111111111111111111111111111 remove RT task cache for detector " + detectorId);
+                removeRealtimeTaskCache(detectorId);
+            }
+        } else if (!taskDone){
+            logger.info("aaaaaaaaaaaaaaaaa init task cache  ");
             realtimeTaskCaches.put(detectorId, new ADRealtimeTaskCache(newState, newInitProgress, newError));
         }
+    }
+
+    public void initRealtimeTaskCache(String detectorId) {
+        realtimeTaskCaches.put(detectorId, new ADRealtimeTaskCache(null, null, null));
     }
 
     /**
@@ -1072,6 +1091,7 @@ public class ADTaskCacheManager {
      * @param detectorId detector id
      */
     public void removeRealtimeTaskCache(String detectorId) {
+        logger.info("aaaaaaaaaaaaaaaaa Delete realtime cache for detector {}, {}", detectorId, realtimeTaskCaches.containsKey(detectorId));
         if (realtimeTaskCaches.containsKey(detectorId)) {
             realtimeTaskCaches.remove(detectorId);
         }

@@ -190,8 +190,11 @@ public class IndexAnomalyDetectorJobActionHandler {
             );
     }
 
-    private void onGetAnomalyDetectorJobForWrite(GetResponse response, AnomalyDetector detector, AnomalyDetectorJob job)
-        throws IOException {
+    private void onGetAnomalyDetectorJobForWrite(GetResponse response, AnomalyDetector detector, AnomalyDetectorJob job) {
+        ActionListener<AnomalyDetectorJobResponse> wrappedListener = ActionListener.wrap(r -> {
+            logger.info("aaaaaaaaaaaaaaaaa start to index AD job........" + detectorId);
+            indexAnomalyDetectorJob(job, null);
+        }, e-> {listener.onFailure(e);});
         if (response.isExists()) {
             try (XContentParser parser = createXContentParserFromRegistry(xContentRegistry, response.getSourceAsBytesRef())) {
                 ensureExpectedToken(XContentParser.Token.START_OBJECT, parser.nextToken(), parser);
@@ -214,11 +217,15 @@ public class IndexAnomalyDetectorJobActionHandler {
                     );
                     // Get latest realtime task and check its state before index job. Will reset running realtime task
                     // as STOPPED first if job disabled, then start new job and create new realtime task.
-                    adTaskManager.getAndExecuteOnLatestDetectorLevelTask(detectorId, ADTaskType.REALTIME_TASK_TYPES, (adTask) -> {
+
+                    adTaskManager.startDetector(detector, null, job.getUser(), transportService, wrappedListener);
+
+                    /*adTaskManager.getAndExecuteOnLatestDetectorLevelTask(detectorId, ADTaskType.REALTIME_TASK_TYPES, (adTask) -> {
                         if (!adTask.isPresent() || adTask.get().isDone()) {
                             try {
                                 indexAnomalyDetectorJob(
                                     newJob,
+                                    ylwudebug
                                     () -> { adTaskManager.executeAnomalyDetector(detector, null, job.getUser(), listener); }
                                 );
                             } catch (IOException e) {
@@ -229,7 +236,7 @@ public class IndexAnomalyDetectorJobActionHandler {
                         } else {
                             listener.onFailure(new OpenSearchStatusException(DETECTOR_IS_RUNNING, RestStatus.BAD_REQUEST));
                         }
-                    }, transportService, true, listener);
+                    }, transportService, true, listener);*/
                 }
             } catch (IOException e) {
                 String message = "Failed to parse anomaly detector job " + job.getName();
@@ -237,7 +244,9 @@ public class IndexAnomalyDetectorJobActionHandler {
                 listener.onFailure(new OpenSearchStatusException(message, RestStatus.INTERNAL_SERVER_ERROR));
             }
         } else {
-            indexAnomalyDetectorJob(job, () -> { adTaskManager.startDetector(detector, null, job.getUser(), null, listener); });
+            adTaskManager.startDetector(detector, null, job.getUser(), transportService, wrappedListener);
+//            ylwudebug
+//            indexAnomalyDetectorJob(job, () -> { adTaskManager.startDetector(detector, null, job.getUser(), null, listener); });
         }
     }
 
@@ -293,7 +302,7 @@ public class IndexAnomalyDetectorJobActionHandler {
                     ensureExpectedToken(XContentParser.Token.START_OBJECT, parser.nextToken(), parser);
                     AnomalyDetectorJob job = AnomalyDetectorJob.parse(parser);
                     if (!job.isEnabled()) {
-                        adTaskManager.updateLatestRealtimeTask(detectorId, ADTaskState.STOPPED, null, listener);
+                        adTaskManager.stopLatestRealtimeTask(detectorId, ADTaskState.STOPPED, null, listener);
                     } else {
                         AnomalyDetectorJob newJob = new AnomalyDetectorJob(
                             job.getName(),
@@ -333,11 +342,11 @@ public class IndexAnomalyDetectorJobActionHandler {
             public void onResponse(StopDetectorResponse stopDetectorResponse) {
                 if (stopDetectorResponse.success()) {
                     logger.info("AD model deleted successfully for detector {}", detectorId);
-                    adTaskManager.updateLatestRealtimeTask(detectorId, ADTaskState.STOPPED, null, listener);
+                    adTaskManager.stopLatestRealtimeTask(detectorId, ADTaskState.STOPPED, null, listener);
                 } else {
                     logger.error("Failed to delete AD model for detector {}", detectorId);
                     adTaskManager
-                        .updateLatestRealtimeTask(
+                        .stopLatestRealtimeTask(
                             detectorId,
                             ADTaskState.FAILED,
                             new OpenSearchStatusException("Failed to delete AD model", RestStatus.INTERNAL_SERVER_ERROR),
@@ -350,7 +359,7 @@ public class IndexAnomalyDetectorJobActionHandler {
             public void onFailure(Exception e) {
                 logger.error("Failed to delete AD model for detector " + detectorId, e);
                 adTaskManager
-                    .updateLatestRealtimeTask(
+                    .stopLatestRealtimeTask(
                         detectorId,
                         ADTaskState.FAILED,
                         new OpenSearchStatusException("Failed to execute stop detector action", RestStatus.INTERNAL_SERVER_ERROR),

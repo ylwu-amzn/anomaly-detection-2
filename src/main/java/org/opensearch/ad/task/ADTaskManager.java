@@ -993,18 +993,21 @@ public class ADTaskManager {
         SearchRequest searchRequest = new SearchRequest();
         searchRequest.source(sourceBuilder);
         searchRequest.indices(DETECTION_STATE_INDEX);
+        logger.info("aaaaaaaaaaaaaaaaa query to search latest AD task for detctor {}, {}", detectorId, sourceBuilder);
 
         client.search(searchRequest, ActionListener.wrap(r -> {
             // https://github.com/opendistro-for-elasticsearch/anomaly-detection/pull/359#discussion_r558653132
             // getTotalHits will be null when we track_total_hits is false in the query request.
             // Add more checking here to cover some unknown cases.
             List<ADTask> adTasks = new ArrayList<>();
+            logger.info("aaaaaaaaaaaaaaaaa ad tasks size of detctor {}, {}", detectorId, r.getHits().getTotalHits() );
             if (r == null || r.getHits().getTotalHits() == null || r.getHits().getTotalHits().value == 0) {
                 // don't throw exception here as consumer functions need to handle missing task
                 // in different way.
                 function.accept(adTasks);
                 return;
             }
+            logger.info("aaaaaaaaaaaaaaaaa ad tasks size of detctor {}, {}", detectorId, r.getHits().getTotalHits().value );
 
             Iterator<SearchHit> iterator = r.getHits().iterator();
             while (iterator.hasNext()) {
@@ -1446,6 +1449,13 @@ public class ADTaskManager {
         return true;
     }
 
+    /**
+     *
+     * @param detector anomlay detector
+     * @param detectionDateRange detection date range
+     * @param user user
+     * @param listener action listener
+     */
     public void executeAnomalyDetector(
         AnomalyDetector detector,
         DetectionDateRange detectionDateRange,
@@ -1487,6 +1497,7 @@ public class ADTaskManager {
         String userName = user == null ? null : user.getName();
         Instant now = Instant.now();
         String taskType = getADTaskType(detector, detectionDateRange).name();
+        String coordinatingNode = detectionDateRange == null? null : clusterService.localNode().getId();
         ADTask adTask = new ADTask.Builder()
             .detectorId(detector.getDetectorId())
             .detector(detector)
@@ -1498,7 +1509,7 @@ public class ADTaskManager {
             .state(ADTaskState.CREATED.name())
             .lastUpdateTime(now)
             .startedBy(userName)
-            .coordinatingNode(clusterService.localNode().getId())
+            .coordinatingNode(coordinatingNode)
             .detectionDateRange(detectionDateRange)
             .user(user)
             .build();
@@ -1558,7 +1569,9 @@ public class ADTaskManager {
                 listener.onFailure(new OpenSearchStatusException(DETECTOR_IS_RUNNING, RestStatus.BAD_REQUEST));
             } else {
                 listener.onFailure(e);
-                adTaskCacheManager.removeHistoricalTaskCache(adTask.getDetectorId());
+                if(adTask.isHistoricalTask()){
+                    adTaskCacheManager.removeHistoricalTaskCache(adTask.getDetectorId());
+                }
             }
         });
         try {
@@ -1940,7 +1953,7 @@ public class ADTaskManager {
      * @param error error
      * @param listener action listener
      */
-    public void updateLatestRealtimeTask(
+    public void stopLatestRealtimeTask(
         String detectorId,
         ADTaskState state,
         Exception error,
@@ -1967,108 +1980,127 @@ public class ADTaskManager {
     }
 
     /**
-     * Set latest realtime task as STOPPED.
-     * @param detectorId detector id
-     */
-    private void stopLatestRealtimeTask(String detectorId) {
-        updateLatestRealtimeTask(detectorId, ADTaskState.STOPPED.name(), null, null, null);
-    }
-
-    /**
-     * Update latest realtime task's state, init progress, estimated left minutes and error field
-     * on realtime detector's coordinating node.
-     *
-     * @param detectorId detector id
-     * @param newState new task state which will override state calculated with rcf total updates
-     * @param rcfTotalUpdates total updates of RCF model
-     * @param detectorIntervalInMinutes detector interval in minutes
-     * @param error error message
-     */
-    public void updateLatestRealtimeTask(
-        String detectorId,
-        String newState,
-        Long rcfTotalUpdates,
-        Long detectorIntervalInMinutes,
-        String error
-    ) {
-        updateLatestRealtimeTask(
-            detectorId,
-            newState,
-            rcfTotalUpdates,
-            detectorIntervalInMinutes,
-            error,
-            ActionListener
-                .wrap(
-                    r -> logger.info("Updated latest realtiem task successfully for " + detectorId),
-                    e -> logger.warn("Update latest realtime task failed", e)
-                )
-        );
-    }
-
-    /**
      * Update realtime task cache on realtime detector's coordinating node.
      *
      * @param detectorId detector id
-     * @param newState new state
+     * @param state new state
      * @param rcfTotalUpdates rcf total updates
      * @param detectorIntervalInMinutes detector interval in minutes
      * @param error error
      * @param listener action listener
      */
-    public void updateLatestRealtimeTask(
+    public void updateLatestRealtimeTaskOnCoordinatingNode(
         String detectorId,
-        String newState,
+        String state,
         Long rcfTotalUpdates,
         Long detectorIntervalInMinutes,
         String error,
         ActionListener<UpdateResponse> listener
     ) {
+        logger.info("aaaaaaaaaaaaaaaaa start to updateLatestRealtimeTaskOnCoordinatingNode .......... newState: {}, rcfTotalUpdates: {} detectorIntervalInMinutes: {}, error: {}",
+                state, rcfTotalUpdates, detectorIntervalInMinutes, error);
         Float initProgress = null;
-        String state = null;
+        String newState = null;
         // calculate init progress and task state with RCF total updates
         if (detectorIntervalInMinutes != null && rcfTotalUpdates != null) {
-            state = ADTaskState.INIT.name();
+            newState = ADTaskState.INIT.name();
             if (rcfTotalUpdates < NUM_MIN_SAMPLES) {
                 initProgress = (float) rcfTotalUpdates / NUM_MIN_SAMPLES;
             } else {
-                state = ADTaskState.RUNNING.name();
+                newState = ADTaskState.RUNNING.name();
                 initProgress = 1.0f;
             }
         }
         // Check if new state is not null and override state calculated with rcf total updates
-        if (newState != null) {
-            state = newState;
+        if (state != null) {
+            newState = state;
         }
 
         error = Optional.ofNullable(error).orElse("");
-        if (!adTaskCacheManager.isRealtimeTaskChanged(detectorId, state, initProgress, error)) {
+        logger.info("aaaaaaaaaaaaaaaaa, realtime task changed: {}", adTaskCacheManager.isRealtimeTaskChanged(detectorId, newState, initProgress, error));
+        if (!adTaskCacheManager.isRealtimeTaskChanged(detectorId, newState, initProgress, error)) {
+            listener.onResponse(null);
+            // If task not changed, no need to update, just return
             return;
         }
-        if (ADTaskState.STOPPED.name().equals(state)) {
-            adTaskCacheManager.removeRealtimeTaskCache(detectorId);
-        }
+        logger.info("aaaaaaaaaaaaaaaaa, update RT task state as : {}", newState);
+//        if (ADTaskState.STOPPED.name().equals(newState)) {
+//            // If stopped, we should clean up cache
+//            adTaskCacheManager.removeRealtimeTaskCache(detectorId);
+//        }
         Map<String, Object> updatedFields = new HashMap<>();
         updatedFields.put(COORDINATING_NODE_FIELD, clusterService.localNode().getId());
         if (initProgress != null) {
             updatedFields.put(INIT_PROGRESS_FIELD, initProgress);
             updatedFields.put(ESTIMATED_MINUTES_LEFT_FIELD, Math.max(0, NUM_MIN_SAMPLES - rcfTotalUpdates) * detectorIntervalInMinutes);
         }
-        if (state != null) {
-            updatedFields.put(STATE_FIELD, state);
+        if (newState != null) {
+            updatedFields.put(STATE_FIELD, newState);
         }
         if (error != null) {
             updatedFields.put(ERROR_FIELD, error);
         }
-        Float newInitProgress = initProgress;
-        String newError = error;
+        Float finalInitProgress = initProgress;
+        String finalError = error;
+        String finalNewState = newState;
         updateLatestADTask(detectorId, ADTaskType.REALTIME_TASK_TYPES, updatedFields, ActionListener.wrap(r -> {
             logger.debug("Updated latest realtime AD task successfully for detector {}", detectorId);
-            adTaskCacheManager.updateRealtimeTaskCache(detectorId, newState, newInitProgress, newError);
+            adTaskCacheManager.updateRealtimeTaskCache(detectorId, finalNewState, finalInitProgress, finalError);
             listener.onResponse(r);
         }, e -> {
             logger.error("Failed to update realtime task for detector " + detectorId, e);
             listener.onFailure(e);
         }));
+    }
+
+
+    /**
+     * Init realtime task cache and clean up realtime task cache on old coordinating node.
+     * If realtime task cache inited for the first time on this node, listener will return true.
+     *
+     * @param detectorId detector id
+     * @param transportService transport service
+     * @param listener listener
+     */
+    public void initRealtimeTaskCacheAndCleanupOldCache(String detectorId, TransportService transportService, ActionListener<Boolean> listener) {
+        try {
+            if (adTaskCacheManager.getRealtimeTaskCache(detectorId) != null) {
+                logger.info("aaaaaaaaaaaaaaaaa realtime task cache already inited for detector {}", detectorId);
+                listener.onResponse(false);
+                return;
+            }
+
+            logger.info("aaaaaaaaaaaaaaaaa Start to init realtime task cache for detector {}", detectorId);
+            getAndExecuteOnLatestDetectorLevelTask(detectorId, REALTIME_TASK_TYPES, (adTaskOptional) -> {
+                if (!adTaskOptional.isPresent()) {
+                    logger.info("aaaaaaaaaaaaaaaaa Can't find realtime task for detector {}, init cache directly", detectorId);
+                    adTaskCacheManager.initRealtimeTaskCache(detectorId);
+                    listener.onResponse(true);
+                    return;
+                }
+
+                ADTask adTask = adTaskOptional.get();
+                String localNodeId = clusterService.localNode().getId();
+                String oldCoordinatingNode = adTask.getCoordinatingNode();
+                if (oldCoordinatingNode != null && !localNodeId.equals(oldCoordinatingNode)) {
+                    logger.warn("aaaaaaaaaaaaaaaaa AD realtime job coordinating node changed from {} to this node {} for detector {}",
+                            oldCoordinatingNode, localNodeId, detectorId);
+                    cleanDetectorCache(adTask, transportService, () -> {
+                        logger.info("aaaaaaaaaaaaaaaaa Realtime task cache cleaned on old coordinating node {} for detector {}", oldCoordinatingNode, detectorId);
+                        adTaskCacheManager.initRealtimeTaskCache(detectorId);
+                        listener.onResponse(true);
+                    }, listener);
+                } else {
+                    logger.info("aaaaaaaaaaaaaaaaa AD realtime job  node not changed for detector {}", detectorId);
+                    adTaskCacheManager.initRealtimeTaskCache(detectorId);
+                    listener.onResponse(true);
+                }
+            }, transportService, false, listener);
+        } catch (Exception e) {
+            logger.error("Failed to init realtime task cache for " + detectorId, e);
+            listener.onFailure(e);
+        }
+
     }
 
     /**
@@ -2636,6 +2668,165 @@ public class ADTaskManager {
             && Objects.equals(error, realtimeTaskCache.getError());
     }
 
+    public String convertEntityToString(ADTask adTask) {
+        if (adTask == null || !adTask.isEntityTask()) {
+            return null;
+        }
+        AnomalyDetector detector = adTask.getDetector();
+        return convertEntityToString(adTask.getEntity(), detector);
+    }
+
+    /**
+     * Convert {@link Entity} instance to string.
+     * @param entity entity
+     * @param detector detector
+     * @return entity string value
+     */
+    public String convertEntityToString(Entity entity, AnomalyDetector detector) {
+        if (detector.isMultiCategoryDetector()) {
+            try {
+                XContentBuilder builder = entity.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS);
+                return BytesReference.bytes(builder).utf8ToString();
+            } catch (IOException e) {
+                String error = "Failed to parse entity into string";
+                logger.debug(error, e);
+                throw new AnomalyDetectionException(error);
+            }
+        }
+        if (detector.isMultientityDetector()) {
+            String categoryField = detector.getCategoryField().get(0);
+            return entity.getAttributes().get(categoryField);
+        }
+        return null;
+    }
+
+    /**
+     * Parse entity string value into Entity {@link Entity} instance.
+     * @param entityValue entity value
+     * @param adTask AD task
+     * @return Entity instance
+     */
+    public Entity parseEntityFromString(String entityValue, ADTask adTask) {
+        AnomalyDetector detector = adTask.getDetector();
+        if (detector.isMultiCategoryDetector()) {
+            try {
+                XContentParser parser = XContentType.JSON
+                        .xContent()
+                        .createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, entityValue);
+                ensureExpectedToken(XContentParser.Token.START_ARRAY, parser.nextToken(), parser);
+                return Entity.parse(parser);
+            } catch (IOException e) {
+                String error = "Failed to parse string into entity";
+                logger.debug(error, e);
+                throw new AnomalyDetectionException(error);
+            }
+        } else if (detector.isMultientityDetector()) {
+            return Entity.createSingleAttributeEntity(detector.getCategoryField().get(0), entityValue);
+        }
+        throw new IllegalArgumentException("Fail to parse to Entity for single flow detector");
+    }
+
+    /**
+     * Get AD task with task id and execute listener.
+     * @param taskId task id
+     * @param listener action listener
+     */
+    public void getADTask(String taskId, ActionListener<Optional<ADTask>> listener) {
+        GetRequest request = new GetRequest(DETECTION_STATE_INDEX, taskId);
+        client.get(request, ActionListener.wrap(r -> {
+            if (r != null && r.isExists()) {
+                try (XContentParser parser = createXContentParserFromRegistry(xContentRegistry, r.getSourceAsBytesRef())) {
+                    ensureExpectedToken(XContentParser.Token.START_OBJECT, parser.nextToken(), parser);
+                    ADTask adTask = ADTask.parse(parser, r.getId());
+                    listener.onResponse(Optional.ofNullable(adTask));
+                } catch (Exception e) {
+                    logger.error("Failed to parse AD task " + r.getId(), e);
+                    listener.onFailure(e);
+                }
+            } else {
+                listener.onResponse(Optional.empty());
+            }
+        }, e -> {
+            if (e instanceof IndexNotFoundException) {
+                listener.onResponse(Optional.empty());
+            } else {
+                logger.error("Failed to get AD task " + taskId, e);
+                listener.onFailure(e);
+            }
+        }));
+    }
+
+    /**
+     * Set old AD task's latest flag as false.
+     * @param adTasks list of AD tasks
+     */
+    public void resetLatestFlagAsFalse(List<ADTask> adTasks) {
+        if (adTasks == null || adTasks.size() == 0) {
+            return;
+        }
+        BulkRequest bulkRequest = new BulkRequest();
+        adTasks.forEach(task -> {
+            try {
+                task.setLatest(false);
+                task.setLastUpdateTime(Instant.now());
+                IndexRequest indexRequest = new IndexRequest(DETECTION_STATE_INDEX)
+                        .id(task.getTaskId())
+                        .source(task.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), XCONTENT_WITH_TYPE));
+                bulkRequest.add(indexRequest);
+            } catch (Exception e) {
+                logger.error("Fail to parse task AD task to XContent, task id " + task.getTaskId(), e);
+            }
+        });
+
+        bulkRequest.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
+        client.execute(BulkAction.INSTANCE, bulkRequest, ActionListener.wrap(res -> {
+            BulkItemResponse[] bulkItemResponses = res.getItems();
+            if (bulkItemResponses != null && bulkItemResponses.length > 0) {
+                for (BulkItemResponse bulkItemResponse : bulkItemResponses) {
+                    if (!bulkItemResponse.isFailed()) {
+                        logger.warn("Reset AD tasks latest flag as false Successfully. Task id: {}", bulkItemResponse.getId());
+                    } else {
+                        logger.warn("Failed to reset AD tasks latest flag as false. Task id: " + bulkItemResponse.getId());
+                    }
+                }
+            }
+        }, e -> { logger.warn("Failed to reset AD tasks latest flag as false", e); }));
+    }
+
+    public int getLocalAdUsedBatchTaskSlot() {
+        return adTaskCacheManager.getTotalBatchTaskCount();
+    }
+
+    /**
+     * In normal case "assigned_task_slots" should always greater than or equals to "used_task_slots". One
+     * example may help understand.
+     *
+     * If a cluster has 3 data nodes, HC detector was assigned 3 task slots. It will start task lane one by one,
+     * so the timeline looks like:
+     *
+     * t1 -- node1: 1 entity running
+     * t2 -- node1: 1 entity running ,
+     *       node2: 1 entity running
+     * t3 -- node1: 1 entity running ,
+     *       node2: 1 entity running,
+     *       node3: 1 entity running
+     *
+     * So if we check between t2 and t3, we can see assigned task slots (3) is greater than used task slots (2).
+     *
+     * Assume node1 is coordinating node, the assigned task slots will be cached on node1. If node1 left cluster,
+     * then we don't know how many task slots was assigned to the detector. But the detector will not send out
+     * more entity tasks as well due to coordinating node left. So we can calculate how many task slots used on
+     * node2 and node3 to calculate how many task slots available for new detector.
+     * @return assigned batch task slots
+     */
+    public int getLocalAdAssignedBatchTaskSlot() {
+        return adTaskCacheManager.getTotalDetectorTaskSlots();
+    }
+
+    // =========================================================
+    // Below are maintenance code triggered in hourly cron
+    // =========================================================
+
     /**
      * Maintain running historical tasks.
      * Search current running latest tasks, then maintain tasks one by one.
@@ -2679,7 +2870,7 @@ public class ADTaskManager {
                     ensureExpectedToken(XContentParser.Token.START_OBJECT, parser.nextToken(), parser);
                     taskQueue.add(ADTask.parse(parser, searchHit.getId()));
                 } catch (Exception e) {
-                    logger.error("Maintaining running task: failed to parse AD task " + searchHit.getId(), e);
+                    logger.error("Maintaining running historical task: failed to parse AD task " + searchHit.getId(), e);
                 }
             }
             maintainRunningHistoricalTask(taskQueue, transportService);
@@ -2768,6 +2959,22 @@ public class ADTaskManager {
                             stopLatestRealtimeTask(detectorId);
                         } else {
                             logger.debug("{} AD job is running for detector {}", logPrefix, detectorId);
+                            getAndExecuteOnLatestDetectorLevelTask(detectorId, REALTIME_TASK_TYPES, (adTask) -> {
+                                        String localNodeId = clusterService.localNode().getId();
+                                        if (!adTask.isPresent()) {
+                                            // Don't recreate realtime task here. Job runner will recreate realtime task.
+                                            logger.warn("{} Realtime task not found for running AD job {}", logPrefix, detectorId);
+                                        } else if (!localNodeId.equals(adTask.get().getCoordinatingNode())){
+                                            // Clean up realtime task if realtime task coordinating node changed.
+                                            logger.warn("{} Clean up realtime task cache as realtime task coordinating node changed for running AD job {}", logPrefix, detectorId);
+                                            adTaskCacheManager.removeRealtimeTaskCache(detectorId);
+                                        }
+                                    }, null, false,
+                                    ActionListener.wrap(res -> {
+                                        logger.debug("{} Successfully got latest realtime task for detector {}", logPrefix, detectorId);
+                                    }, ex -> {
+                                        logger.error(logPrefix + " Failed to get latest realtime task for detector " + detectorId, ex);
+                                    }));
                         }
                     } catch (IOException e) {
                         logger.error(logPrefix + " Failed to parse AD job " + detectorId, e);
@@ -2788,6 +2995,17 @@ public class ADTaskManager {
                 }
             }));
         }, TimeValue.timeValueSeconds(DEFAULT_MAINTAIN_INTERVAL_IN_SECONDS), AD_BATCH_TASK_THREAD_POOL_NAME);
+    }
+
+    /**
+     * Set latest realtime task as STOPPED and clean up realtime task cache.
+     * @param detectorId detector id
+     */
+    private void stopLatestRealtimeTask(String detectorId) {
+        updateLatestRealtimeTaskOnCoordinatingNode(detectorId, ADTaskState.STOPPED.name(), null, null, null, ActionListener.wrap(
+                res -> logger.info("Stopped latest realtime task successfully for " + detectorId),
+                ex -> logger.warn("Failed to stop latest realtime task for " + detectorId, ex)
+        ));
     }
 
     private void resetAllRealtimeTasksAsStopped() {
@@ -2812,160 +3030,4 @@ public class ADTaskManager {
                     )
             );
     }
-
-    public String convertEntityToString(ADTask adTask) {
-        if (adTask == null || !adTask.isEntityTask()) {
-            return null;
-        }
-        AnomalyDetector detector = adTask.getDetector();
-        return convertEntityToString(adTask.getEntity(), detector);
-    }
-
-    /**
-     * Convert {@link Entity} instance to string.
-     * @param entity entity
-     * @param detector detector
-     * @return entity string value
-     */
-    public String convertEntityToString(Entity entity, AnomalyDetector detector) {
-        if (detector.isMultiCategoryDetector()) {
-            try {
-                XContentBuilder builder = entity.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS);
-                return BytesReference.bytes(builder).utf8ToString();
-            } catch (IOException e) {
-                String error = "Failed to parse entity into string";
-                logger.debug(error, e);
-                throw new AnomalyDetectionException(error);
-            }
-        }
-        if (detector.isMultientityDetector()) {
-            String categoryField = detector.getCategoryField().get(0);
-            return entity.getAttributes().get(categoryField);
-        }
-        return null;
-    }
-
-    /**
-     * Parse entity string value into Entity {@link Entity} instance.
-     * @param entityValue entity value
-     * @param adTask AD task
-     * @return Entity instance
-     */
-    public Entity parseEntityFromString(String entityValue, ADTask adTask) {
-        AnomalyDetector detector = adTask.getDetector();
-        if (detector.isMultiCategoryDetector()) {
-            try {
-                XContentParser parser = XContentType.JSON
-                    .xContent()
-                    .createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, entityValue);
-                ensureExpectedToken(XContentParser.Token.START_ARRAY, parser.nextToken(), parser);
-                return Entity.parse(parser);
-            } catch (IOException e) {
-                String error = "Failed to parse string into entity";
-                logger.debug(error, e);
-                throw new AnomalyDetectionException(error);
-            }
-        } else if (detector.isMultientityDetector()) {
-            return Entity.createSingleAttributeEntity(detector.getCategoryField().get(0), entityValue);
-        }
-        throw new IllegalArgumentException("Fail to parse to Entity for single flow detector");
-    }
-
-    /**
-     * Get AD task with task id and execute listener.
-     * @param taskId task id
-     * @param listener action listener
-     */
-    public void getADTask(String taskId, ActionListener<Optional<ADTask>> listener) {
-        GetRequest request = new GetRequest(DETECTION_STATE_INDEX, taskId);
-        client.get(request, ActionListener.wrap(r -> {
-            if (r != null && r.isExists()) {
-                try (XContentParser parser = createXContentParserFromRegistry(xContentRegistry, r.getSourceAsBytesRef())) {
-                    ensureExpectedToken(XContentParser.Token.START_OBJECT, parser.nextToken(), parser);
-                    ADTask adTask = ADTask.parse(parser, r.getId());
-                    listener.onResponse(Optional.ofNullable(adTask));
-                } catch (Exception e) {
-                    logger.error("Failed to parse AD task " + r.getId(), e);
-                    listener.onFailure(e);
-                }
-            } else {
-                listener.onResponse(Optional.empty());
-            }
-        }, e -> {
-            if (e instanceof IndexNotFoundException) {
-                listener.onResponse(Optional.empty());
-            } else {
-                logger.error("Failed to get AD task " + taskId, e);
-                listener.onFailure(e);
-            }
-        }));
-    }
-
-    /**
-     * Set old AD task's latest flag as false.
-     * @param adTasks list of AD tasks
-     */
-    public void resetLatestFlagAsFalse(List<ADTask> adTasks) {
-        if (adTasks == null || adTasks.size() == 0) {
-            return;
-        }
-        BulkRequest bulkRequest = new BulkRequest();
-        adTasks.forEach(task -> {
-            try {
-                task.setLatest(false);
-                task.setLastUpdateTime(Instant.now());
-                IndexRequest indexRequest = new IndexRequest(DETECTION_STATE_INDEX)
-                    .id(task.getTaskId())
-                    .source(task.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), XCONTENT_WITH_TYPE));
-                bulkRequest.add(indexRequest);
-            } catch (Exception e) {
-                logger.error("Fail to parse task AD task to XContent, task id " + task.getTaskId(), e);
-            }
-        });
-
-        bulkRequest.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
-        client.execute(BulkAction.INSTANCE, bulkRequest, ActionListener.wrap(res -> {
-            BulkItemResponse[] bulkItemResponses = res.getItems();
-            if (bulkItemResponses != null && bulkItemResponses.length > 0) {
-                for (BulkItemResponse bulkItemResponse : bulkItemResponses) {
-                    if (!bulkItemResponse.isFailed()) {
-                        logger.warn("Reset AD tasks latest flag as false Successfully. Task id: {}", bulkItemResponse.getId());
-                    } else {
-                        logger.warn("Failed to reset AD tasks latest flag as false. Task id: " + bulkItemResponse.getId());
-                    }
-                }
-            }
-        }, e -> { logger.warn("Failed to reset AD tasks latest flag as false", e); }));
-    }
-
-    public int getLocalAdUsedBatchTaskSlot() {
-        return adTaskCacheManager.getTotalBatchTaskCount();
-    }
-
-    /**
-     * In normal case "assigned_task_slots" should always greater than or equals to "used_task_slots". One
-     * example may help understand.
-     *
-     * If a cluster has 3 data nodes, HC detector was assigned 3 task slots. It will start task lane one by one,
-     * so the timeline looks like:
-     *
-     * t1 -- node1: 1 entity running
-     * t2 -- node1: 1 entity running ,
-     *       node2: 1 entity running
-     * t3 -- node1: 1 entity running ,
-     *       node2: 1 entity running,
-     *       node3: 1 entity running
-     *
-     * So if we check between t2 and t3, we can see assigned task slots (3) is greater than used task slots (2).
-     *
-     * Assume node1 is coordinating node, the assigned task slots will be cached on node1. If node1 left cluster,
-     * then we don't know how many task slots was assigned to the detector. But the detector will not send out
-     * more entity tasks as well due to coordinating node left. So we can calculate how many task slots used on
-     * node2 and node3 to calculate how many task slots available for new detector.
-     * @return assigned batch task slots
-     */
-    public int getLocalAdAssignedBatchTaskSlot() {
-        return adTaskCacheManager.getTotalDetectorTaskSlots();
-    }
-
 }

@@ -90,6 +90,7 @@ import org.opensearch.ad.settings.AnomalyDetectorSettings;
 import org.opensearch.ad.settings.EnabledSetting;
 import org.opensearch.ad.stats.ADStats;
 import org.opensearch.ad.stats.StatNames;
+import org.opensearch.ad.task.ADTaskManager;
 import org.opensearch.ad.util.ExceptionUtil;
 import org.opensearch.ad.util.ParseUtils;
 import org.opensearch.client.Client;
@@ -144,6 +145,7 @@ public class AnomalyResultTransportAction extends HandledTransportAction<ActionR
     private final ADCircuitBreakerService adCircuitBreakerService;
     private final ThreadPool threadPool;
     private final Client client;
+    private final ADTaskManager adTaskManager;
 
     // cache HC detector id
     private final Set<String> hcDetectors;
@@ -172,7 +174,8 @@ public class AnomalyResultTransportAction extends HandledTransportAction<ActionR
         ADCircuitBreakerService adCircuitBreakerService,
         ADStats adStats,
         ThreadPool threadPool,
-        NamedXContentRegistry xContentRegistry
+        NamedXContentRegistry xContentRegistry,
+        ADTaskManager adTaskManager
     ) {
         super(AnomalyResultAction.NAME, transportService, actionFilters, AnomalyResultRequest::new);
         this.transportService = transportService;
@@ -202,6 +205,7 @@ public class AnomalyResultTransportAction extends HandledTransportAction<ActionR
 
         this.pageSize = PAGE_SIZE.get(settings);
         clusterService.getClusterSettings().addSettingsUpdateConsumer(PAGE_SIZE, it -> pageSize = it);
+        this.adTaskManager = adTaskManager;
     }
 
     /**
@@ -261,45 +265,58 @@ public class AnomalyResultTransportAction extends HandledTransportAction<ActionR
         try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
             AnomalyResultRequest request = AnomalyResultRequest.fromActionRequest(actionRequest);
             String adID = request.getAdID();
-            ActionListener<AnomalyResultResponse> original = listener;
-            listener = ActionListener.wrap(r -> {
-                hcDetectors.remove(adID);
-                original.onResponse(r);
-            }, e -> {
-                // If exception is AnomalyDetectionException and it should not be counted in stats,
-                // we will not count it in failure stats.
-                if (!(e instanceof AnomalyDetectionException) || ((AnomalyDetectionException) e).isCountedInStats()) {
-                    adStats.getStat(StatNames.AD_EXECUTE_FAIL_COUNT.getName()).increment();
-                    if (hcDetectors.contains(adID)) {
-                        adStats.getStat(StatNames.AD_HC_EXECUTE_FAIL_COUNT.getName()).increment();
-                    }
-                }
-                hcDetectors.remove(adID);
-                original.onFailure(e);
-            });
-
-            if (!EnabledSetting.isADPluginEnabled()) {
-                throw new EndRunException(adID, CommonErrorMessages.DISABLED_ERR_MSG, true).countedInStats(false);
-            }
-
-            adStats.getStat(StatNames.AD_EXECUTE_REQUEST_COUNT.getName()).increment();
-
-            if (adCircuitBreakerService.isOpen()) {
-                listener.onFailure(new LimitExceededException(adID, CommonErrorMessages.MEMORY_CIRCUIT_BROKEN_ERR_MSG, false));
-                return;
-            }
-            try {
-                stateManager.getAnomalyDetector(adID, onGetDetector(listener, adID, request));
-            } catch (Exception ex) {
-                handleExecuteException(ex, listener, adID);
-            }
+            ActionListener<Boolean> initRealtimeTaskCacheListener = ActionListener.wrap(
+                    r -> {
+                        if (r) LOG.debug("Realtime task cache initied for detector {}", adID);
+                    },
+                    e -> LOG.error("Failed to init realtime task cache for " + adID, e)
+            );
+            adTaskManager.initRealtimeTaskCacheAndCleanupOldCache(adID, transportService,
+                    ActionListener.runAfter(initRealtimeTaskCacheListener, () -> runDetector(request, adID, listener)));
         } catch (Exception e) {
             LOG.error(e);
             listener.onFailure(e);
         }
     }
 
-    //
+    private void runDetector(AnomalyResultRequest request, String adID, ActionListener<AnomalyResultResponse> listener) {
+        ActionListener<AnomalyResultResponse> original = listener;
+        listener = ActionListener.wrap(r -> {
+            hcDetectors.remove(adID);
+            original.onResponse(r);
+        }, e -> {
+            // If exception is AnomalyDetectionException and it should not be counted in stats,
+            // we will not count it in failure stats.
+            if (!(e instanceof AnomalyDetectionException) || ((AnomalyDetectionException) e).isCountedInStats()) {
+                adStats.getStat(StatNames.AD_EXECUTE_FAIL_COUNT.getName()).increment();
+                if (hcDetectors.contains(adID)) {
+                    adStats.getStat(StatNames.AD_HC_EXECUTE_FAIL_COUNT.getName()).increment();
+                }
+            }
+            hcDetectors.remove(adID);
+            original.onFailure(e);
+        });
+
+        if (!EnabledSetting.isADPluginEnabled()) {
+            throw new EndRunException(adID, CommonErrorMessages.DISABLED_ERR_MSG, true).countedInStats(false);
+        }
+
+        adStats.getStat(StatNames.AD_EXECUTE_REQUEST_COUNT.getName()).increment();
+
+        if (adCircuitBreakerService.isOpen()) {
+            listener.onFailure(new LimitExceededException(adID, CommonErrorMessages.MEMORY_CIRCUIT_BROKEN_ERR_MSG, false));
+            return;
+        }
+        if (adID != null) {
+            listener.onFailure(new EndRunException("aaaaabbbbbccccc", true));
+            return;
+        }
+        try {
+            stateManager.getAnomalyDetector(adID, onGetDetector(listener, adID, request));
+        } catch (Exception ex) {
+            handleExecuteException(ex, listener, adID);
+        }
+    }
 
     /**
      * didn't use ActionListener.wrap so that I can
