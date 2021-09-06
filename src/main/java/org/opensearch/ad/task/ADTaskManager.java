@@ -312,7 +312,7 @@ public class ADTaskManager {
     ) {
         getDetector(detectorId, (detector) -> {
             if (!detector.isPresent()) {
-                listener.onFailure(new OpenSearchStatusException(FAIL_TO_FIND_DETECTOR_MSG, RestStatus.NOT_FOUND));
+                listener.onFailure(new OpenSearchStatusException(FAIL_TO_FIND_DETECTOR_MSG + detectorId, RestStatus.NOT_FOUND));
                 return;
             }
             if (validateDetector(detector.get(), listener)) { // validate if detector is ready to start
@@ -722,7 +722,7 @@ public class ADTaskManager {
                 break;
             }
         }
-        if (targetNode == null) {
+        if (targetNode != null) {
             throw new ResourceNotFoundException(adTask.getDetectorId(), "AD task coordinating node not found");
         }
         return targetNode;
@@ -1319,7 +1319,7 @@ public class ADTaskManager {
         } catch (ResourceNotFoundException e) {
             logger
                 .warn(
-                    "Task coordinating node left cluster, taskId: {}, detectorId: {}, coordinatingNode: {}",
+                    "aaaaaaaaaaaaaaaaa ++++++++++++++ Task coordinating node left cluster, taskId: {}, detectorId: {}, coordinatingNode: {}",
                     taskId,
                     detectorId,
                     coordinatingNode
@@ -1489,15 +1489,26 @@ public class ADTaskManager {
     }
 
     private void createNewADTask(
+            AnomalyDetector detector,
+            DetectionDateRange detectionDateRange,
+            User user,
+            ActionListener<AnomalyDetectorJobResponse> listener
+    ) {
+        createNewADTask(detector, detectionDateRange, user, null, listener);
+    }
+
+    private void createNewADTask(
         AnomalyDetector detector,
         DetectionDateRange detectionDateRange,
         User user,
+        String realtimeADCoordinatingNode,
         ActionListener<AnomalyDetectorJobResponse> listener
     ) {
         String userName = user == null ? null : user.getName();
         Instant now = Instant.now();
         String taskType = getADTaskType(detector, detectionDateRange).name();
-        String coordinatingNode = detectionDateRange == null? null : clusterService.localNode().getId();
+        //   String coordinatingNode = detectionDateRange == null? null : clusterService.localNode().getId();
+        String coordinatingNode = detectionDateRange == null? realtimeADCoordinatingNode : clusterService.localNode().getId();
         ADTask adTask = new ADTask.Builder()
             .detectorId(detector.getDetectorId())
             .detector(detector)
@@ -2062,7 +2073,7 @@ public class ADTaskManager {
      * @param transportService transport service
      * @param listener listener
      */
-    public void initRealtimeTaskCacheAndCleanupOldCache(String detectorId, TransportService transportService, ActionListener<Boolean> listener) {
+    public void initRealtimeTaskCacheAndCleanupStaleCache(String detectorId, AnomalyDetector detector, TransportService transportService, ActionListener<Boolean> listener) {
         try {
             if (adTaskCacheManager.getRealtimeTaskCache(detectorId) != null) {
                 logger.info("aaaaaaaaaaaaaaaaa realtime task cache already inited for detector {}", detectorId);
@@ -2074,8 +2085,20 @@ public class ADTaskManager {
             getAndExecuteOnLatestDetectorLevelTask(detectorId, REALTIME_TASK_TYPES, (adTaskOptional) -> {
                 if (!adTaskOptional.isPresent()) {
                     logger.info("aaaaaaaaaaaaaaaaa Can't find realtime task for detector {}, init cache directly", detectorId);
-                    adTaskCacheManager.initRealtimeTaskCache(detectorId);
-                    listener.onResponse(true);
+
+                    AnomalyDetectorFunction function = () -> createNewADTask(detector, null, detector.getUser(), clusterService.localNode().getId(),
+                            ActionListener.wrap(
+                                    r -> {
+                                        logger.info("Recreate realtime task successfully for detector {}", detectorId);
+                                        adTaskCacheManager.initRealtimeTaskCache(detectorId);
+                                        listener.onResponse(true);
+                                    },
+                                    e -> {
+                                        logger.error("Failed to recreate realtime task for detector " + detectorId, e);
+                                        listener.onFailure(e);
+                                    }
+                            ));
+                    recreateRealtimeTask(function, listener);
                     return;
                 }
 
@@ -2100,7 +2123,35 @@ public class ADTaskManager {
             logger.error("Failed to init realtime task cache for " + detectorId, e);
             listener.onFailure(e);
         }
+    }
 
+    private void recreateRealtimeTask(AnomalyDetectorFunction function, ActionListener<Boolean> listener) {
+        if (detectionIndices.doesDetectorStateIndexExist()) {
+            function.execute();
+        } else {
+            // If detection index doesn't exist, create index and execute detector.
+            detectionIndices.initDetectionStateIndex(ActionListener.wrap(r -> {
+                if (r.isAcknowledged()) {
+                    logger.info("Created {} with mappings.", DETECTION_STATE_INDEX);
+                    function.execute();
+                } else {
+                    String error = String.format(Locale.ROOT, CREATE_INDEX_NOT_ACKNOWLEDGED, DETECTION_STATE_INDEX);
+                    logger.warn(error);
+                    listener.onFailure(new OpenSearchStatusException(error, RestStatus.INTERNAL_SERVER_ERROR));
+                }
+            }, e -> {
+                if (ExceptionsHelper.unwrapCause(e) instanceof ResourceAlreadyExistsException) {
+                    function.execute();
+                } else {
+                    logger.error("Failed to init anomaly detection state index", e);
+                    listener.onFailure(e);
+                }
+            }));
+        }
+    }
+
+    public void recordRealtimeJobRunTime(String detectorId) {
+        adTaskCacheManager.recordRealtimeJobRunTime(detectorId);
     }
 
     /**
@@ -2920,6 +2971,20 @@ public class ADTaskManager {
      *    and clear all realtime tasks cache.
      */
     public void maintainRunningRealtimeTasks() {
+        String[] detectorIds = adTaskCacheManager.getDetectorIdsInRealtimeTaskCache();
+        if (detectorIds == null || detectorIds.length == 0) {
+            return;
+        }
+        for (int i = 0; i<detectorIds.length; i++) {
+            String detectorId = detectorIds[i];
+            ADRealtimeTaskCache taskCache = adTaskCacheManager.getRealtimeTaskCache(detectorId);
+            if (taskCache != null && taskCache.expired()) {
+                adTaskCacheManager.removeRealtimeTaskCache(detectorId);
+            }
+        }
+    }
+
+    public void maintainRunningRealtimeTasksOldCode() {
         threadPool.schedule(() -> {
             String[] detectorsInRealtimeTaskCache = adTaskCacheManager.getDetectorIdsInRealtimeTaskCache();
             // Default maintain interval is 5 seconds, so 100 detectors will take 500 seconds at least.

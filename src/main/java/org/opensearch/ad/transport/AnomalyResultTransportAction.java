@@ -147,7 +147,10 @@ public class AnomalyResultTransportAction extends HandledTransportAction<ActionR
     private final Client client;
     private final ADTaskManager adTaskManager;
 
-    // cache HC detector id
+    // cache HC detector id. This is used to count HC failure stats. We can tell a detector
+    // if HC or not by checking if detector id exists in this field or not. Will add
+    // detector id to this field when start to run realtime detection and remove detector
+    // id once realtime detection done.
     private final Set<String> hcDetectors;
     private NamedXContentRegistry xContentRegistry;
     private Settings settings;
@@ -265,58 +268,91 @@ public class AnomalyResultTransportAction extends HandledTransportAction<ActionR
         try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
             AnomalyResultRequest request = AnomalyResultRequest.fromActionRequest(actionRequest);
             String adID = request.getAdID();
-            ActionListener<Boolean> initRealtimeTaskCacheListener = ActionListener.wrap(
-                    r -> {
-                        if (r) LOG.debug("Realtime task cache initied for detector {}", adID);
-                    },
-                    e -> LOG.error("Failed to init realtime task cache for " + adID, e)
-            );
-            adTaskManager.initRealtimeTaskCacheAndCleanupOldCache(adID, transportService,
-                    ActionListener.runAfter(initRealtimeTaskCacheListener, () -> runDetector(request, adID, listener)));
+//            ActionListener<Boolean> initRealtimeTaskCacheListener = ActionListener.wrap(
+//                    r -> {
+//                        if (r) LOG.debug("Realtime task cache initied for detector {}", adID);
+//                    },
+//                    e -> LOG.error("Failed to init realtime task cache for " + adID, e)
+//            );
+//            adTaskManager.initRealtimeTaskCacheAndCleanupStaleCache(adID, transportService,
+//                    ActionListener.runAfter(initRealtimeTaskCacheListener, () -> runDetector(request, adID, listener)));
+            // runDetector(request, adID, listener);
+            ActionListener<AnomalyResultResponse> original = listener;
+            listener = ActionListener.wrap(r -> {
+                hcDetectors.remove(adID);
+                original.onResponse(r);
+            }, e -> {
+                // If exception is AnomalyDetectionException and it should not be counted in stats,
+                // we will not count it in failure stats.
+                if (!(e instanceof AnomalyDetectionException) || ((AnomalyDetectionException) e).isCountedInStats()) {
+                    adStats.getStat(StatNames.AD_EXECUTE_FAIL_COUNT.getName()).increment();
+                    if (hcDetectors.contains(adID)) {
+                        adStats.getStat(StatNames.AD_HC_EXECUTE_FAIL_COUNT.getName()).increment();
+                    }
+                }
+                hcDetectors.remove(adID);
+                original.onFailure(e);
+            });
+
+            if (!EnabledSetting.isADPluginEnabled()) {
+                throw new EndRunException(adID, CommonErrorMessages.DISABLED_ERR_MSG, true).countedInStats(false);
+            }
+
+            adStats.getStat(StatNames.AD_EXECUTE_REQUEST_COUNT.getName()).increment();
+
+            if (adCircuitBreakerService.isOpen()) {
+                listener.onFailure(new LimitExceededException(adID, CommonErrorMessages.MEMORY_CIRCUIT_BROKEN_ERR_MSG, false));
+                return;
+            }
+            try {
+                stateManager.getAnomalyDetector(adID, onGetDetector(listener, adID, request));
+            } catch (Exception ex) {
+                handleExecuteException(ex, listener, adID);
+            }
         } catch (Exception e) {
             LOG.error(e);
             listener.onFailure(e);
         }
     }
 
-    private void runDetector(AnomalyResultRequest request, String adID, ActionListener<AnomalyResultResponse> listener) {
-        ActionListener<AnomalyResultResponse> original = listener;
-        listener = ActionListener.wrap(r -> {
-            hcDetectors.remove(adID);
-            original.onResponse(r);
-        }, e -> {
-            // If exception is AnomalyDetectionException and it should not be counted in stats,
-            // we will not count it in failure stats.
-            if (!(e instanceof AnomalyDetectionException) || ((AnomalyDetectionException) e).isCountedInStats()) {
-                adStats.getStat(StatNames.AD_EXECUTE_FAIL_COUNT.getName()).increment();
-                if (hcDetectors.contains(adID)) {
-                    adStats.getStat(StatNames.AD_HC_EXECUTE_FAIL_COUNT.getName()).increment();
-                }
-            }
-            hcDetectors.remove(adID);
-            original.onFailure(e);
-        });
-
-        if (!EnabledSetting.isADPluginEnabled()) {
-            throw new EndRunException(adID, CommonErrorMessages.DISABLED_ERR_MSG, true).countedInStats(false);
-        }
-
-        adStats.getStat(StatNames.AD_EXECUTE_REQUEST_COUNT.getName()).increment();
-
-        if (adCircuitBreakerService.isOpen()) {
-            listener.onFailure(new LimitExceededException(adID, CommonErrorMessages.MEMORY_CIRCUIT_BROKEN_ERR_MSG, false));
-            return;
-        }
-        if (adID != null) {
-            listener.onFailure(new EndRunException("aaaaabbbbbccccc", true));
-            return;
-        }
-        try {
-            stateManager.getAnomalyDetector(adID, onGetDetector(listener, adID, request));
-        } catch (Exception ex) {
-            handleExecuteException(ex, listener, adID);
-        }
-    }
+//    private void runDetector(AnomalyResultRequest request, String adID, ActionListener<AnomalyResultResponse> listener) {
+//        ActionListener<AnomalyResultResponse> original = listener;
+//        listener = ActionListener.wrap(r -> {
+//            hcDetectors.remove(adID);
+//            original.onResponse(r);
+//        }, e -> {
+//            // If exception is AnomalyDetectionException and it should not be counted in stats,
+//            // we will not count it in failure stats.
+//            if (!(e instanceof AnomalyDetectionException) || ((AnomalyDetectionException) e).isCountedInStats()) {
+//                adStats.getStat(StatNames.AD_EXECUTE_FAIL_COUNT.getName()).increment();
+//                if (hcDetectors.contains(adID)) {
+//                    adStats.getStat(StatNames.AD_HC_EXECUTE_FAIL_COUNT.getName()).increment();
+//                }
+//            }
+//            hcDetectors.remove(adID);
+//            original.onFailure(e);
+//        });
+//
+//        if (!EnabledSetting.isADPluginEnabled()) {
+//            throw new EndRunException(adID, CommonErrorMessages.DISABLED_ERR_MSG, true).countedInStats(false);
+//        }
+//
+//        adStats.getStat(StatNames.AD_EXECUTE_REQUEST_COUNT.getName()).increment();
+//
+//        if (adCircuitBreakerService.isOpen()) {
+//            listener.onFailure(new LimitExceededException(adID, CommonErrorMessages.MEMORY_CIRCUIT_BROKEN_ERR_MSG, false));
+//            return;
+//        }
+////        if (adID != null) {
+////            listener.onFailure(new EndRunException("aaaaabbbbbccccc", true));
+////            return;
+////        }
+//        try {
+//            stateManager.getAnomalyDetector(adID, onGetDetector(listener, adID, request));
+//        } catch (Exception ex) {
+//            handleExecuteException(ex, listener, adID);
+//        }
+//    }
 
     /**
      * didn't use ActionListener.wrap so that I can
@@ -454,110 +490,127 @@ public class AnomalyResultTransportAction extends HandledTransportAction<ActionR
             long dataStartTime = request.getStart() - delayMillis;
             long dataEndTime = request.getEnd() - delayMillis;
 
-            // HC logic starts here
-            if (anomalyDetector.isMultientityDetector()) {
-                Optional<Exception> previousException = stateManager.fetchExceptionAndClear(adID);
+            adTaskManager.initRealtimeTaskCacheAndCleanupStaleCache(adID, anomalyDetector, transportService,
+                    ActionListener.runAfter(initRealtimeTaskCacheListener(adID), () -> executeAnomalyDetection(listener, adID, request, anomalyDetector, dataStartTime, dataEndTime)));
 
-                if (previousException.isPresent()) {
-                    Exception exception = previousException.get();
-                    LOG.error("Previous exception of {}: {}", adID, exception);
-                    if (exception instanceof EndRunException) {
-                        EndRunException endRunException = (EndRunException) exception;
-                        if (endRunException.isEndNow()) {
-                            listener.onFailure(exception);
-                            return;
-                        }
+            executeAnomalyDetection(listener, adID, request, anomalyDetector, dataStartTime, dataEndTime);
+        }, exception -> handleExecuteException(exception, listener, adID));
+    }
+
+    private ActionListener<Boolean> initRealtimeTaskCacheListener(String detectorId) {
+        return ActionListener.wrap(
+                r -> {
+                    if (r) {
+                        LOG.debug("Realtime task cache initied for detector {}", detectorId);
+                    }
+                },
+                e -> LOG.error("Failed to init realtime task cache for " + detectorId, e)
+        );
+    }
+
+    private void executeAnomalyDetection(ActionListener<AnomalyResultResponse> listener, String adID, AnomalyResultRequest request, AnomalyDetector anomalyDetector, long dataStartTime, long dataEndTime) {
+        // HC logic starts here
+        if (anomalyDetector.isMultientityDetector()) {
+            Optional<Exception> previousException = stateManager.fetchExceptionAndClear(adID);
+
+            if (previousException.isPresent()) {
+                Exception exception = previousException.get();
+                LOG.error("Previous exception of {}: {}", adID, exception);
+                if (exception instanceof EndRunException) {
+                    EndRunException endRunException = (EndRunException) exception;
+                    if (endRunException.isEndNow()) {
+                        listener.onFailure(exception);
+                        return;
                     }
                 }
+            }
 
-                // assume request are in epoch milliseconds
-                long nextDetectionStartTime = request.getEnd() + (long) (anomalyDetector.getDetectorIntervalInMilliseconds()
-                    * intervalRatioForRequest);
+            // assume request are in epoch milliseconds
+            long nextDetectionStartTime = request.getEnd() + (long) (anomalyDetector.getDetectorIntervalInMilliseconds()
+                * intervalRatioForRequest);
 
-                CompositeRetriever compositeRetriever = new CompositeRetriever(
+            CompositeRetriever compositeRetriever = new CompositeRetriever(
                     dataStartTime,
                     dataEndTime,
                     anomalyDetector,
-                    xContentRegistry,
-                    client,
-                    nextDetectionStartTime,
-                    settings,
-                    maxEntitiesPerInterval,
-                    pageSize
-                );
+                xContentRegistry,
+                client,
+                nextDetectionStartTime,
+                settings,
+                maxEntitiesPerInterval,
+                pageSize
+            );
 
-                PageIterator pageIterator = null;
+            PageIterator pageIterator = null;
 
-                try {
-                    pageIterator = compositeRetriever.iterator();
-                } catch (Exception e) {
-                    listener
-                        .onFailure(
-                            new EndRunException(anomalyDetector.getDetectorId(), CommonErrorMessages.INVALID_SEARCH_QUERY_MSG, e, false)
-                        );
-                    return;
-                }
-
-                PageListener getEntityFeatureslistener = new PageListener(pageIterator, adID, dataStartTime, dataEndTime);
-
-                if (pageIterator.hasNext()) {
-                    pageIterator.next(getEntityFeatureslistener);
-                }
-
-                // We don't know when the pagination will not finish. To not
-                // block the following interval request to start, we return immediately.
-                // Pagination will stop itself when the time is up.
-                if (previousException.isPresent()) {
-                    listener.onFailure(previousException.get());
-                } else {
-                    listener
-                        .onResponse(
-                            new AnomalyResultResponse(
-                                Double.NaN,
-                                Double.NaN,
-                                Double.NaN,
-                                new ArrayList<FeatureData>(),
-                                null,
-                                null,
-                                anomalyDetector.getDetectorIntervalInMinutes(),
-                                true
-                            )
-                        );
-                }
+            try {
+                pageIterator = compositeRetriever.iterator();
+            } catch (Exception e) {
+                listener
+                    .onFailure(
+                        new EndRunException(anomalyDetector.getDetectorId(), CommonErrorMessages.INVALID_SEARCH_QUERY_MSG, e, false)
+                    );
                 return;
             }
 
-            // HC logic ends and single entity logic starts here
-            String thresholdModelID = modelPartitioner.getThresholdModelId(adID);
-            Optional<DiscoveryNode> asThresholdNode = hashRing.getOwningNodeWithSameLocalAdVersionForRealtimeAD(thresholdModelID);
-            if (!asThresholdNode.isPresent()) {
-                listener.onFailure(new InternalFailure(adID, "Threshold model node is not available."));
-                return;
+            PageListener getEntityFeatureslistener = new PageListener(pageIterator, adID, dataStartTime, dataEndTime);
+
+            if (pageIterator.hasNext()) {
+                pageIterator.next(getEntityFeatureslistener);
             }
 
-            DiscoveryNode thresholdNode = asThresholdNode.get();
-
-            if (!shouldStart(listener, adID, anomalyDetector, thresholdNode.getId(), thresholdModelID)) {
-                return;
+            // We don't know when the pagination will not finish. To not
+            // block the following interval request to start, we return immediately.
+            // Pagination will stop itself when the time is up.
+            if (previousException.isPresent()) {
+                listener.onFailure(previousException.get());
+            } else {
+                listener
+                    .onResponse(
+                        new AnomalyResultResponse(
+                            Double.NaN,
+                            Double.NaN,
+                            Double.NaN,
+                            new ArrayList<FeatureData>(),
+                            null,
+                            null,
+                            anomalyDetector.getDetectorIntervalInMinutes(),
+                            true
+                        )
+                    );
             }
+            return;
+        }
 
-            featureManager
-                .getCurrentFeatures(
+        // HC logic ends and single entity logic starts here
+        String thresholdModelID = modelPartitioner.getThresholdModelId(adID);
+        Optional<DiscoveryNode> asThresholdNode = hashRing.getOwningNodeWithSameLocalAdVersionForRealtimeAD(thresholdModelID);
+        if (!asThresholdNode.isPresent()) {
+            listener.onFailure(new InternalFailure(adID, "Threshold model node is not available."));
+            return;
+        }
+
+        DiscoveryNode thresholdNode = asThresholdNode.get();
+
+        if (!shouldStart(listener, adID, anomalyDetector, thresholdNode.getId(), thresholdModelID)) {
+            return;
+        }
+
+        featureManager
+            .getCurrentFeatures(
                     anomalyDetector,
                     dataStartTime,
                     dataEndTime,
-                    onFeatureResponseForSingleEntityDetector(
+                onFeatureResponseForSingleEntityDetector(
                         adID,
                         anomalyDetector,
                         listener,
-                        thresholdModelID,
-                        thresholdNode,
+                    thresholdModelID,
+                    thresholdNode,
                         dataStartTime,
                         dataEndTime
-                    )
-                );
-        }, exception -> handleExecuteException(exception, listener, adID));
-
+                )
+            );
     }
 
     // For single entity detector

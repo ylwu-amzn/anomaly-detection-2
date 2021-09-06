@@ -160,6 +160,7 @@ public class AnomalyDetectorJobRunner implements ScheduledJobRunner {
     public void runJob(ScheduledJobParameter jobParameter, JobExecutionContext context) {
         String detectorId = jobParameter.getName();
         log.info("Start to run AD job {}", detectorId);
+        adTaskManager.recordRealtimeJobRunTime(detectorId);
         if (!(jobParameter instanceof AnomalyDetectorJob)) {
             throw new IllegalArgumentException(
                 "Job parameter is not instance of AnomalyDetectorJob, type: " + jobParameter.getClass().getCanonicalName()
@@ -656,12 +657,13 @@ public class AnomalyDetectorJobRunner implements ScheduledJobRunner {
                         detectorIntervalInMinutes
                     );
             }, e -> {
-                if ((e instanceof ResourceNotFoundException) && e.getMessage().contains(CAN_NOT_FIND_LATEST_TASK)) {
-                    log.info("aaaaaaaaaaaaaaaaa create AD realtime task for detector {}", detectorId);
-                    adTaskManager.createRealtimeTask((AnomalyDetectorJob) job);
-                } else {
-                    log.error("Failed to update latest realtime task for detector " + detectorId, e);
-                }
+                log.error("Failed to update latest realtime task for detector " + detectorId, e);
+//                if ((e instanceof ResourceNotFoundException) && e.getMessage().contains(CAN_NOT_FIND_LATEST_TASK)) {
+//                    log.info("aaaaaaaaaaaaaaaaa create AD realtime task for detector {}", detectorId);
+//                    adTaskManager.createRealtimeTask((AnomalyDetectorJob) job);
+//                } else {
+//                    log.error("Failed to update latest realtime task for detector " + detectorId, e);
+//                }
             }));
     }
 
