@@ -268,15 +268,6 @@ public class AnomalyResultTransportAction extends HandledTransportAction<ActionR
         try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
             AnomalyResultRequest request = AnomalyResultRequest.fromActionRequest(actionRequest);
             String adID = request.getAdID();
-            // ActionListener<Boolean> initRealtimeTaskCacheListener = ActionListener.wrap(
-            // r -> {
-            // if (r) LOG.debug("Realtime task cache initied for detector {}", adID);
-            // },
-            // e -> LOG.error("Failed to init realtime task cache for " + adID, e)
-            // );
-            // adTaskManager.initRealtimeTaskCacheAndCleanupStaleCache(adID, transportService,
-            // ActionListener.runAfter(initRealtimeTaskCacheListener, () -> runDetector(request, adID, listener)));
-            // runDetector(request, adID, listener);
             ActionListener<AnomalyResultResponse> original = listener;
             listener = ActionListener.wrap(r -> {
                 hcDetectors.remove(adID);
@@ -314,45 +305,6 @@ public class AnomalyResultTransportAction extends HandledTransportAction<ActionR
             listener.onFailure(e);
         }
     }
-
-    // private void runDetector(AnomalyResultRequest request, String adID, ActionListener<AnomalyResultResponse> listener) {
-    // ActionListener<AnomalyResultResponse> original = listener;
-    // listener = ActionListener.wrap(r -> {
-    // hcDetectors.remove(adID);
-    // original.onResponse(r);
-    // }, e -> {
-    // // If exception is AnomalyDetectionException and it should not be counted in stats,
-    // // we will not count it in failure stats.
-    // if (!(e instanceof AnomalyDetectionException) || ((AnomalyDetectionException) e).isCountedInStats()) {
-    // adStats.getStat(StatNames.AD_EXECUTE_FAIL_COUNT.getName()).increment();
-    // if (hcDetectors.contains(adID)) {
-    // adStats.getStat(StatNames.AD_HC_EXECUTE_FAIL_COUNT.getName()).increment();
-    // }
-    // }
-    // hcDetectors.remove(adID);
-    // original.onFailure(e);
-    // });
-    //
-    // if (!EnabledSetting.isADPluginEnabled()) {
-    // throw new EndRunException(adID, CommonErrorMessages.DISABLED_ERR_MSG, true).countedInStats(false);
-    // }
-    //
-    // adStats.getStat(StatNames.AD_EXECUTE_REQUEST_COUNT.getName()).increment();
-    //
-    // if (adCircuitBreakerService.isOpen()) {
-    // listener.onFailure(new LimitExceededException(adID, CommonErrorMessages.MEMORY_CIRCUIT_BROKEN_ERR_MSG, false));
-    // return;
-    // }
-    //// if (adID != null) {
-    //// listener.onFailure(new EndRunException("aaaaabbbbbccccc", true));
-    //// return;
-    //// }
-    // try {
-    // stateManager.getAnomalyDetector(adID, onGetDetector(listener, adID, request));
-    // } catch (Exception ex) {
-    // handleExecuteException(ex, listener, adID);
-    // }
-    // }
 
     /**
      * didn't use ActionListener.wrap so that I can

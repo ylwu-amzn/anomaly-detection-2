@@ -249,7 +249,10 @@ public class IndexAnomalyDetectorActionHandler {
                 return;
             }
 
-            adTaskManager.getAndExecuteOnLatestDetectorLevelTask(detectorId, HISTORICAL_DETECTOR_TASK_TYPES, (adTask) -> {
+            adTaskManager.getAndExecuteOnLatestDetectorLevelTask(detectorId, HISTORICAL_DETECTOR_TASK_TYPES, (adTask) -> {// TODO: change to
+                                                                                                                          // all detector
+                                                                                                                          // level task
+                                                                                                                          // types
                 if (adTask.isPresent() && !adTask.get().isDone()) {
                     // can't update detector if there is AD task running
                     listener.onFailure(new OpenSearchStatusException("Detector is running", RestStatus.INTERNAL_SERVER_ERROR));

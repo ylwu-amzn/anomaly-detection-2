@@ -38,11 +38,12 @@ public class ADRealtimeTaskCache {
     // detector interval in milliseconds.
     private long detectorIntervalInMillis;
 
-    public ADRealtimeTaskCache(String state, Float initProgress, String error) {
+    public ADRealtimeTaskCache(String state, Float initProgress, String error, long detectorIntervalInMillis) {
         this.state = state;
         this.initProgress = initProgress;
         this.error = error;
         this.lastJobRunTime = Instant.now().toEpochMilli();
+        this.detectorIntervalInMillis = detectorIntervalInMillis;
     }
 
     public String getState() {
@@ -69,16 +70,8 @@ public class ADRealtimeTaskCache {
         this.error = error;
     }
 
-    public long getLastJobRunTime() {
-        return lastJobRunTime;
-    }
-
     public void setLastJobRunTime(long lastJobRunTime) {
         this.lastJobRunTime = lastJobRunTime;
-    }
-
-    public long getDetectorIntervalInMillis() {
-        return detectorIntervalInMillis;
     }
 
     public void setDetectorIntervalInMillis(long detectorIntervalInMillis) {

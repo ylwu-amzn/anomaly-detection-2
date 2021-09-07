@@ -125,8 +125,8 @@ public class ForwardADTaskTransportAction extends HandledTransportAction<Forward
             case FINISHED:
                 boolean historicalTask = adTask.isHistoricalTask();
                 logger
-                    .info(
-                        "aaaaaaaaaaaaaaaaa Received FINISHED action for detector {}, taskId: {}, historical: {}",
+                    .debug(
+                        "Received FINISHED action for detector {}, taskId: {}, historical: {}",
                         detectorId,
                         adTask.getTaskId(),
                         historicalTask

@@ -1026,13 +1026,6 @@ public class ADTaskCacheManager {
             if (newError != null && !newError.equals(realtimeTaskCache.getError())) {
                 errorChanged = true;
             }
-            logger
-                .info(
-                    "aaaaaaaaaaaaaaaaa ------------ stateChanged: {}, initProgressChanged: {}, errorChanged:{}",
-                    stateChanged,
-                    initProgressChanged,
-                    errorChanged
-                );
             if (stateChanged || initProgressChanged || errorChanged) {
                 return true;
             }
@@ -1066,27 +1059,18 @@ public class ADTaskCacheManager {
             if (newError != null) {
                 realtimeTaskCache.setError(newError);
             }
-            logger.info("aaaaaaaaaaaaaaaaa update realtime task cache successfully");
             if (newState != null && !ADTaskState.NOT_ENDED_STATES.contains(newState)) {
-                logger
-                    .info(
-                        "aaaaaaaaaaaaaaaaa 11111111111111111111111111111111111111111111111111 remove RT task cache for detector "
-                            + detectorId
-                    );
+                logger.info("Realtime task done with state {}, remove RT task cache for detector ", newState, detectorId);
                 removeRealtimeTaskCache(detectorId);
             }
         } else {
-            logger.info("aaaaaaaaaaaaaaaaa haven't inited task cache yet @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@  ");
+            logger.debug("Realtime task cache is not inited yet for detector {}", detectorId);
         }
-        // else if (!taskDone){
-        // logger.info("aaaaaaaaaaaaaaaaa don't init task cache @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ ");
-        //// realtimeTaskCaches.put(detectorId, new ADRealtimeTaskCache(newState, newInitProgress, newError));
-        // }
     }
 
-    public void initRealtimeTaskCache(String detectorId) {
-        logger.info("aaaaaaaaaaaaaaaaa init task cache #############################################  ");
-        realtimeTaskCaches.put(detectorId, new ADRealtimeTaskCache(null, null, null));
+    public void initRealtimeTaskCache(String detectorId, long detectorIntervalInMillis) {
+        realtimeTaskCaches.put(detectorId, new ADRealtimeTaskCache(null, null, null, detectorIntervalInMillis));
+        logger.debug("Realtime task cache inited");
     }
 
     public void recordRealtimeJobRunTime(String detectorId) {
@@ -1109,8 +1093,8 @@ public class ADTaskCacheManager {
      * @param detectorId detector id
      */
     public void removeRealtimeTaskCache(String detectorId) {
-        logger.info("aaaaaaaaaaaaaaaaa Delete realtime cache for detector {}, {}", detectorId, realtimeTaskCaches.containsKey(detectorId));
         if (realtimeTaskCaches.containsKey(detectorId)) {
+            logger.info("Delete realtime cache for detector {}", detectorId);
             realtimeTaskCaches.remove(detectorId);
         }
     }

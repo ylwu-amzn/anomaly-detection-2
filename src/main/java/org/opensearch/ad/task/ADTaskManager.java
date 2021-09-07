@@ -90,7 +90,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Semaphore;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
@@ -993,21 +992,18 @@ public class ADTaskManager {
         SearchRequest searchRequest = new SearchRequest();
         searchRequest.source(sourceBuilder);
         searchRequest.indices(DETECTION_STATE_INDEX);
-        logger.info("aaaaaaaaaaaaaaaaa query to search latest AD task for detctor {}, {}", detectorId, sourceBuilder);
 
         client.search(searchRequest, ActionListener.wrap(r -> {
             // https://github.com/opendistro-for-elasticsearch/anomaly-detection/pull/359#discussion_r558653132
             // getTotalHits will be null when we track_total_hits is false in the query request.
             // Add more checking here to cover some unknown cases.
             List<ADTask> adTasks = new ArrayList<>();
-            logger.info("aaaaaaaaaaaaaaaaa ad tasks size of detctor {}, {}", detectorId, r.getHits().getTotalHits());
             if (r == null || r.getHits().getTotalHits() == null || r.getHits().getTotalHits().value == 0) {
                 // don't throw exception here as consumer functions need to handle missing task
                 // in different way.
                 function.accept(adTasks);
                 return;
             }
-            logger.info("aaaaaaaaaaaaaaaaa ad tasks size of detctor {}, {}", detectorId, r.getHits().getTotalHits().value);
 
             Iterator<SearchHit> iterator = r.getHits().iterator();
             while (iterator.hasNext()) {
@@ -1319,7 +1315,7 @@ public class ADTaskManager {
         } catch (ResourceNotFoundException e) {
             logger
                 .warn(
-                    "aaaaaaaaaaaaaaaaa ++++++++++++++ Task coordinating node left cluster, taskId: {}, detectorId: {}, coordinatingNode: {}",
+                    "Task coordinating node left cluster, taskId: {}, detectorId: {}, coordinatingNode: {}",
                     taskId,
                     detectorId,
                     coordinatingNode
@@ -1470,7 +1466,7 @@ public class ADTaskManager {
         client.execute(UpdateByQueryAction.INSTANCE, updateByQueryRequest, ActionListener.wrap(r -> {
             List<BulkItemResponse.Failure> bulkFailures = r.getBulkFailures();
             if (bulkFailures.isEmpty()) {
-                // Realtime AD coordinating node is chosen by job scheduler, so won't know it until realtime AD job
+                // Realtime AD coordinating node is chosen by job scheduler, we won't know it until realtime AD job
                 // runs. Just set realtime AD coordinating node as null here, and AD job runner will reset correct
                 // coordinating node once realtime job starts.
                 createNewADTask(detector, detectionDateRange, user, null, listener);
@@ -1494,7 +1490,6 @@ public class ADTaskManager {
         String userName = user == null ? null : user.getName();
         Instant now = Instant.now();
         String taskType = getADTaskType(detector, detectionDateRange).name();
-        // String coordinatingNode = detectionDateRange == null? null : clusterService.localNode().getId();
         String coordinatingNode = detectionDateRange == null ? realtimeADCoordinatingNode : clusterService.localNode().getId();
         ADTask adTask = new ADTask.Builder()
             .detectorId(detector.getDetectorId())
@@ -1567,8 +1562,9 @@ public class ADTaskManager {
                 listener.onFailure(new OpenSearchStatusException(DETECTOR_IS_RUNNING, RestStatus.BAD_REQUEST));
             } else {
                 // For historical AD task, clear historical task if any other exception happened.
-                // For realtime AD, task cache will not be inited if failed to create realtime AD task,
-                // check ADTaskManager#initRealtimeTaskCacheAndCleanupStaleCache for details.
+                // For realtime AD, task cache will be inited when realtime job starts, check
+                // ADTaskManager#initRealtimeTaskCacheAndCleanupStaleCache for details. Here the
+                // realtime task cache not inited yet when create AD task, so no need to cleanup.
                 if (adTask.isHistoricalTask()) {
                     adTaskCacheManager.removeHistoricalTaskCache(adTask.getDetectorId());
                 }
@@ -1977,12 +1973,10 @@ public class ADTaskManager {
                     }
                 }, e -> { listener.onFailure(e); }));
 
-                // String localNodeId = clusterService.localNode().getId();
-                String oldCoordinatingNode = adTask.get().getCoordinatingNode();
-                if (oldCoordinatingNode != null && transportService != null) {
+                String coordinatingNode = adTask.get().getCoordinatingNode();
+                if (coordinatingNode != null && transportService != null) {
                     cleanDetectorCache(adTask.get(), transportService, function, listener);
                 } else {
-                    logger.warn("aaaaaaaaaa Realtime task coordinating node is null for " + detectorId);
                     function.execute();
                 }
             } else {
@@ -2009,14 +2003,6 @@ public class ADTaskManager {
         String error,
         ActionListener<UpdateResponse> listener
     ) {
-        logger
-            .info(
-                "aaaaaaaaaaaaaaaaa start to updateLatestRealtimeTaskOnCoordinatingNode .......... newState: {}, rcfTotalUpdates: {} detectorIntervalInMinutes: {}, error: {}",
-                state,
-                rcfTotalUpdates,
-                detectorIntervalInMinutes,
-                error
-            );
         Float initProgress = null;
         String newState = null;
         // calculate init progress and task state with RCF total updates
@@ -2035,17 +2021,11 @@ public class ADTaskManager {
         }
 
         error = Optional.ofNullable(error).orElse("");
-        logger
-            .info(
-                "aaaaaaaaaaaaaaaaa, realtime task changed: {}",
-                adTaskCacheManager.isRealtimeTaskChanged(detectorId, newState, initProgress, error)
-            );
         if (!adTaskCacheManager.isRealtimeTaskChanged(detectorId, newState, initProgress, error)) {
-            listener.onResponse(null);
             // If task not changed, no need to update, just return
+            listener.onResponse(null);
             return;
         }
-        logger.info("aaaaaaaaaaaaaaaaa, update RT task state as : {}", newState);
         Map<String, Object> updatedFields = new HashMap<>();
         updatedFields.put(COORDINATING_NODE_FIELD, clusterService.localNode().getId());
         if (initProgress != null) {
@@ -2096,15 +2076,13 @@ public class ADTaskManager {
     ) {
         try {
             if (adTaskCacheManager.getRealtimeTaskCache(detectorId) != null) {
-                logger.info("aaaaaaaaaaaaaaaaa realtime task cache already inited for detector {}", detectorId);
                 listener.onResponse(false);
                 return;
             }
 
-            logger.info("aaaaaaaaaaaaaaaaa Start to init realtime task cache for detector {}", detectorId);
             getAndExecuteOnLatestDetectorLevelTask(detectorId, REALTIME_TASK_TYPES, (adTaskOptional) -> {
                 if (!adTaskOptional.isPresent()) {
-                    logger.info("aaaaaaaaaaaaaaaaa Can't find realtime task for detector {}, init cache directly", detectorId);
+                    logger.debug("Can't find realtime task for detector {}, init realtime task cache directly", detectorId);
                     AnomalyDetectorFunction function = () -> createNewADTask(
                         detector,
                         null,
@@ -2112,7 +2090,7 @@ public class ADTaskManager {
                         clusterService.localNode().getId(),
                         ActionListener.wrap(r -> {
                             logger.info("Recreate realtime task successfully for detector {}", detectorId);
-                            adTaskCacheManager.initRealtimeTaskCache(detectorId);
+                            adTaskCacheManager.initRealtimeTaskCache(detectorId, detector.getDetectorIntervalInMinutes());
                             listener.onResponse(true);
                         }, e -> {
                             logger.error("Failed to recreate realtime task for detector " + detectorId, e);
@@ -2129,7 +2107,7 @@ public class ADTaskManager {
                 if (oldCoordinatingNode != null && !localNodeId.equals(oldCoordinatingNode)) {
                     logger
                         .warn(
-                            "aaaaaaaaaaaaaaaaa AD realtime job coordinating node changed from {} to this node {} for detector {}",
+                            "AD realtime job coordinating node changed from {} to this node {} for detector {}",
                             oldCoordinatingNode,
                             localNodeId,
                             detectorId
@@ -2137,16 +2115,16 @@ public class ADTaskManager {
                     cleanDetectorCache(adTask, transportService, () -> {
                         logger
                             .info(
-                                "aaaaaaaaaaaaaaaaa Realtime task cache cleaned on old coordinating node {} for detector {}",
+                                "Realtime task cache cleaned on old coordinating node {} for detector {}",
                                 oldCoordinatingNode,
                                 detectorId
                             );
-                        adTaskCacheManager.initRealtimeTaskCache(detectorId);
+                        adTaskCacheManager.initRealtimeTaskCache(detectorId, detector.getDetectorIntervalInMinutes());
                         listener.onResponse(true);
                     }, listener);
                 } else {
-                    logger.info("aaaaaaaaaaaaaaaaa AD realtime job  node not changed for detector {}", detectorId);
-                    adTaskCacheManager.initRealtimeTaskCache(detectorId);
+                    logger.info("Init realtime task cache for detector {}", detectorId);
+                    adTaskCacheManager.initRealtimeTaskCache(detectorId, detector.getDetectorIntervalInMinutes());
                     listener.onResponse(true);
                 }
             }, transportService, false, listener);
@@ -2181,7 +2159,7 @@ public class ADTaskManager {
         }
     }
 
-    public void recordRealtimeJobRunTime(String detectorId) {
+    public void refreshRealtimeJobRunTime(String detectorId) {
         adTaskCacheManager.recordRealtimeJobRunTime(detectorId);
     }
 
@@ -2740,7 +2718,8 @@ public class ADTaskManager {
     public boolean skipUpdateHCRealtimeTask(String detectorId, String error) {
         ADRealtimeTaskCache realtimeTaskCache = adTaskCacheManager.getRealtimeTaskCache(detectorId);
         return realtimeTaskCache != null
-            && realtimeTaskCache.getInitProgress() == 1.0
+            && realtimeTaskCache.getInitProgress() != null
+            && realtimeTaskCache.getInitProgress().floatValue() == 1.0
             && Objects.equals(error, realtimeTaskCache.getError());
     }
 
@@ -2989,11 +2968,8 @@ public class ADTaskManager {
     }
 
     /**
-     * Maintain running realtime tasks:
-     * 1. check if realtime time job enabled or not, if job not enabled or not found, reset latest
-     *    realtime task as STOPPED and remove realtime task cache.
-     * 2. If AD job index doesn't exist, reset all running realtime tasks for all detectors as STOPPED
-     *    and clear all realtime tasks cache.
+     * Maintain running realtime tasks. Check if realtime task cache expires or not. Remove realtime
+     * task cache directly if expired.
      */
     public void maintainRunningRealtimeTasks() {
         String[] detectorIds = adTaskCacheManager.getDetectorIdsInRealtimeTaskCache();
@@ -3009,135 +2985,4 @@ public class ADTaskManager {
         }
     }
 
-    public void maintainRunningRealtimeTasksOldCode() {
-        threadPool.schedule(() -> {
-            String[] detectorsInRealtimeTaskCache = adTaskCacheManager.getDetectorIdsInRealtimeTaskCache();
-            // Default maintain interval is 5 seconds, so 100 detectors will take 500 seconds at least.
-            int maxDetectorsToMaintain = Math.min(100, detectorsInRealtimeTaskCache.length);
-            if (maxDetectorsToMaintain == 0) {
-                logger.debug("No running realtime tasks to maintain");
-                return;
-            }
-            ConcurrentLinkedQueue<String> detectorIdQueue = new ConcurrentLinkedQueue<>();
-            for (int i = 0; i < maxDetectorsToMaintain; i++) {
-                detectorIdQueue.add(detectorsInRealtimeTaskCache[i]);
-            }
-            maintainRunningRealtimeTask(detectorIdQueue);
-        }, TimeValue.timeValueSeconds(ThreadLocalRandom.current().nextLong(2, 60)), AD_BATCH_TASK_THREAD_POOL_NAME);
-    }
-
-    private void maintainRunningRealtimeTask(ConcurrentLinkedQueue<String> detectorIdQueue) {
-        String detectorId = detectorIdQueue.poll();
-        if (detectorId == null) {
-            return;
-        }
-        String logPrefix = "[maintainRunningRealtimeTask]";
-        threadPool.schedule(() -> {
-            GetRequest getJobRequest = new GetRequest(ANOMALY_DETECTOR_JOB_INDEX, detectorId);
-            client.get(getJobRequest, ActionListener.wrap(r -> {
-                if (r.isExists()) {
-                    try (XContentParser parser = createXContentParserFromRegistry(xContentRegistry, r.getSourceAsBytesRef())) {
-                        ensureExpectedToken(XContentParser.Token.START_OBJECT, parser.nextToken(), parser);
-                        AnomalyDetectorJob job = AnomalyDetectorJob.parse(parser);
-                        if (!job.isEnabled()) {
-                            logger
-                                .debug(
-                                    "{} Maintain running realtime task: AD job is disabled, reset realtime task as stopped for detector {}",
-                                    logPrefix,
-                                    detectorId
-                                );
-                            stopLatestRealtimeTask(detectorId);
-                        } else {
-                            logger.debug("{} AD job is running for detector {}", logPrefix, detectorId);
-                            getAndExecuteOnLatestDetectorLevelTask(detectorId, REALTIME_TASK_TYPES, (adTask) -> {
-                                String localNodeId = clusterService.localNode().getId();
-                                if (!adTask.isPresent()) {
-                                    // Don't recreate realtime task here. Job runner will recreate realtime task.
-                                    logger.warn("{} Realtime task not found for running AD job {}", logPrefix, detectorId);
-                                } else if (!localNodeId.equals(adTask.get().getCoordinatingNode())) {
-                                    // Clean up realtime task if realtime task coordinating node changed.
-                                    logger
-                                        .warn(
-                                            "{} Clean up realtime task cache as realtime task coordinating node changed for running AD job {}",
-                                            logPrefix,
-                                            detectorId
-                                        );
-                                    adTaskCacheManager.removeRealtimeTaskCache(detectorId);
-                                }
-                            },
-                                null,
-                                false,
-                                ActionListener
-                                    .wrap(
-                                        res -> {
-                                            logger.debug("{} Successfully got latest realtime task for detector {}", logPrefix, detectorId);
-                                        },
-                                        ex -> {
-                                            logger.error(logPrefix + " Failed to get latest realtime task for detector " + detectorId, ex);
-                                        }
-                                    )
-                            );
-                        }
-                    } catch (IOException e) {
-                        logger.error(logPrefix + " Failed to parse AD job " + detectorId, e);
-                    }
-                } else {
-                    logger.debug("{} AD job is not found, reset realtime task as stopped for detector {}", logPrefix, detectorId);
-                    stopLatestRealtimeTask(detectorId);
-                }
-                maintainRunningRealtimeTask(detectorIdQueue);
-            }, e -> {
-                if (e instanceof IndexNotFoundException) {
-                    logger.debug(logPrefix + " AD job index deleted");
-                    adTaskCacheManager.clearRealtimeTaskCache();
-                    resetAllRealtimeTasksAsStopped();
-                } else {
-                    // Stop poll next detector in case any exception happen to avoid adding more load to cluster
-                    logger.error(logPrefix + " Failed to get detector job for detector " + detectorId, e);
-                }
-            }));
-        }, TimeValue.timeValueSeconds(DEFAULT_MAINTAIN_INTERVAL_IN_SECONDS), AD_BATCH_TASK_THREAD_POOL_NAME);
-    }
-
-    /**
-     * Set latest realtime task as STOPPED and clean up realtime task cache.
-     * @param detectorId detector id
-     */
-    private void stopLatestRealtimeTask(String detectorId) {
-        updateLatestRealtimeTaskOnCoordinatingNode(
-            detectorId,
-            ADTaskState.STOPPED.name(),
-            null,
-            null,
-            null,
-            ActionListener
-                .wrap(
-                    res -> logger.info("Stopped latest realtime task successfully for " + detectorId),
-                    ex -> logger.warn("Failed to stop latest realtime task for " + detectorId, ex)
-                )
-        );
-    }
-
-    private void resetAllRealtimeTasksAsStopped() {
-        UpdateByQueryRequest updateByQueryRequest = new UpdateByQueryRequest();
-        updateByQueryRequest.indices(DETECTION_STATE_INDEX);
-        BoolQueryBuilder query = new BoolQueryBuilder();
-        query.filter(new TermsQueryBuilder(TASK_TYPE_FIELD, taskTypeToString(REALTIME_TASK_TYPES)));
-        query.filter(new TermsQueryBuilder(STATE_FIELD, NOT_ENDED_STATES));
-        updateByQueryRequest.setQuery(query);
-        updateByQueryRequest.setRefresh(true);
-        String script = String.format(Locale.ROOT, "ctx._source.%s='%s';", STATE_FIELD, ADTaskState.STOPPED.name());
-        updateByQueryRequest.setScript(new Script(script));
-
-        client
-            .execute(
-                UpdateByQueryAction.INSTANCE,
-                updateByQueryRequest,
-                ActionListener
-                    .wrap(
-                        r -> { logger.info("Set all running realtime tasks as stopped"); },
-                        e -> logger.error("Exception happened when set all realtime tasks as stopped ", e)
-                    )
-            );
-    }
 }
