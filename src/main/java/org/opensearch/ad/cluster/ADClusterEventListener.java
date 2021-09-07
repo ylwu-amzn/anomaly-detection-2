@@ -142,7 +142,9 @@ public class ADClusterEventListener implements ClusterStateListener {
                                 if (node.isPresent() && !node.get().getId().equals(localNodeId)) {
                                     LOG.info(REMOVE_MODEL_MSG + " {}", modelId);
                                     modelManager
-                                        .stopModel(//TODO: confirm with Kaituo, the stop model method just store RCF and threshold model into checkpoint index, will not clear cache?
+                                        .stopModel(
+                                            // TODO: confirm with Kaituo, the stop model method just store RCF and threshold model into
+                                            // checkpoint index, will not clear cache?
                                             modelManager.getDetectorIdForModelId(modelId),
                                             modelId,
                                             ActionListener

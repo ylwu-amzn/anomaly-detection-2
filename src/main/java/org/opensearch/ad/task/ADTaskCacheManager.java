@@ -62,10 +62,10 @@ import org.opensearch.ad.model.Entity;
 import org.opensearch.ad.settings.AnomalyDetectorSettings;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.settings.Settings;
+import org.opensearch.transport.TransportService;
 
 import com.amazon.randomcutforest.RandomCutForest;
 import com.google.common.collect.ImmutableList;
-import org.opensearch.transport.TransportService;
 
 public class ADTaskCacheManager {
     private final Logger logger = LogManager.getLogger(ADTaskCacheManager.class);
@@ -1026,8 +1026,13 @@ public class ADTaskCacheManager {
             if (newError != null && !newError.equals(realtimeTaskCache.getError())) {
                 errorChanged = true;
             }
-            logger.info("aaaaaaaaaaaaaaaaa ------------ stateChanged: {}, initProgressChanged: {}, errorChanged:{}",
-                    stateChanged, initProgressChanged, errorChanged);
+            logger
+                .info(
+                    "aaaaaaaaaaaaaaaaa ------------ stateChanged: {}, initProgressChanged: {}, errorChanged:{}",
+                    stateChanged,
+                    initProgressChanged,
+                    errorChanged
+                );
             if (stateChanged || initProgressChanged || errorChanged) {
                 return true;
             }
@@ -1062,18 +1067,21 @@ public class ADTaskCacheManager {
                 realtimeTaskCache.setError(newError);
             }
             logger.info("aaaaaaaaaaaaaaaaa update realtime task cache successfully");
-            boolean taskDone = !ADTaskState.NOT_ENDED_STATES.contains(newState);
-            if (taskDone) {
-                logger.info("aaaaaaaaaaaaaaaaa 11111111111111111111111111111111111111111111111111 remove RT task cache for detector " + detectorId);
+            if (newState != null && !ADTaskState.NOT_ENDED_STATES.contains(newState)) {
+                logger
+                    .info(
+                        "aaaaaaaaaaaaaaaaa 11111111111111111111111111111111111111111111111111 remove RT task cache for detector "
+                            + detectorId
+                    );
                 removeRealtimeTaskCache(detectorId);
             }
         } else {
             logger.info("aaaaaaaaaaaaaaaaa haven't inited task cache yet @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@  ");
         }
-//        else if (!taskDone){
-//            logger.info("aaaaaaaaaaaaaaaaa don't init task cache @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@  ");
-////            realtimeTaskCaches.put(detectorId, new ADRealtimeTaskCache(newState, newInitProgress, newError));
-//        }
+        // else if (!taskDone){
+        // logger.info("aaaaaaaaaaaaaaaaa don't init task cache @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ ");
+        //// realtimeTaskCaches.put(detectorId, new ADRealtimeTaskCache(newState, newInitProgress, newError));
+        // }
     }
 
     public void initRealtimeTaskCache(String detectorId) {

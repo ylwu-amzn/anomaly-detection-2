@@ -46,7 +46,6 @@ import org.opensearch.ad.model.ADTaskAction;
 import org.opensearch.ad.model.ADTaskState;
 import org.opensearch.ad.model.AnomalyDetector;
 import org.opensearch.ad.model.DetectionDateRange;
-import org.opensearch.ad.stats.ADStats;
 import org.opensearch.ad.task.ADTaskCacheManager;
 import org.opensearch.ad.task.ADTaskManager;
 import org.opensearch.common.inject.Inject;

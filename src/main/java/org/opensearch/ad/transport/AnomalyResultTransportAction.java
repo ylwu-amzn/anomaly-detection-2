@@ -268,14 +268,14 @@ public class AnomalyResultTransportAction extends HandledTransportAction<ActionR
         try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
             AnomalyResultRequest request = AnomalyResultRequest.fromActionRequest(actionRequest);
             String adID = request.getAdID();
-//            ActionListener<Boolean> initRealtimeTaskCacheListener = ActionListener.wrap(
-//                    r -> {
-//                        if (r) LOG.debug("Realtime task cache initied for detector {}", adID);
-//                    },
-//                    e -> LOG.error("Failed to init realtime task cache for " + adID, e)
-//            );
-//            adTaskManager.initRealtimeTaskCacheAndCleanupStaleCache(adID, transportService,
-//                    ActionListener.runAfter(initRealtimeTaskCacheListener, () -> runDetector(request, adID, listener)));
+            // ActionListener<Boolean> initRealtimeTaskCacheListener = ActionListener.wrap(
+            // r -> {
+            // if (r) LOG.debug("Realtime task cache initied for detector {}", adID);
+            // },
+            // e -> LOG.error("Failed to init realtime task cache for " + adID, e)
+            // );
+            // adTaskManager.initRealtimeTaskCacheAndCleanupStaleCache(adID, transportService,
+            // ActionListener.runAfter(initRealtimeTaskCacheListener, () -> runDetector(request, adID, listener)));
             // runDetector(request, adID, listener);
             ActionListener<AnomalyResultResponse> original = listener;
             listener = ActionListener.wrap(r -> {
@@ -315,44 +315,44 @@ public class AnomalyResultTransportAction extends HandledTransportAction<ActionR
         }
     }
 
-//    private void runDetector(AnomalyResultRequest request, String adID, ActionListener<AnomalyResultResponse> listener) {
-//        ActionListener<AnomalyResultResponse> original = listener;
-//        listener = ActionListener.wrap(r -> {
-//            hcDetectors.remove(adID);
-//            original.onResponse(r);
-//        }, e -> {
-//            // If exception is AnomalyDetectionException and it should not be counted in stats,
-//            // we will not count it in failure stats.
-//            if (!(e instanceof AnomalyDetectionException) || ((AnomalyDetectionException) e).isCountedInStats()) {
-//                adStats.getStat(StatNames.AD_EXECUTE_FAIL_COUNT.getName()).increment();
-//                if (hcDetectors.contains(adID)) {
-//                    adStats.getStat(StatNames.AD_HC_EXECUTE_FAIL_COUNT.getName()).increment();
-//                }
-//            }
-//            hcDetectors.remove(adID);
-//            original.onFailure(e);
-//        });
-//
-//        if (!EnabledSetting.isADPluginEnabled()) {
-//            throw new EndRunException(adID, CommonErrorMessages.DISABLED_ERR_MSG, true).countedInStats(false);
-//        }
-//
-//        adStats.getStat(StatNames.AD_EXECUTE_REQUEST_COUNT.getName()).increment();
-//
-//        if (adCircuitBreakerService.isOpen()) {
-//            listener.onFailure(new LimitExceededException(adID, CommonErrorMessages.MEMORY_CIRCUIT_BROKEN_ERR_MSG, false));
-//            return;
-//        }
-////        if (adID != null) {
-////            listener.onFailure(new EndRunException("aaaaabbbbbccccc", true));
-////            return;
-////        }
-//        try {
-//            stateManager.getAnomalyDetector(adID, onGetDetector(listener, adID, request));
-//        } catch (Exception ex) {
-//            handleExecuteException(ex, listener, adID);
-//        }
-//    }
+    // private void runDetector(AnomalyResultRequest request, String adID, ActionListener<AnomalyResultResponse> listener) {
+    // ActionListener<AnomalyResultResponse> original = listener;
+    // listener = ActionListener.wrap(r -> {
+    // hcDetectors.remove(adID);
+    // original.onResponse(r);
+    // }, e -> {
+    // // If exception is AnomalyDetectionException and it should not be counted in stats,
+    // // we will not count it in failure stats.
+    // if (!(e instanceof AnomalyDetectionException) || ((AnomalyDetectionException) e).isCountedInStats()) {
+    // adStats.getStat(StatNames.AD_EXECUTE_FAIL_COUNT.getName()).increment();
+    // if (hcDetectors.contains(adID)) {
+    // adStats.getStat(StatNames.AD_HC_EXECUTE_FAIL_COUNT.getName()).increment();
+    // }
+    // }
+    // hcDetectors.remove(adID);
+    // original.onFailure(e);
+    // });
+    //
+    // if (!EnabledSetting.isADPluginEnabled()) {
+    // throw new EndRunException(adID, CommonErrorMessages.DISABLED_ERR_MSG, true).countedInStats(false);
+    // }
+    //
+    // adStats.getStat(StatNames.AD_EXECUTE_REQUEST_COUNT.getName()).increment();
+    //
+    // if (adCircuitBreakerService.isOpen()) {
+    // listener.onFailure(new LimitExceededException(adID, CommonErrorMessages.MEMORY_CIRCUIT_BROKEN_ERR_MSG, false));
+    // return;
+    // }
+    //// if (adID != null) {
+    //// listener.onFailure(new EndRunException("aaaaabbbbbccccc", true));
+    //// return;
+    //// }
+    // try {
+    // stateManager.getAnomalyDetector(adID, onGetDetector(listener, adID, request));
+    // } catch (Exception ex) {
+    // handleExecuteException(ex, listener, adID);
+    // }
+    // }
 
     /**
      * didn't use ActionListener.wrap so that I can
@@ -490,25 +490,38 @@ public class AnomalyResultTransportAction extends HandledTransportAction<ActionR
             long dataStartTime = request.getStart() - delayMillis;
             long dataEndTime = request.getEnd() - delayMillis;
 
-            adTaskManager.initRealtimeTaskCacheAndCleanupStaleCache(adID, anomalyDetector, transportService,
-                    ActionListener.runAfter(initRealtimeTaskCacheListener(adID), () -> executeAnomalyDetection(listener, adID, request, anomalyDetector, dataStartTime, dataEndTime)));
+            adTaskManager
+                .initRealtimeTaskCacheAndCleanupStaleCache(
+                    adID,
+                    anomalyDetector,
+                    transportService,
+                    ActionListener
+                        .runAfter(
+                            initRealtimeTaskCacheListener(adID),
+                            () -> executeAnomalyDetection(listener, adID, request, anomalyDetector, dataStartTime, dataEndTime)
+                        )
+                );
 
-            executeAnomalyDetection(listener, adID, request, anomalyDetector, dataStartTime, dataEndTime);
+            // executeAnomalyDetection(listener, adID, request, anomalyDetector, dataStartTime, dataEndTime);
         }, exception -> handleExecuteException(exception, listener, adID));
     }
 
     private ActionListener<Boolean> initRealtimeTaskCacheListener(String detectorId) {
-        return ActionListener.wrap(
-                r -> {
-                    if (r) {
-                        LOG.debug("Realtime task cache initied for detector {}", detectorId);
-                    }
-                },
-                e -> LOG.error("Failed to init realtime task cache for " + detectorId, e)
-        );
+        return ActionListener.wrap(r -> {
+            if (r) {
+                LOG.debug("Realtime task cache initied for detector {}", detectorId);
+            }
+        }, e -> LOG.error("Failed to init realtime task cache for " + detectorId, e));
     }
 
-    private void executeAnomalyDetection(ActionListener<AnomalyResultResponse> listener, String adID, AnomalyResultRequest request, AnomalyDetector anomalyDetector, long dataStartTime, long dataEndTime) {
+    private void executeAnomalyDetection(
+        ActionListener<AnomalyResultResponse> listener,
+        String adID,
+        AnomalyResultRequest request,
+        AnomalyDetector anomalyDetector,
+        long dataStartTime,
+        long dataEndTime
+    ) {
         // HC logic starts here
         if (anomalyDetector.isMultientityDetector()) {
             Optional<Exception> previousException = stateManager.fetchExceptionAndClear(adID);
@@ -530,9 +543,9 @@ public class AnomalyResultTransportAction extends HandledTransportAction<ActionR
                 * intervalRatioForRequest);
 
             CompositeRetriever compositeRetriever = new CompositeRetriever(
-                    dataStartTime,
-                    dataEndTime,
-                    anomalyDetector,
+                dataStartTime,
+                dataEndTime,
+                anomalyDetector,
                 xContentRegistry,
                 client,
                 nextDetectionStartTime,
@@ -598,17 +611,17 @@ public class AnomalyResultTransportAction extends HandledTransportAction<ActionR
 
         featureManager
             .getCurrentFeatures(
-                    anomalyDetector,
-                    dataStartTime,
-                    dataEndTime,
+                anomalyDetector,
+                dataStartTime,
+                dataEndTime,
                 onFeatureResponseForSingleEntityDetector(
-                        adID,
-                        anomalyDetector,
-                        listener,
+                    adID,
+                    anomalyDetector,
+                    listener,
                     thresholdModelID,
                     thresholdNode,
-                        dataStartTime,
-                        dataEndTime
+                    dataStartTime,
+                    dataEndTime
                 )
             );
     }
