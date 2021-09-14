@@ -110,7 +110,8 @@ public class ADTaskCacheManager {
     // Key: task id
     private final Map<String, ADBatchTaskCache> batchTaskCaches;
     // cache detector level task state on worker node
-    private Map<String, ADHCBatchTaskRunState> hcDetectorTaskState;
+    // Key: HC detector level task id;
+    private Map<String, Map<String, ADHCBatchTaskRunState>> hcBatchTaskRunState;
 
     // ===================================================================
     // Fields below are caches on any data node serves delete detector
@@ -139,7 +140,7 @@ public class ADTaskCacheManager {
         this.deletedDetectorTasks = new ConcurrentLinkedQueue<>();
         this.deletedDetectors = new ConcurrentLinkedQueue<>();
         this.detectorTaskSlotLimit = new ConcurrentHashMap<>();
-        this.hcDetectorTaskState = new ConcurrentHashMap<>();
+        this.hcBatchTaskRunState = new ConcurrentHashMap<>();
     }
 
     /**
@@ -169,6 +170,10 @@ public class ADTaskCacheManager {
         ADBatchTaskCache taskCache = new ADBatchTaskCache(adTask);
         taskCache.getCacheMemorySize().set(neededCacheSize);
         batchTaskCaches.put(taskId, taskCache);
+        if (adTask.isEntityTask()) {
+            Map<String, ADHCBatchTaskRunState> runStates = hcBatchTaskRunState.computeIfAbsent(detectorId, it -> new ConcurrentHashMap<>());
+            runStates.put(adTask.getParentTaskId(), new ADHCBatchTaskRunState());
+        }
     }
 
     /**
@@ -188,6 +193,8 @@ public class ADTaskCacheManager {
         if (ADTaskType.HISTORICAL_HC_DETECTOR.name().equals(adTask.getTaskType())) {
             ADHCBatchTaskCache adhcBatchTaskCache = new ADHCBatchTaskCache();
             this.hcBatchTaskCaches.put(detectorId, adhcBatchTaskCache);
+            Map<String, ADHCBatchTaskRunState> runStates = hcBatchTaskRunState.computeIfAbsent(detectorId, it -> new ConcurrentHashMap<>());
+            runStates.put(adTask.getTaskId(), new ADHCBatchTaskRunState());
         }
     }
 
@@ -463,7 +470,6 @@ public class ADTaskCacheManager {
             logger.info("Detector is not in AD task coordinating node cache");
         }
         detectorTaskSlotLimit.remove(detectorId);
-        hcDetectorTaskState.remove(detectorId);
     }
 
     /**
@@ -477,14 +483,21 @@ public class ADTaskCacheManager {
     public ADTaskCancellationState cancelByDetectorId(String detectorId, String reason, String userName) {
         ADHCBatchTaskCache hcTaskCache = hcBatchTaskCaches.get(detectorId);
         List<ADBatchTaskCache> taskCaches = getBatchTaskCacheByDetectorId(detectorId);
+        String detectorTaskId = null;
         if (hcTaskCache != null) {
             // coordinating node
+            detectorTaskId = detectorTasks.get(detectorId);
             logger.debug("Set HC historical analysis as cancelled for detector {}", detectorId);
             hcTaskCache.clearPendingEntities();
             hcTaskCache.setEntityTaskLanes(0);
-        } else if (!isNullOrEmpty(taskCaches)) {
-            // worker node
-            ADHCBatchTaskRunState taskStateCache = getOrCreateHCDetectorTaskStateCache(detectorId);
+        }
+
+        if (!isNullOrEmpty(taskCaches)) {
+            detectorTaskId = taskCaches.get(0).getParentTaskId();
+        }
+
+        if (detectorTaskId != null) {
+            ADHCBatchTaskRunState taskStateCache = getOrCreateHCDetectorTaskStateCache(detectorTaskId);
             taskStateCache.setHistoricalAnalysisCancelled(true);
             taskStateCache.setCancelReason(reason);
             taskStateCache.setCancelledBy(userName);
@@ -515,7 +528,7 @@ public class ADTaskCacheManager {
         ADBatchTaskCache taskCache = getBatchTaskCache(taskId);
         String detectorId = taskCache.getDetectorId();
 
-        ADHCBatchTaskRunState taskStateCache = hcDetectorTaskState.get(detectorId);
+        ADHCBatchTaskRunState taskStateCache = hcBatchTaskRunState.get(detectorId);
         boolean hcDetectorStopped = false;
         if (taskStateCache != null) {
             hcDetectorStopped = taskStateCache.getHistoricalAnalysisCancelled();
@@ -529,11 +542,11 @@ public class ADTaskCacheManager {
     /**
      * Check if HC detector's historical analysis cancelled or not.
      *
-     * @param detectorId detector id
+     * @param detectorLevelTaskId detector id
      * @return true if HC detector historical analysis cancelled; otherwise return false
      */
-    public boolean isHistoricalAnalysisCancelledForHC(String detectorId) {
-        ADHCBatchTaskRunState taskStateCache = hcDetectorTaskState.get(detectorId);
+    public boolean isHistoricalAnalysisCancelledForHC(String detectorLevelTaskId) {
+        ADHCBatchTaskRunState taskStateCache = hcBatchTaskRunState.get(detectorLevelTaskId);
         if (taskStateCache != null) {
             return taskStateCache.getHistoricalAnalysisCancelled();
         }
@@ -561,7 +574,7 @@ public class ADTaskCacheManager {
     }
 
     public String getCancelledByForHC(String detectorId) {
-        ADHCBatchTaskRunState taskCache = hcDetectorTaskState.get(detectorId);
+        ADHCBatchTaskRunState taskCache = hcBatchTaskRunState.get(detectorId);
         if (taskCache != null) {
             return taskCache.getCancelledBy();
         }
@@ -569,7 +582,7 @@ public class ADTaskCacheManager {
     }
 
     public String getCancelReasonForHC(String detectorId) {
-        ADHCBatchTaskRunState taskCache = hcDetectorTaskState.get(detectorId);
+        ADHCBatchTaskRunState taskCache = hcBatchTaskRunState.get(detectorId);
         if (taskCache != null) {
             return taskCache.getCancelReason();
         }
@@ -881,7 +894,6 @@ public class ADTaskCacheManager {
      * @return true if find detector id in HC cache
      */
     public boolean isHCTaskCoordinatingNode(String detectorId) {
-//        return hcBatchTaskCaches.containsKey(detectorId) && hcBatchTaskCaches.get(detectorId).isCoordinatingNode();
         return hcBatchTaskCaches.containsKey(detectorId);
     }
 
@@ -1229,7 +1241,7 @@ public class ADTaskCacheManager {
 //    }
 
     public String getDetectorTaskState(String detectorId) {
-        ADHCBatchTaskRunState batchTaskStateCache = this.hcDetectorTaskState.get(detectorId);
+        ADHCBatchTaskRunState batchTaskStateCache = this.hcBatchTaskRunState.get(detectorId);
         if (batchTaskStateCache != null) {
             return batchTaskStateCache.getDetectorTaskState();
         }
@@ -1237,23 +1249,23 @@ public class ADTaskCacheManager {
     }
 
     public boolean detectorTaskStateExists(String detectorId) {
-        return hcDetectorTaskState.containsKey(detectorId);
+        return hcBatchTaskRunState.containsKey(detectorId);
     }
 
     /**
      * Update detector level task's state in cache.
-     * @param detectorId detector id
+     * @param detectorTaskId detector task id
      * @param newState new state
      */
-    public synchronized void updateDetectorTaskState(String detectorId, String newState) {
-        ADHCBatchTaskRunState cache = getOrCreateHCDetectorTaskStateCache(detectorId);
+    public synchronized void updateDetectorTaskState(String detectorTaskId, String newState) {
+        ADHCBatchTaskRunState cache = getOrCreateHCDetectorTaskStateCache(detectorTaskId);
         if (cache != null) {
             cache.setDetectorTaskState(newState);
         }
     }
 
-    public ADHCBatchTaskRunState getOrCreateHCDetectorTaskStateCache(String detectorId) {
-        return hcDetectorTaskState.computeIfAbsent(detectorId, it -> new ADHCBatchTaskRunState());
+    public ADHCBatchTaskRunState getOrCreateHCDetectorTaskStateCache(String detectorTaskId) {
+        return hcBatchTaskRunState.computeIfAbsent(detectorTaskId, it -> new ADHCBatchTaskRunState());
     }
 
     public String getDetectorTaskId(String detectorId) {

@@ -2698,6 +2698,9 @@ public class ADTaskManager {
                 // Detector task slots stored in coordinating node cache.
                 detectorTaskProfile.setDetectorTaskSlots(1);
             }
+            if (tasksOfDetector.size() == 1){
+                adTaskCacheManager.removeHistoricalTaskCache(detectorId);
+            }
         }
         return detectorTaskProfile;
     }

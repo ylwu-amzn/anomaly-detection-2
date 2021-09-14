@@ -13,6 +13,8 @@ package org.opensearch.ad.task;
 
 import org.opensearch.ad.model.ADTaskState;
 
+import java.time.Instant;
+
 
 public class ADHCBatchTaskRunState {
 
@@ -22,9 +24,11 @@ public class ADHCBatchTaskRunState {
     private boolean isHistoricalAnalysisCancelled;
     private String cancelReason;
     private String cancelledBy;
+    private Instant createTime;
 
     public ADHCBatchTaskRunState() {
         this.detectorTaskState = ADTaskState.INIT.name();
+        createTime = Instant.now();
     }
 
     public String getDetectorTaskState() {
