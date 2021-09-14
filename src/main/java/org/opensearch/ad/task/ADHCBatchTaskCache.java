@@ -79,6 +79,11 @@ public class ADHCBatchTaskCache {
     // recheck this field and stop if it's true.
     private boolean isHistoricalAnalysisCancelled;
 
+    // record lastest HC detector task run time, will use this field to check if task is running or not.
+    private Instant latestTaskRunTime;
+    private String cancelReason;
+    private String cancelledBy;
+
     public ADHCBatchTaskCache() {
         this.pendingEntities = new ConcurrentLinkedQueue<>();
         this.runningEntities = new ConcurrentLinkedQueue<>();
@@ -89,6 +94,7 @@ public class ADHCBatchTaskCache {
         this.detectorTaskState = ADTaskState.INIT.name();
         this.isCoordinatingNode = new SetOnce<>();
         this.lastScaleEntityTaskSlotsTime = Instant.now();
+        this.latestTaskRunTime = Instant.now();
     }
 
     public void setIsCoordinatingNode(boolean isCoordinatingNode) {
@@ -101,6 +107,7 @@ public class ADHCBatchTaskCache {
     }
 
     public void setTopEntityCount(Integer topEntityCount) {
+        this.refreshLatestTaskRunTime();
         this.topEntityCount = topEntityCount;
     }
 
@@ -133,6 +140,7 @@ public class ADHCBatchTaskCache {
     }
 
     public void setEntityTaskLanes(int entityTaskLanes) {
+        this.refreshLatestTaskRunTime();
         this.entityTaskLanes = new AtomicInteger(entityTaskLanes);
     }
 
@@ -166,6 +174,7 @@ public class ADHCBatchTaskCache {
      * @param entities a list of entity
      */
     public void addEntities(List<String> entities) {
+        this.refreshLatestTaskRunTime();
         if (entities == null || entities.size() == 0) {
             return;
         }
@@ -177,7 +186,6 @@ public class ADHCBatchTaskCache {
                 pendingEntities.add(entity);
             }
         }
-
     }
 
     /**
@@ -185,6 +193,7 @@ public class ADHCBatchTaskCache {
      * @param entity entity value
      */
     public void moveToRunningEntity(String entity) {
+        this.refreshLatestTaskRunTime();
         if (entity == null) {
             return;
         }
@@ -225,6 +234,14 @@ public class ADHCBatchTaskCache {
         this.lastScaleEntityTaskSlotsTime = lastScaleEntityTaskSlotsTime;
     }
 
+    public Instant getLatestTaskRunTime() {
+        return latestTaskRunTime;
+    }
+
+    public void refreshLatestTaskRunTime() {
+        this.latestTaskRunTime = Instant.now();
+    }
+
     public boolean getHistoricalAnalysisCancelled() {
         return isHistoricalAnalysisCancelled;
     }
@@ -233,8 +250,28 @@ public class ADHCBatchTaskCache {
         isHistoricalAnalysisCancelled = historicalAnalysisCancelled;
     }
 
+    public String getCancelReason() {
+        return cancelReason;
+    }
+
+    public void setCancelReason(String cancelReason) {
+        this.cancelReason = cancelReason;
+    }
+
+    public String getCancelledBy() {
+        return cancelledBy;
+    }
+
+    public void setCancelledBy(String cancelledBy) {
+        this.cancelledBy = cancelledBy;
+    }
+
     public boolean hasEntity() {
         return !this.pendingEntities.isEmpty() || !this.runningEntities.isEmpty() || !this.tempEntities.isEmpty();
+    }
+
+    public boolean hasRunningEntity() {
+        return !this.runningEntities.isEmpty();
     }
 
     public boolean removeRunningEntity(String entity) {
@@ -257,6 +294,7 @@ public class ADHCBatchTaskCache {
      * @return entity value
      */
     public String pollEntity() {
+        this.refreshLatestTaskRunTime();
         String entity = this.pendingEntities.poll();
         if (entity != null) {
             this.moveToTempEntity(entity);
@@ -286,6 +324,7 @@ public class ADHCBatchTaskCache {
      * @param entity entity value
      */
     public void removeEntity(String entity) {
+        this.refreshLatestTaskRunTime();
         if (entity == null) {
             return;
         }

@@ -261,13 +261,14 @@ public class ADBatchTaskRunner {
         TransportService transportService,
         ActionListener<ADBatchAnomalyResultResponse> listener
     ) {
+        String taskId = adTask.getTaskId();
+        String detectorId = adTask.getDetectorId();
         ActionListener<String> actionListener = ActionListener.wrap(response -> {
-            adTaskCacheManager.setTopEntityInited(adTask.getDetectorId());
-            int totalEntities = adTaskCacheManager.getPendingEntityCount(adTask.getDetectorId());
-            logger.info("total top entities: {}", totalEntities);
+            adTaskCacheManager.setTopEntityInited(detectorId);
+            int totalEntities = adTaskCacheManager.getPendingEntityCount(detectorId);
+            logger.info("Total top entities: {} for detector {}, task {}", totalEntities, detectorId, taskId);
             hashRing.getNodesWithSameLocalAdVersion(dataNodes -> {
                 int numberOfEligibleDataNodes = dataNodes.length;
-                String detectorId = adTask.getDetectorId();
                 // maxAdBatchTaskPerNode means how many task can run on per data node, which is hard limitation per node.
                 // maxRunningEntitiesPerDetector means how many entities can run per detector on whole cluster, which is
                 // soft limit to control how many entities to run in parallel per HC detector.
@@ -290,10 +291,10 @@ public class ADBatchTaskRunner {
                     );
                 forwardOrExecuteADTask(adTask, transportService, listener);
                 // As we have started one entity task, need to minus 1 for max allowed running entities.
-                adTaskCacheManager.setAllowedRunningEntities(adTask.getDetectorId(), maxRunningEntities - 1);
+                adTaskCacheManager.setAllowedRunningEntities(detectorId, maxRunningEntities - 1);
             }, listener);
         }, e -> {
-            logger.debug("Failed to run task " + adTask.getTaskId(), e);
+            logger.debug("Failed to run task " + taskId, e);
             if (adTask.getTaskType().equals(ADTaskType.HISTORICAL_HC_DETECTOR.name())) {
                 adTaskManager.entityTaskDone(adTask, e, transportService);
             }
@@ -1270,6 +1271,18 @@ public class ADBatchTaskRunner {
     private void checkIfADTaskCancelledAndCleanupCache(ADTask adTask) {
         String taskId = adTask.getTaskId();
         String detectorId = adTask.getDetectorId();
+        // refresh latest HC task run time
+        adTaskCacheManager.refreshLatestHCTaskRunTime(detectorId);
+        if (adTask.getDetector().isMultientityDetector()
+            && adTaskCacheManager.isHCTaskCoordinatingNode(detectorId)
+            && adTaskCacheManager.isHistoricalAnalysisCancelledForHC(detectorId)) {
+            adTaskCacheManager.clearPendingEntities(detectorId);
+            throw new ADTaskCancelledException(
+                adTaskCacheManager.getCancelReasonForHC(detectorId),
+                adTaskCacheManager.getCancelledByForHC(detectorId)
+            );
+        }
+
         if (adTaskCacheManager.contains(taskId) && adTaskCacheManager.isCancelled(taskId)) {
             logger.info("AD task cancelled, stop running task {}", taskId);
             String cancelReason = adTaskCacheManager.getCancelReason(taskId);

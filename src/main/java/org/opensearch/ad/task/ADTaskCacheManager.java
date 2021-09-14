@@ -393,6 +393,21 @@ public class ADTaskCacheManager {
     }
 
     /**
+     * Only remove detector cache if no running entities.
+     *
+     * @param detectorId detector id
+     */
+    public void removeHistoricalTaskCacheIfNoRunningEntity(String detectorId) {
+        ADHCBatchTaskCache taskCache = hcBatchTaskCaches.get(detectorId);
+        if (taskCache != null) {
+            if (taskCache.hasRunningEntity()) {
+                throw new IllegalArgumentException("HC detector still has running entities");
+            }
+        }
+        removeHistoricalTaskCache(detectorId);
+    }
+
+    /**
      * Remove detector id from running detector cache
      *
      * @param detectorId detector id
@@ -445,6 +460,16 @@ public class ADTaskCacheManager {
      * @return AD task cancellation state
      */
     public ADTaskCancellationState cancelByDetectorId(String detectorId, String reason, String userName) {
+        ADHCBatchTaskCache hcTaskCache = hcBatchTaskCaches.get(detectorId);
+        if (hcTaskCache != null) {
+            logger.debug("Set HC historical analysis as cancelled for detector {}", detectorId);
+            hcTaskCache.setHistoricalAnalysisCancelled(true);
+            hcTaskCache.clearPendingEntities();
+            hcTaskCache.setEntityTaskLanes(0);
+            hcTaskCache.setCancelReason(reason);
+            hcTaskCache.setCancelledBy(userName);
+        }
+
         List<ADBatchTaskCache> taskCaches = getBatchTaskCacheByDetectorId(detectorId);
 
         if (taskCaches.isEmpty()) {
@@ -458,19 +483,13 @@ public class ADTaskCacheManager {
                 cache.cancel(reason, userName);
             }
         }
-        ADHCBatchTaskCache hcTaskCache = hcBatchTaskCaches.get(detectorId);
-        if (hcTaskCache != null) {
-            hcTaskCache.setHistoricalAnalysisCancelled(true);
-            hcTaskCache.clearPendingEntities();
-            hcTaskCache.setEntityTaskLanes(0);
-        }
         return cancellationState;
     }
 
     /**
-     * Task is cancelled or not.
+     * Check if single entity detector level task or HC entity task is cancelled or not.
      *
-     * @param taskId AD task id
+     * @param taskId AD task id, should not be HC detector level task
      * @return true if task is cancelled; otherwise return false
      */
     public boolean isCancelled(String taskId) {
@@ -487,6 +506,20 @@ public class ADTaskCacheManager {
         // So we need to check hcDetectorStopped for HC detector to know if it's cancelled or not.
         // For single entity detector, it has just 1 task, just need to check taskCache.isCancelled.
         return taskCache.isCancelled() || hcDetectorStopped;
+    }
+
+    /**
+     * Check if HC detector's historical analysis cancelled or not.
+     *
+     * @param detectorId detector id
+     * @return true if HC detector historical analysis cancelled; otherwise return false
+     */
+    public boolean isHistoricalAnalysisCancelledForHC(String detectorId) {
+        ADHCBatchTaskCache hcTaskCache = hcBatchTaskCaches.get(detectorId);
+        if (hcTaskCache != null) {
+            return hcTaskCache.getHistoricalAnalysisCancelled();
+        }
+        return false;
     }
 
     /**
@@ -507,6 +540,22 @@ public class ADTaskCacheManager {
      */
     public String getCancelledBy(String taskId) {
         return getBatchTaskCache(taskId).getCancelledBy();
+    }
+
+    public String getCancelledByForHC(String detectorId) {
+        ADHCBatchTaskCache taskCache = hcBatchTaskCaches.get(detectorId);
+        if (taskCache != null) {
+            return taskCache.getCancelledBy();
+        }
+        return null;
+    }
+
+    public String getCancelReasonForHC(String detectorId) {
+        ADHCBatchTaskCache taskCache = hcBatchTaskCaches.get(detectorId);
+        if (taskCache != null) {
+            return taskCache.getCancelReason();
+        }
+        return null;
     }
 
     /**
@@ -774,6 +823,10 @@ public class ADTaskCacheManager {
         }
     }
 
+    public boolean hcBatchTaskCacheExists(String detectorId) {
+        return hcBatchTaskCaches.containsKey(detectorId);
+    }
+
     /**
      * Add list of entities into pending entities queue. And will remove these entities
      * from temp entities queue.
@@ -955,7 +1008,7 @@ public class ADTaskCacheManager {
      * @param detectorId detector id
      * @return true if can get semaphore
      */
-    public boolean tryAcquireTaskUpdatingSemaphore(String detectorId) {
+    public synchronized boolean tryAcquireTaskUpdatingSemaphore(String detectorId) {
         ADHCBatchTaskCache taskCache = hcBatchTaskCaches.get(detectorId);
         if (taskCache != null) {
             return taskCache.tryAcquireTaskUpdatingSemaphore();
@@ -1183,4 +1236,20 @@ public class ADTaskCacheManager {
             taskCache.setLastScaleEntityTaskSlotsTime(Instant.now());
         }
     }
+
+    public Instant getLatestHCTaskRunTime(String detectorId) {
+        ADHCBatchTaskCache taskCache = hcBatchTaskCaches.get(detectorId);
+        if (taskCache != null) {
+            return taskCache.getLatestTaskRunTime();
+        }
+        return null;
+    }
+
+    public void refreshLatestHCTaskRunTime(String detectorId) {
+        ADHCBatchTaskCache taskCache = hcBatchTaskCaches.get(detectorId);
+        if (taskCache != null) {
+            taskCache.refreshLatestTaskRunTime();
+        }
+    }
+
 }
