@@ -24,7 +24,8 @@ import org.apache.lucene.util.SetOnce;
 import org.opensearch.ad.model.ADTaskState;
 
 /**
- * AD HC detector batch task cache which will mainly hold these for HC detector
+ * AD HC detector batch task cache which will mainly hold these for HC detector on
+ * coordinating node.
  * 1. pending entities queue
  * 2. running entities queue
  * 3. temp entities queue
@@ -68,10 +69,6 @@ public class ADHCBatchTaskCache {
     // Record how many times the task has retried. Key is task id.
     private Map<String, AtomicInteger> taskRetryTimes;
 
-    // detector level task state
-    private String detectorTaskState;
-
-    private SetOnce<Boolean> isCoordinatingNode;
     // record last time when HC detector scales entity task slots
     private Instant lastScaleEntityTaskSlotsTime;
 
@@ -81,8 +78,6 @@ public class ADHCBatchTaskCache {
 
     // record lastest HC detector task run time, will use this field to check if task is running or not.
     private Instant latestTaskRunTime;
-    private String cancelReason;
-    private String cancelledBy;
 
     public ADHCBatchTaskCache() {
         this.pendingEntities = new ConcurrentLinkedQueue<>();
@@ -91,19 +86,8 @@ public class ADHCBatchTaskCache {
         this.taskRetryTimes = new ConcurrentHashMap<>();
         this.detectorTaskUpdatingSemaphore = new Semaphore(1);
         this.topEntitiesInited = false;
-        this.detectorTaskState = ADTaskState.INIT.name();
-        this.isCoordinatingNode = new SetOnce<>();
         this.lastScaleEntityTaskSlotsTime = Instant.now();
         this.latestTaskRunTime = Instant.now();
-    }
-
-    public void setIsCoordinatingNode(boolean isCoordinatingNode) {
-        this.isCoordinatingNode.set(isCoordinatingNode);
-    }
-
-    public boolean isCoordinatingNode() {
-        Boolean isCoordinating = this.isCoordinatingNode.get();
-        return isCoordinating != null && isCoordinating.booleanValue();
     }
 
     public void setTopEntityCount(Integer topEntityCount) {
@@ -158,14 +142,6 @@ public class ADHCBatchTaskCache {
 
     public int getTaskRetryTimes(String taskId) {
         return taskRetryTimes.computeIfAbsent(taskId, id -> new AtomicInteger(0)).get();
-    }
-
-    public String getDetectorTaskState() {
-        return detectorTaskState;
-    }
-
-    public void setDetectorTaskState(String detectorTaskState) {
-        this.detectorTaskState = detectorTaskState;
     }
 
     /**
@@ -248,22 +224,6 @@ public class ADHCBatchTaskCache {
 
     public void setHistoricalAnalysisCancelled(boolean historicalAnalysisCancelled) {
         isHistoricalAnalysisCancelled = historicalAnalysisCancelled;
-    }
-
-    public String getCancelReason() {
-        return cancelReason;
-    }
-
-    public void setCancelReason(String cancelReason) {
-        this.cancelReason = cancelReason;
-    }
-
-    public String getCancelledBy() {
-        return cancelledBy;
-    }
-
-    public void setCancelledBy(String cancelledBy) {
-        this.cancelledBy = cancelledBy;
     }
 
     public boolean hasEntity() {

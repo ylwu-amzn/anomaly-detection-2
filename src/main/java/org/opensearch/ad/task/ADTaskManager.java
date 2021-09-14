@@ -1663,6 +1663,7 @@ public class ADTaskManager {
     ) {
         ActionListener<SearchResponse> searchListener = ActionListener.wrap(r -> {
             Iterator<SearchHit> iterator = r.getHits().iterator();
+             boolean isHistoricalTask = false;
             if (iterator.hasNext()) {
                 BulkRequest bulkRequest = new BulkRequest();
                 while (iterator.hasNext()) {
@@ -1672,24 +1673,30 @@ public class ADTaskManager {
                         ADTask adTask = ADTask.parse(parser, searchHit.getId());
                         logger.debug("Delete old task: {} of detector: {}", adTask.getTaskId(), adTask.getDetectorId());
                         bulkRequest.add(new DeleteRequest(DETECTION_STATE_INDEX).id(adTask.getTaskId()));
+                        if (adTask.isHistoricalTask()) {
+                            isHistoricalTask = true;
+                        }
                     } catch (Exception e) {
                         listener.onFailure(e);
                     }
                 }
+                 boolean finalIsHistoricalTask = isHistoricalTask;
                 client.execute(BulkAction.INSTANCE, bulkRequest, ActionListener.wrap(res -> {
                     logger.info("Old AD tasks deleted for detector {}", detectorId);
                     BulkItemResponse[] bulkItemResponses = res.getItems();
                     if (bulkItemResponses != null && bulkItemResponses.length > 0) {
                         for (BulkItemResponse bulkItemResponse : bulkItemResponses) {
-                            if (!bulkItemResponse.isFailed()) {
+                            if (!bulkItemResponse.isFailed() && finalIsHistoricalTask) {
                                 logger.debug("Add deleted detector task into cache. Task id: {}", bulkItemResponse.getId());
                                 // add deleted task in cache and delete its child tasks and AD results
                                 adTaskCacheManager.addDeletedDetectorTask(bulkItemResponse.getId());
                             }
                         }
                     }
-                    // delete child tasks and AD results of this task
-                    cleanChildTasksAndADResultsOfDeletedTask();
+                    if (finalIsHistoricalTask) { //TODO: check if realtime task id stored in AD result index.
+                        // delete child tasks and AD results of this task
+                        cleanChildTasksAndADResultsOfDeletedTask();
+                    }
 
                     function.execute();
                 }, e -> {

@@ -56,6 +56,7 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
@@ -90,6 +91,7 @@ import org.opensearch.ad.model.DetectionDateRange;
 import org.opensearch.ad.model.Entity;
 import org.opensearch.ad.model.FeatureData;
 import org.opensearch.ad.model.IntervalTimeConfiguration;
+import org.opensearch.ad.rest.handler.AnomalyDetectorFunction;
 import org.opensearch.ad.settings.AnomalyDetectorSettings;
 import org.opensearch.ad.settings.EnabledSetting;
 import org.opensearch.ad.stats.ADStats;
@@ -1235,26 +1237,26 @@ public class ADBatchTaskRunner {
     }
 
     private void updateDetectorLevelTaskState(String detectorId, String detectorTaskId, String newState) {
-        adTaskManager.getADTask(detectorTaskId, ActionListener.wrap(task -> {
-            if (task.isPresent()) {
-                adTaskCacheManager.updateDetectorTaskState(detectorId, task.get().getState());
-                if (adTaskCacheManager.isDetectorTaskStateChanged(detectorId, newState)) {
-                    adTaskManager
-                        .updateADTask(
-                            detectorTaskId,
-                            ImmutableMap.of(STATE_FIELD, newState),
-                            ActionListener
-                                .wrap(
-                                    r -> { adTaskCacheManager.updateDetectorTaskState(detectorId, newState); },
-                                    e -> { logger.error("Failed to update detector level task " + detectorTaskId, e); }
-                                )
-                        );
-                }
-            }
-        }, exception -> { logger.error("failed to get detector level task " + detectorTaskId, exception); }));
+        AnomalyDetectorFunction function = () -> adTaskManager.updateADTask(detectorTaskId, ImmutableMap.of(STATE_FIELD, newState),
+                ActionListener.wrap(r -> {
+                    logger.info("Updated HC detector task: {} as state: {} for detector: {}", detectorTaskId, newState, detectorId);
+                    adTaskCacheManager.updateDetectorTaskState(detectorId, newState);
+                }, e -> {
+                    logger.error("Failed to update HC detector task: {} for detector: {}", detectorTaskId, detectorId);
+                }));
 
-        if (adTaskCacheManager.isDetectorTaskStateChanged(detectorId, newState)) {
-            adTaskManager.updateADTask(detectorTaskId, ImmutableMap.of(STATE_FIELD, newState), ActionListener.wrap(r -> {}, e -> {}));
+        if (adTaskCacheManager.detectorTaskStateExists(detectorId)) {
+            if (adTaskCacheManager.isDetectorTaskStateChanged(detectorId, newState)) {
+                function.execute();
+            }
+        } else if (adTaskCacheManager.isHistoricalAnalysisCancelledForHC(detectorId)){
+            adTaskManager.getADTask(detectorTaskId, ActionListener.wrap(task -> {
+                if (task.isPresent()) {
+                    if (!Objects.equals(task.get().getState(), newState)) {
+                        function.execute();
+                    }
+                }
+            }, exception -> { logger.error("failed to get detector level task " + detectorTaskId, exception); }));
         }
     }
 
@@ -1274,9 +1276,7 @@ public class ADBatchTaskRunner {
         // refresh latest HC task run time
         adTaskCacheManager.refreshLatestHCTaskRunTime(detectorId);
         if (adTask.getDetector().isMultientityDetector()
-            && adTaskCacheManager.isHCTaskCoordinatingNode(detectorId)
             && adTaskCacheManager.isHistoricalAnalysisCancelledForHC(detectorId)) {
-            adTaskCacheManager.clearPendingEntities(detectorId);
             throw new ADTaskCancelledException(
                 adTaskCacheManager.getCancelReasonForHC(detectorId),
                 adTaskCacheManager.getCancelledByForHC(detectorId)
