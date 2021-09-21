@@ -346,7 +346,7 @@ List<Provider<RegularFile>> plugins = [
         systemProperty 'tests.plugin_bwc_version', bwcVersion
         nonInputProperties.systemProperty('tests.rest.cluster', "${-> testClusters."${baseName}$i".allHttpSocketURI.join(",")}")
         nonInputProperties.systemProperty('tests.clustername', "${-> testClusters."${baseName}$i".getName()}")
-    }    
+    }
 }
 
 // Upgrades one node of the old cluster to new OpenSearch version with upgraded plugin version 
