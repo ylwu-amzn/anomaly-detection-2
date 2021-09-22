@@ -31,11 +31,15 @@ import static org.opensearch.common.xcontent.json.JsonXContent.jsonXContent;
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Map;
+import java.util.function.ToDoubleFunction;
 
 import org.apache.http.HttpHeaders;
 import org.apache.http.message.BasicHeader;
+import org.apache.http.util.EntityUtils;
+import org.opensearch.ad.mock.model.MockSimpleLog;
 import org.opensearch.ad.model.ADTask;
 import org.opensearch.ad.model.AnomalyDetector;
 import org.opensearch.ad.model.AnomalyDetectorExecutionInput;
@@ -518,5 +522,74 @@ public abstract class AnomalyDetectorRestTestCase extends ODFERestTestCase {
                     ),
                 ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, "Kibana"))
             );
+    }
+
+    public void ingestTestDataForHistoricalAnalysis(String indexName, int detectionIntervalInMinutes, int categoryFieldDocCount) throws IOException {
+        ingestSimpleMockLog(indexName, 10, 3000, detectionIntervalInMinutes, (i) -> {
+            if (i % 500 == 0) {
+                return randomDoubleBetween(100, 1000, true);
+            } else {
+                return randomDoubleBetween(1, 10, true);
+            }
+        }, categoryFieldDocCount, categoryFieldDocCount);
+    }
+
+    public Response ingestSimpleMockLog(
+            String indexName,
+            int startDays,
+            int totalDoc,
+            long intervalInMinutes,
+            ToDoubleFunction<Integer> valueFunc,
+            int ipSize,
+            int categorySize
+    ) throws IOException {
+        TestHelpers
+                .makeRequest(
+                        client(),
+                        "PUT",
+                        indexName,
+                        null,
+                        TestHelpers.toHttpEntity(MockSimpleLog.INDEX_MAPPING),
+                        ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, "Kibana"))
+                );
+
+        Response statsResponse = TestHelpers.makeRequest(client(), "GET", indexName, ImmutableMap.of(), "", null);
+        assertEquals(RestStatus.OK, TestHelpers.restStatus(statsResponse));
+        String result = EntityUtils.toString(statsResponse.getEntity());
+        assertTrue(result.contains(indexName));
+
+        StringBuilder bulkRequestBuilder = new StringBuilder();
+        Instant startTime = Instant.now().minus(startDays, ChronoUnit.DAYS);
+        for (int i = 0; i < totalDoc; i++) {
+            for (int m = 0; m < ipSize; m++) {
+                String ip = "192.168.1." + m;
+                for (int n = 0; n < categorySize; n++) {
+                    String category = "category" + n;
+                    String docId = randomAlphaOfLength(10);
+                    bulkRequestBuilder.append("{ \"index\" : { \"_index\" : \"" + indexName + "\", \"_id\" : \"" + docId + "\" } }\n");
+                    MockSimpleLog simpleLog1 = new MockSimpleLog(
+                            startTime,
+                            valueFunc.applyAsDouble(i),
+                            ip,
+                            category,
+                            randomBoolean(),
+                            randomAlphaOfLength(5)
+                    );
+                    bulkRequestBuilder.append(TestHelpers.toJsonString(simpleLog1));
+                    bulkRequestBuilder.append("\n");
+                }
+            }
+            startTime = startTime.plus(intervalInMinutes, ChronoUnit.MINUTES);
+        }
+        Response bulkResponse = TestHelpers
+                .makeRequest(
+                        client(),
+                        "POST",
+                        "_bulk?refresh=true",
+                        null,
+                        TestHelpers.toHttpEntity(bulkRequestBuilder.toString()),
+                        ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, "Kibana"))
+                );
+        return bulkResponse;
     }
 }
