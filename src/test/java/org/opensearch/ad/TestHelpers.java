@@ -567,6 +567,19 @@ public class TestHelpers {
         return new Feature(randomAlphaOfLength(5), featureName, enabled, testAggregation);
     }
 
+    public static Feature randomFeature(String featureName, String fieldName, String aggregationMethod, boolean enabled) {
+        try {
+            AggregationBuilder testAggregation = null;
+            XContentParser parser = parser("{\"" + featureName + "\":{\"" + aggregationMethod + "\":{\"field\":\"" + fieldName + "\"}}}");
+            AggregatorFactories.Builder aggregators = AggregatorFactories.parseAggregators(parser);
+            testAggregation = aggregators.getAggregatorFactories().iterator().next();
+            return new Feature(randomAlphaOfLength(5), featureName, enabled, testAggregation);
+        } catch (IOException e) {
+            logger.error("Fail to generate test aggregation");
+            throw new RuntimeException();
+        }
+    }
+
     public static Features randomFeatures() {
         List<Map.Entry<Long, Long>> ranges = Arrays.asList(new AbstractMap.SimpleEntry<>(0L, 1L));
         double[][] unprocessed = new double[][] { { randomDouble(), randomDouble() } };
