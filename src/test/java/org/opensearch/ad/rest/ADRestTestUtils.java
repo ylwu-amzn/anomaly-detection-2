@@ -348,15 +348,15 @@ public class ADRestTestUtils {
             long lastUpdateTime = (long) jobMap.get(AnomalyDetectorJob.LAST_UPDATE_TIME_FIELD);
 
             AnomalyDetectorJob job = new AnomalyDetectorJob(
-                    jobName,
-                    null,
-                    null,
-                    enabled,
-                    Instant.ofEpochMilli(enabledTime),
-                    null,
-                    Instant.ofEpochMilli(lastUpdateTime),
-                    null,
-                    null
+                jobName,
+                null,
+                null,
+                enabled,
+                Instant.ofEpochMilli(enabledTime),
+                null,
+                Instant.ofEpochMilli(lastUpdateTime),
+                null,
+                null
             );
             results.put(ANOMALY_DETECTOR_JOB, job);
         }
@@ -385,15 +385,15 @@ public class ADRestTestUtils {
         String parsedTaskType = (String) taskMap.get(ADTask.TASK_TYPE_FIELD);
         String coordinatingNode = (String) taskMap.get(ADTask.COORDINATING_NODE_FIELD);
         return ADTask
-                .builder()
-                .taskId(id)
-                .state(state)
-                .detectorId(parsedDetectorId)
-                .taskProgress(taskProgress.floatValue())
-                .initProgress(initProgress.floatValue())
-                .taskType(parsedTaskType)
-                .coordinatingNode(coordinatingNode)
-                .build();
+            .builder()
+            .taskId(id)
+            .state(state)
+            .detectorId(parsedDetectorId)
+            .taskProgress(taskProgress.floatValue())
+            .initProgress(initProgress.floatValue())
+            .taskType(parsedTaskType)
+            .coordinatingNode(coordinatingNode)
+            .build();
     }
 
     /**
@@ -445,8 +445,8 @@ public class ADRestTestUtils {
                 "POST",
                 TestHelpers.LEGACY_OPENDISTRO_AD_BASE_DETECTORS_URI + "/" + detectorId + "/_start",
                 ImmutableMap.of(),
-                    // Start historical detector directly on new node will start realtime job.
-                    // Need to pass detection date range in http body if need to start historical analysis.
+                // Start historical detector directly on new node will start realtime job.
+                // Need to pass detection date range in http body if need to start historical analysis.
                 TestHelpers.toHttpEntity(TestHelpers.toJsonString(dateRange)),
                 null
             );
@@ -518,27 +518,27 @@ public class ADRestTestUtils {
     public static Response stopDetector(RestClient client, String detectorId, boolean historicalAnalysis) throws IOException {
         String param = historicalAnalysis ? "?historical" : "";
         Response response = TestHelpers
-                .makeRequest(
-                        client,
-                        "POST",
-                        TestHelpers.LEGACY_OPENDISTRO_AD_BASE_DETECTORS_URI + "/" + detectorId + "/_stop" + param,
-                        ImmutableMap.of(),
-                        "",
-                        null
-                );
+            .makeRequest(
+                client,
+                "POST",
+                TestHelpers.LEGACY_OPENDISTRO_AD_BASE_DETECTORS_URI + "/" + detectorId + "/_stop" + param,
+                ImmutableMap.of(),
+                "",
+                null
+            );
         return response;
     }
 
     public static Response deleteDetector(RestClient client, String detectorId) throws IOException {
         Response response = TestHelpers
-                .makeRequest(
-                        client,
-                        "DELETE",
-                        TestHelpers.LEGACY_OPENDISTRO_AD_BASE_DETECTORS_URI + "/" + detectorId,
-                        ImmutableMap.of(),
-                        "",
-                        null
-                );
+            .makeRequest(
+                client,
+                "DELETE",
+                TestHelpers.LEGACY_OPENDISTRO_AD_BASE_DETECTORS_URI + "/" + detectorId,
+                ImmutableMap.of(),
+                "",
+                null
+            );
         return response;
     }
 }

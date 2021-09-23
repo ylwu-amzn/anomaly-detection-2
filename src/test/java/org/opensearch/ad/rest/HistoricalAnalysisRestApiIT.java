@@ -85,17 +85,14 @@ public class HistoricalAnalysisRestApiIT extends HistoricalAnalysisRestTestCase 
         checkIfTaskCanFinishCorrectly(detectorId, taskId, HISTORICAL_ANALYSIS_FINISHED_FAILED_STATS);
     }
 
-    //TODO: fix this flaky test
+    // TODO: fix this flaky test
+    @Ignore
     public void testHistoricalAnalysisForMultiCategoryHC() throws Exception {
         List<String> startHistoricalAnalysisResult = startHistoricalAnalysis(2);
         String detectorId = startHistoricalAnalysisResult.get(0);
         String taskId = startHistoricalAnalysisResult.get(1);
-
-        ADTaskProfile endTaskProfile = waitUntilTaskDone(detectorId);
-        ADTask stoppedAdTask = endTaskProfile.getAdTask();
-        assertEquals(taskId, stoppedAdTask.getTaskId());
-        //Sometimes the multi-category HC may not end during our checking window
-        //checkIfTaskCanFinishCorrectly(detectorId, taskId, HISTORICAL_ANALYSIS_FINISHED_FAILED_STATS);
+        // Sometimes the multi-category HC may not end during our checking window
+        checkIfTaskCanFinishCorrectly(detectorId, taskId, HISTORICAL_ANALYSIS_FINISHED_FAILED_STATS);
     }
 
     private void checkIfTaskCanFinishCorrectly(String detectorId, String taskId, Set<String> states) throws InterruptedException {
