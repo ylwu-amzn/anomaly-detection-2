@@ -28,5 +28,5 @@ public class Bwc {
      */
     public static boolean supportMultiCategoryFields(Version version) {
         return version.after(Version.V_1_0_0);
-    } // TODO: remove this
+    }
 }
