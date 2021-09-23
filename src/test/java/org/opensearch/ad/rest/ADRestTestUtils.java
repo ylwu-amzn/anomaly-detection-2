@@ -10,16 +10,19 @@ package org.opensearch.ad.rest;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import org.apache.http.HttpEntity;
 import org.apache.http.HttpHeaders;
 import org.apache.http.message.BasicHeader;
 import org.opensearch.ad.TestHelpers;
 import org.opensearch.ad.mock.model.MockSimpleLog;
 import org.opensearch.ad.model.ADTask;
 import org.opensearch.ad.model.AnomalyDetector;
+import org.opensearch.ad.model.AnomalyDetectorJob;
 import org.opensearch.ad.model.DetectionDateRange;
 import org.opensearch.ad.model.IntervalTimeConfiguration;
 import org.opensearch.client.Response;
 import org.opensearch.client.RestClient;
+import org.opensearch.commons.authuser.User;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -249,5 +252,66 @@ public class ADRestTestUtils {
         Map<String, Object> responseMap = entityAsMap(searchAdTaskResponse);
         Map<String, Object> hits = (Map<String, Object>) ((Map<String, Object>) responseMap.get("hits")).get("total");
         return (int) hits.get("value");
+    }
+
+    @SuppressWarnings("unchecked")
+    public static AnomalyDetectorJob getDetectorJob(RestClient client, String detectorId) throws IOException {
+        Response searchAdTaskResponse = TestHelpers
+                .makeRequest(
+                        client,
+                        "GET",
+                        TestHelpers.LEGACY_OPENDISTRO_AD_BASE_DETECTORS_URI + "/" + detectorId + "?job=true",
+                        ImmutableMap.of(),
+                        (HttpEntity) null,
+                        null
+                );
+        Map<String, Object> responseMap = entityAsMap(searchAdTaskResponse);
+        Map<String, Object> jobMap = (Map<String, Object>) responseMap.get("anomaly_detector_job");
+        String jobName = (String)jobMap.get(AnomalyDetectorJob.NAME_FIELD);
+        boolean enabled = (boolean) jobMap.get(AnomalyDetectorJob.IS_ENABLED_FIELD);
+        long enabledTime = (long)jobMap.get(AnomalyDetectorJob.ENABLED_TIME_FIELD);
+        long lastUpdateTime = (long)jobMap.get(AnomalyDetectorJob.LAST_UPDATE_TIME_FIELD);
+
+        return new AnomalyDetectorJob(jobName, null, null, enabled,
+                Instant.ofEpochMilli(enabledTime),
+                null,
+                Instant.ofEpochMilli(lastUpdateTime),
+                null,
+                null);
+    }
+
+    @SuppressWarnings("unchecked")
+    public static String startAnomalyDetectorDirectly(RestClient client, String detectorId) throws IOException {
+        Response response = TestHelpers
+                .makeRequest(
+                        client,
+                        "POST",
+                        TestHelpers.LEGACY_OPENDISTRO_AD_BASE_DETECTORS_URI + "/" + detectorId + "/_start",
+                        ImmutableMap.of(),
+                        (HttpEntity) null,
+                        null
+                );
+        Map<String, Object> startDetectorResponseMap = entityAsMap(response);
+        // For AD on or before 1.0, if the detector is historical detector, then it will be task id
+        String jobOrTaskId = (String) startDetectorResponseMap.get("_id");
+        return jobOrTaskId;
+    }
+
+    @SuppressWarnings("unchecked")
+    public static String startHistoricalAnalysis(RestClient client, String detectorId) throws IOException {
+        Instant now = Instant.now();
+        DetectionDateRange dateRange = new DetectionDateRange(now.minus(30, ChronoUnit.DAYS), now);
+        Response response = TestHelpers
+                .makeRequest(
+                        client,
+                        "POST",
+                        TestHelpers.LEGACY_OPENDISTRO_AD_BASE_DETECTORS_URI + "/" + detectorId + "/_start",
+                        ImmutableMap.of(),
+                        TestHelpers.toHttpEntity(TestHelpers.toJsonString(dateRange)),
+                        null
+                );
+        Map<String, Object> startDetectorResponseMap = entityAsMap(response);
+        String taskId = (String) startDetectorResponseMap.get("_id");
+        return taskId;
     }
 }
