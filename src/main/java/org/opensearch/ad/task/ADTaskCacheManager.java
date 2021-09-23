@@ -1351,8 +1351,18 @@ public class ADTaskCacheManager {
                 String detectorId = detectorRunStates.getKey();
                 boolean noRunningTask = isNullOrEmpty(getTasksOfDetector(detectorId));
                 Map<String, ADHCBatchTaskRunState> taskRunStates = detectorRunStates.getValue();
-                if (taskRunStates == null || !noRunningTask) {
+                if (taskRunStates == null) {
+                    // If detector's task run state is null, add detector id to detectorIdOfEmptyStates and remove it from
+                    // hcBatchTaskRunState later.
                     detectorIdOfEmptyStates.add(detectorId);
+                    continue;
+                }
+                if (!noRunningTask) {
+                    // If a detector has running task, we should not clean up task run state cache for it.
+                    // It's possible that some entity task is on the way to worker node. So we should not
+                    // remove detector level state if no running task found. Otherwise the task may arrive
+                    // after run state cache deleted, then it can run on work node. We should delete cache
+                    // if no running task and run state expired.
                     continue;
                 }
                 for (Map.Entry<String, ADHCBatchTaskRunState> taskRunState : taskRunStates.entrySet()) {
