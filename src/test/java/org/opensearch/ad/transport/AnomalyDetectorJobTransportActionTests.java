@@ -242,18 +242,20 @@ public class AnomalyDetectorJobTransportActionTests extends HistoricalAnalysisIn
             }, 90, TimeUnit.SECONDS);
             ADTask adTask = getADTask(taskId);
             assertEquals(ADTaskType.HISTORICAL_HC_DETECTOR.toString(), adTask.getTaskType());
-            assertEquals(ADTaskState.FINISHED.name(), adTask.getState());
+            // Task may fail if memory circuit breaker triggered
+            assertTrue(ImmutableList.of(ADTaskState.FINISHED.name(), ADTaskState.FAILED.name()).contains(adTask.getState()));
             assertEquals(categoryField, adTask.getDetector().getCategoryField().get(0));
             assertEquals(ipField, adTask.getDetector().getCategoryField().get(1));
 
-            // TODO: check why entity ad task number is more than 5 sometimes
-            // List<ADTask> adTasks = searchADTasks(detectorId, taskId, true, 100);
-            // assertEquals(5, adTasks.size());
-            // List<ADTask> entityTasks = adTasks
-            // .stream()
-            // .filter(task -> ADTaskType.HISTORICAL_HC_ENTITY.name().equals(task.getTaskType()))
-            // .collect(Collectors.toList());
-            // assertEquals(5, entityTasks.size());
+            if (ADTaskState.FINISHED.name().equals(adTask.getState())) {
+                List<ADTask> adTasks = searchADTasks(detectorId, taskId, true, 100);
+                assertEquals(5, adTasks.size());
+                List<ADTask> entityTasks = adTasks
+                    .stream()
+                    .filter(task -> ADTaskType.HISTORICAL_HC_ENTITY.name().equals(task.getTaskType()))
+                    .collect(Collectors.toList());
+                assertEquals(5, entityTasks.size());
+            }
         }
     }
 

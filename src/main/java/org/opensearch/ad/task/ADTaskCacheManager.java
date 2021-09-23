@@ -189,7 +189,7 @@ public class ADTaskCacheManager {
     public synchronized void add(ADTask adTask) {
         String taskId = adTask.getTaskId();
         String detectorId = adTask.getDetectorId();
-        if (contains(taskId)) { //TODO, clean up old resource on coordinating node when start new detector, same for worker node.
+        if (contains(taskId)) { // TODO, clean up old resource on coordinating node when start new detector, same for worker node.
             throw new DuplicateTaskException(DETECTOR_IS_RUNNING);
         }
         // It's possible that multiple entity tasks of one detector run on same data node.
