@@ -238,7 +238,9 @@ public abstract class HistoricalAnalysisRestTestCase extends AnomalyDetectorRest
     protected ADTaskProfile waitUntilTaskReachState(String detectorId, Set<String> targetStates) throws InterruptedException {
         int i = 0;
         ADTaskProfile adTaskProfile = null;
-        while ((adTaskProfile == null || !targetStates.contains(adTaskProfile.getAdTask().getState())) && i < 60) {
+        // Increase retryTimes if some task can't reach done state
+        int retryTimes = 200;
+        while ((adTaskProfile == null || !targetStates.contains(adTaskProfile.getAdTask().getState())) && i < retryTimes) {
             try {
                 adTaskProfile = getADTaskProfile(detectorId);
             } catch (Exception e) {

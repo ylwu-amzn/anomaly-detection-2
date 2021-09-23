@@ -21,6 +21,7 @@ import static org.opensearch.ad.rest.ADRestTestUtils.ingestTestDataForHistorical
 import static org.opensearch.ad.rest.ADRestTestUtils.searchLatestAdTaskOfDetector;
 import static org.opensearch.ad.rest.ADRestTestUtils.startAnomalyDetectorDirectly;
 import static org.opensearch.ad.rest.ADRestTestUtils.startHistoricalAnalysis;
+import static org.opensearch.ad.rest.ADRestTestUtils.stopHistoricalAnalysis;
 import static org.opensearch.ad.rest.ADRestTestUtils.stopRealtimeJob;
 import static org.opensearch.ad.rest.ADRestTestUtils.waitUntilTaskDone;
 import static org.opensearch.ad.util.RestHandlerUtils.ANOMALY_DETECTOR_JOB;
@@ -29,6 +30,7 @@ import static org.opensearch.ad.util.RestHandlerUtils.REALTIME_TASK;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -40,6 +42,7 @@ import org.junit.Before;
 import org.opensearch.ad.TestHelpers;
 import org.opensearch.ad.mock.model.MockSimpleLog;
 import org.opensearch.ad.model.ADTask;
+import org.opensearch.ad.model.ADTaskState;
 import org.opensearch.ad.model.ADTaskType;
 import org.opensearch.ad.model.AnomalyDetector;
 import org.opensearch.ad.model.AnomalyDetectorJob;
@@ -64,14 +67,13 @@ public class ADBackwardsCompatibilityIT extends OpenSearchRestTestCase {
     private String aggregationMethod = "sum";
     private int totalDocsPerCategory = 10_000;
     private int categoryFieldSize = 2;
-    private List<String> runningRaltimeDetectors;
-    private List<String> oldRunningRaltimeDetectors;
+    private List<String> runningRealtimeDetectors;
     private List<String> historicalDetectors;
 
     @Before
     public void setUp() throws Exception {
         super.setUp();
-        this.runningRaltimeDetectors = new ArrayList<>();
+        this.runningRealtimeDetectors = new ArrayList<>();
         this.historicalDetectors = new ArrayList<>();
     }
 
@@ -143,48 +145,60 @@ public class ADBackwardsCompatibilityIT extends OpenSearchRestTestCase {
                     assertEquals(totalDocsPerCategory * categoryFieldSize * 2, getDocCountOfIndex(client(), dataIndexName));
                     Assert.assertTrue(pluginNames.contains("opendistro-anomaly-detection"));
                     Assert.assertTrue(pluginNames.contains("opendistro-job-scheduler"));
+
                     // Create single entity detector and start realtime job
                     createRealtimeAnomalyDetectorsAndStart(SINGLE_ENTITY_DETECTOR);
-                    //oldRunningRaltimeDetectors.add(oldSingleEntityDetectorResults.get(0));
+
                     // Create single category HC detector and start realtime job
                     createRealtimeAnomalyDetectorsAndStart(SINGLE_CATEGORY_HC_DETECTOR);
-                    //oldRunningRaltimeDetectors.add(oldSingleCategoryHCDetectorResults.get(0));
+
                     // Create single entity historical detector and start historical analysis
                     createHistoricalAnomalyDetectorsAndStart();
+
                     // Verify cluster has 3 detectors now
                     verifyAnomalyDetectorCount(TestHelpers.LEGACY_OPENDISTRO_AD_BASE_DETECTORS_URI, 3);
                     // Verify cluster has 3 detectors with search detector API
                     assertEquals(3, countDetectors(client(), null));
+
                     // Verify all realtime detectors are running realtime job
                     verifyRealtimeJobRunning();
                     break;
                 case MIXED:
-                    // We have no way specify whether send request to old node or new node.
-                    // Will add more test later when it's possible to specify request node.
+                    // We have no way to specify whether send request to old node or new node now.
+                    //TODO: Add more test later when it's possible to specify request node.
                     Assert.assertTrue(pluginNames.contains("opensearch-anomaly-detection"));
                     Assert.assertTrue(pluginNames.contains("opensearch-job-scheduler"));
+
                     // Verify cluster has 3 detectors now
                     verifyAnomalyDetectorCount(TestHelpers.LEGACY_OPENDISTRO_AD_BASE_DETECTORS_URI, 3);
                     // Verify cluster has 3 detectors with search detector API
                     assertEquals(3, countDetectors(client(), null));
+
                     // Verify all realtime detectors are running realtime job
                     verifyRealtimeJobRunning();
                     break;
                 case UPGRADED:
                     Assert.assertTrue(pluginNames.contains("opensearch-anomaly-detection"));
                     Assert.assertTrue(pluginNames.contains("opensearch-job-scheduler"));
+
+                    Map<ADRestTestUtils.DetectorType, String> detectors = new HashMap<>();
+
                     // Create single entity detector and start realtime job
                     List<String> singleEntityDetectorResults = createRealtimeAnomalyDetectorsAndStart(SINGLE_ENTITY_DETECTOR);
+                    detectors.put(SINGLE_ENTITY_DETECTOR, singleEntityDetectorResults.get(0));
                     // Start historical analysis for single entity detector
                     startHistoricalAnalysisOnNewNode(singleEntityDetectorResults.get(0), ADTaskType.HISTORICAL_SINGLE_ENTITY.name());
 
+
                     // Create single category HC detector and start realtime job
                     List<String> singleCategoryHCResults = createRealtimeAnomalyDetectorsAndStart(SINGLE_CATEGORY_HC_DETECTOR);
+                    detectors.put(SINGLE_CATEGORY_HC_DETECTOR, singleEntityDetectorResults.get(0));
                     // Start historical analysis for single category HC detector
                     startHistoricalAnalysisOnNewNode(singleCategoryHCResults.get(0), ADTaskType.HISTORICAL_HC_DETECTOR.name());
 
                     // Create multi category HC detector and start realtime job
                     List<String> multiCategoryHCResults = createRealtimeAnomalyDetectorsAndStart(MULTI_CATEGORY_HC_DETECTOR);
+                    detectors.put(MULTI_CATEGORY_HC_DETECTOR, singleEntityDetectorResults.get(0));
                     // Start historical analysis for multi category HC detector
                     startHistoricalAnalysisOnNewNode(multiCategoryHCResults.get(0), ADTaskType.HISTORICAL_HC_DETECTOR.name());
 
@@ -192,12 +206,18 @@ public class ADBackwardsCompatibilityIT extends OpenSearchRestTestCase {
                     verifyAnomalyDetectorCount(TestHelpers.AD_BASE_DETECTORS_URI, 6);
                     // Verify cluster has 3 detectors with search detector API
                     assertEquals(6, countDetectors(client(), null));
-                    // Verify all realtime detectors are running realtime job
-                    verifyRealtimeJobRunning();
-                    // Verify realtime task exists for all running realtime detector
-                    verifyAdTasks();
+
                     // Start realtime job for historical detector created on old cluster and check realtime job running.
                     startRealtimeJobForHistoricalDetectorOnNewNode();
+
+                    // Verify all realtime detectors are running realtime job
+                    verifyRealtimeJobRunning();
+                    // Verify realtime and historical task exists for all running realtime detector
+                    verifyAdTasks();
+
+                    // Verify stop historical analysis works
+                    verifyStopHistoricalAnalysisOnNewNode(detectors);
+
                     // Stop and delete detector
                     stopAndDeleteDetectors();
                     break;
@@ -206,13 +226,52 @@ public class ADBackwardsCompatibilityIT extends OpenSearchRestTestCase {
         }
     }
 
+    private void verifyStopHistoricalAnalysisOnNewNode(Map<ADRestTestUtils.DetectorType, String> detectors) throws IOException, InterruptedException {
+        for (Map.Entry<ADRestTestUtils.DetectorType, String> entry : detectors.entrySet()) {
+            String detectorId = entry.getValue();
+
+            switch (entry.getKey()){
+                case SINGLE_ENTITY_DETECTOR:
+                    verifyHistoricalAnalysisStoppedOnNewNode(detectorId, ADTaskType.HISTORICAL_SINGLE_ENTITY.name());
+                    break;
+                case SINGLE_CATEGORY_HC_DETECTOR:
+                case MULTI_CATEGORY_HC_DETECTOR:
+                    verifyHistoricalAnalysisStoppedOnNewNode(detectorId, ADTaskType.HISTORICAL_HC_DETECTOR.name());
+                    break;
+                default:
+                    break;
+            }
+
+        }
+    }
+
+    private void verifyHistoricalAnalysisStoppedOnNewNode(String detectorId, String taskType) throws IOException, InterruptedException {
+        try {
+            startHistoricalAnalysis(client(), detectorId);
+            verifyHistoricalAnalysisCanBeStopped(detectorId, taskType);
+        } catch (Exception e) {
+            if (ExceptionUtil.getErrorMessage(e).contains("running")) {
+                verifyHistoricalAnalysisCanBeStopped(detectorId, taskType);
+            }
+        }
+    }
+
+    private void verifyHistoricalAnalysisCanBeStopped(String detectorId, String taskType) throws IOException, InterruptedException {
+        Thread.sleep(2_000); // sleep two seconds for the worker node stopping tasks
+        stopHistoricalAnalysis(client(), detectorId);
+        Thread.sleep(2_000); // sleep two seconds for the worker node stopping tasks
+        List<ADTask> adTasks = searchLatestAdTaskOfDetector(client(), detectorId, taskType);
+        assertEquals(1, adTasks.size());
+        assertEquals(ADTaskState.STOPPED.name(), adTasks.get(0).getState());
+    }
+
     private void verifyAdTasks() throws InterruptedException, IOException {
         boolean realtimeTaskMissing = false;
         int i = 0;
         int maxRetryTimes = 10;
         do {
             i++;
-            for (String detectorId : runningRaltimeDetectors) {
+            for (String detectorId : runningRealtimeDetectors) {
                 Map<String, Object> jobAndTask = getDetectorWithJobAndTask(client(), detectorId);
                 AnomalyDetectorJob job = (AnomalyDetectorJob)jobAndTask.get(ANOMALY_DETECTOR_JOB);
                 ADTask historicalTask = (ADTask)jobAndTask.get(HISTORICAL_ANALYSIS_TASK);
@@ -238,7 +297,7 @@ public class ADBackwardsCompatibilityIT extends OpenSearchRestTestCase {
             Response response = deleteDetector(client(), detectorId);
             assertEquals(RestStatus.OK, TestHelpers.restStatus(response));
         }
-        for (String detectorId : runningRaltimeDetectors) {
+        for (String detectorId : runningRealtimeDetectors) {
             deleteRunningDetector(detectorId);
             Response stopDetectorResponse = stopRealtimeJob(client(), detectorId);
             assertEquals(RestStatus.OK, TestHelpers.restStatus(stopDetectorResponse));
@@ -265,18 +324,17 @@ public class ADBackwardsCompatibilityIT extends OpenSearchRestTestCase {
 
     private void startRealtimeJobForHistoricalDetectorOnNewNode() throws IOException {
         for (String detectorId : historicalDetectors) {
-            // Start historical detector directly on new node will start realtime job.
-            // Need to pass detection date range in http body if need to start historical analysis.
             String jobId = startAnomalyDetectorDirectly(client(), detectorId);
             assertEquals(detectorId, jobId);
             Map<String, Object> jobAndTask = getDetectorWithJobAndTask(client(), detectorId);
             AnomalyDetectorJob detectorJob = (AnomalyDetectorJob)jobAndTask.get(ANOMALY_DETECTOR_JOB);
             assertTrue(detectorJob.isEnabled());
+            runningRealtimeDetectors.add(detectorId);
         }
     }
 
     private void verifyRealtimeJobRunning() throws IOException {
-        for (String detectorId : runningRaltimeDetectors) {
+        for (String detectorId : runningRealtimeDetectors) {
             Map<String, Object> jobAndTask = getDetectorWithJobAndTask(client(), detectorId);
             AnomalyDetectorJob detectorJob = (AnomalyDetectorJob)jobAndTask.get(ANOMALY_DETECTOR_JOB);
             assertTrue(detectorJob.isEnabled());
@@ -321,8 +379,7 @@ public class ADBackwardsCompatibilityIT extends OpenSearchRestTestCase {
                 );
                 return startAnomalyDetector(singleFLowDetectorResponse, false);
             case SINGLE_CATEGORY_HC_DETECTOR:
-                // Create single flow detector
-                // Create single category detector
+                // Create single category HC detector
                 Response singleCategoryHCDetectorResponse = createAnomalyDetector(
                     client(),
                     dataIndexName,
@@ -336,8 +393,7 @@ public class ADBackwardsCompatibilityIT extends OpenSearchRestTestCase {
                 );
                 return startAnomalyDetector(singleCategoryHCDetectorResponse, false);
             case MULTI_CATEGORY_HC_DETECTOR:
-                // Create single flow detector
-                // Create single category detector
+                // Create multi-category HC detector
                 Response multiCategoryHCDetectorResponse = createAnomalyDetector(
                     client(),
                     dataIndexName,
@@ -386,7 +442,7 @@ public class ADBackwardsCompatibilityIT extends OpenSearchRestTestCase {
         try {
             deleteDetector(client(), detectorId);
         } catch (Exception e) {
-            assertTrue(ExceptionUtil.getErrorMessage(e).contains("is running"));
+            assertTrue(ExceptionUtil.getErrorMessage(e).contains("running"));
         }
     }
 
@@ -416,7 +472,7 @@ public class ADBackwardsCompatibilityIT extends OpenSearchRestTestCase {
             Map<String, Object> jobAndTask = getDetectorWithJobAndTask(client(), detectorId);
             AnomalyDetectorJob job = (AnomalyDetectorJob)jobAndTask.get(ANOMALY_DETECTOR_JOB);
             assertTrue(job.isEnabled());
-            runningRaltimeDetectors.add(detectorId);
+            runningRealtimeDetectors.add(detectorId);
         } else {
             historicalDetectors.add(detectorId);
         }

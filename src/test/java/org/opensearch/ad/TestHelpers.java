@@ -569,14 +569,12 @@ public class TestHelpers {
 
     public static Feature randomFeature(String featureName, String fieldName, String aggregationMethod, boolean enabled) {
         try {
-            AggregationBuilder testAggregation = null;
             XContentParser parser = parser("{\"" + featureName + "\":{\"" + aggregationMethod + "\":{\"field\":\"" + fieldName + "\"}}}");
             AggregatorFactories.Builder aggregators = AggregatorFactories.parseAggregators(parser);
-            testAggregation = aggregators.getAggregatorFactories().iterator().next();
+            AggregationBuilder testAggregation = aggregators.getAggregatorFactories().iterator().next();
             return new Feature(randomAlphaOfLength(5), featureName, enabled, testAggregation);
         } catch (IOException e) {
-            logger.error("Fail to generate test aggregation");
-            throw new RuntimeException();
+            throw new RuntimeException("Fail to generate test aggregation");
         }
     }
 

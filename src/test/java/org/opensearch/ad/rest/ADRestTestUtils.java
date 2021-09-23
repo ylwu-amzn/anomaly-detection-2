@@ -218,13 +218,6 @@ public class ADRestTestUtils {
                 TestHelpers.toHttpEntity(detector),
                 null
             );
-        // verify that the detector is created
-        // assertEquals("Create anomaly detector failed", RestStatus.CREATED, TestHelpers.restStatus(response));
-        // Map<String, Object> responseMap = entityAsMap(response);
-        // String id = (String) responseMap.get("_id");
-        // int version = (int) responseMap.get("_version");
-        // assertNotEquals("response is missing Id", AnomalyDetector.NO_ID, id);
-        // assertTrue("incorrect version", version > 0);
     }
 
     @SuppressWarnings("unchecked")
@@ -242,7 +235,7 @@ public class ADRestTestUtils {
                             + detectorId
                             + "\"}},{\"term\":{\"is_latest\":\"true\"}},{\"terms\":{\"task_type\":[\""
                             + taskType
-                            + "\"]}}]}},\"sort\":[{\"execution_start_time\":{\"order\":\"desc\"}}],\"size\":100}"
+                            + "\"]}}]}},\"sort\":[{\"execution_start_time\":{\"order\":\"desc\"}}],\"size\":1000}"
                     ),
                 null
             );
@@ -403,6 +396,17 @@ public class ADRestTestUtils {
                 .build();
     }
 
+    /**
+     * Start anomaly detector directly.
+     * For AD versions on or before 1.0, this function will start realtime job for
+     * realtime detector, and start historical analysis for historical detector.
+     *
+     * For AD version on or after 1.1, this function will start realtime job only.
+     * @param client REST client
+     * @param detectorId detector id
+     * @return job id for realtime job or task id for historical analysis
+     * @throws IOException exception may throw in entityAsMap
+     */
     @SuppressWarnings("unchecked")
     public static String startAnomalyDetectorDirectly(RestClient client, String detectorId) throws IOException {
         Response response = TestHelpers
@@ -420,6 +424,17 @@ public class ADRestTestUtils {
         return jobOrTaskId;
     }
 
+    /**
+     * Start historical analysis.
+     * For AD versions on or before 1.0, should pass historical detector id to
+     * this function.
+     * For AD version on or after 1.1, can pass any detector id to this function.
+     *
+     * @param client REST client
+     * @param detectorId detector id
+     * @return task id of historical analysis
+     * @throws IOException exception may throw in toHttpEntity and entityAsMap
+     */
     @SuppressWarnings("unchecked")
     public static String startHistoricalAnalysis(RestClient client, String detectorId) throws IOException {
         Instant now = Instant.now();
@@ -430,6 +445,8 @@ public class ADRestTestUtils {
                 "POST",
                 TestHelpers.LEGACY_OPENDISTRO_AD_BASE_DETECTORS_URI + "/" + detectorId + "/_start",
                 ImmutableMap.of(),
+                    // Start historical detector directly on new node will start realtime job.
+                    // Need to pass detection date range in http body if need to start historical analysis.
                 TestHelpers.toHttpEntity(TestHelpers.toJsonString(dateRange)),
                 null
             );
@@ -445,8 +462,9 @@ public class ADRestTestUtils {
     public static ADTaskProfile waitUntilTaskReachState(RestClient client, String detectorId, Set<String> targetStates)
         throws InterruptedException {
         int i = 0;
+        int retryTimes = 200;
         ADTaskProfile adTaskProfile = null;
-        while ((adTaskProfile == null || !targetStates.contains(adTaskProfile.getAdTask().getState())) && i < 60) {
+        while ((adTaskProfile == null || !targetStates.contains(adTaskProfile.getAdTask().getState())) && i < retryTimes) {
             try {
                 adTaskProfile = getADTaskProfile(client, detectorId);
             } catch (Exception e) {
@@ -490,11 +508,20 @@ public class ADRestTestUtils {
     }
 
     public static Response stopRealtimeJob(RestClient client, String detectorId) throws IOException {
+        return stopDetector(client, detectorId, false);
+    }
+
+    public static Response stopHistoricalAnalysis(RestClient client, String detectorId) throws IOException {
+        return stopDetector(client, detectorId, true);
+    }
+
+    public static Response stopDetector(RestClient client, String detectorId, boolean historicalAnalysis) throws IOException {
+        String param = historicalAnalysis ? "?historical" : "";
         Response response = TestHelpers
                 .makeRequest(
                         client,
                         "POST",
-                        TestHelpers.LEGACY_OPENDISTRO_AD_BASE_DETECTORS_URI + "/" + detectorId + "/_stop",
+                        TestHelpers.LEGACY_OPENDISTRO_AD_BASE_DETECTORS_URI + "/" + detectorId + "/_stop" + param,
                         ImmutableMap.of(),
                         "",
                         null
