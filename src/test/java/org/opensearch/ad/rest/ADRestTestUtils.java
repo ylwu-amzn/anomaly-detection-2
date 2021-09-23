@@ -9,6 +9,9 @@
 package org.opensearch.ad.rest;
 
 import static com.carrotsearch.randomizedtesting.RandomizedTest.randomBoolean;
+import static org.opensearch.ad.util.RestHandlerUtils.ANOMALY_DETECTOR_JOB;
+import static org.opensearch.ad.util.RestHandlerUtils.HISTORICAL_ANALYSIS_TASK;
+import static org.opensearch.ad.util.RestHandlerUtils.REALTIME_TASK;
 import static org.opensearch.test.OpenSearchTestCase.randomAlphaOfLength;
 import static org.opensearch.test.OpenSearchTestCase.randomDoubleBetween;
 import static org.opensearch.test.OpenSearchTestCase.randomInt;
@@ -20,6 +23,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -288,7 +292,6 @@ public class ADRestTestUtils {
         } else {
             query = query.replace(taskFilter, "");
         }
-        System.out.println("ddddddddddddd111111, " + query);
         Response searchAdTaskResponse = TestHelpers
             .makeRequest(
                 client,
@@ -331,34 +334,73 @@ public class ADRestTestUtils {
     }
 
     @SuppressWarnings("unchecked")
-    public static AnomalyDetectorJob getDetectorJob(RestClient client, String detectorId) throws IOException {
+    public static Map<String, Object> getDetectorWithJobAndTask(RestClient client, String detectorId) throws IOException {
+        Map<String, Object> results = new HashMap<>();
         Response searchAdTaskResponse = TestHelpers
             .makeRequest(
                 client,
                 "GET",
-                TestHelpers.LEGACY_OPENDISTRO_AD_BASE_DETECTORS_URI + "/" + detectorId + "?job=true",
+                TestHelpers.LEGACY_OPENDISTRO_AD_BASE_DETECTORS_URI + "/" + detectorId + "?job=true&task=true",
                 ImmutableMap.of(),
                 (HttpEntity) null,
                 null
             );
         Map<String, Object> responseMap = entityAsMap(searchAdTaskResponse);
-        Map<String, Object> jobMap = (Map<String, Object>) responseMap.get("anomaly_detector_job");
-        String jobName = (String) jobMap.get(AnomalyDetectorJob.NAME_FIELD);
-        boolean enabled = (boolean) jobMap.get(AnomalyDetectorJob.IS_ENABLED_FIELD);
-        long enabledTime = (long) jobMap.get(AnomalyDetectorJob.ENABLED_TIME_FIELD);
-        long lastUpdateTime = (long) jobMap.get(AnomalyDetectorJob.LAST_UPDATE_TIME_FIELD);
 
-        return new AnomalyDetectorJob(
-            jobName,
-            null,
-            null,
-            enabled,
-            Instant.ofEpochMilli(enabledTime),
-            null,
-            Instant.ofEpochMilli(lastUpdateTime),
-            null,
-            null
-        );
+        Map<String, Object> jobMap = (Map<String, Object>) responseMap.get(ANOMALY_DETECTOR_JOB);
+        if (jobMap != null) {
+            String jobName = (String) jobMap.get(AnomalyDetectorJob.NAME_FIELD);
+            boolean enabled = (boolean) jobMap.get(AnomalyDetectorJob.IS_ENABLED_FIELD);
+            long enabledTime = (long) jobMap.get(AnomalyDetectorJob.ENABLED_TIME_FIELD);
+            long lastUpdateTime = (long) jobMap.get(AnomalyDetectorJob.LAST_UPDATE_TIME_FIELD);
+
+            AnomalyDetectorJob job = new AnomalyDetectorJob(
+                    jobName,
+                    null,
+                    null,
+                    enabled,
+                    Instant.ofEpochMilli(enabledTime),
+                    null,
+                    Instant.ofEpochMilli(lastUpdateTime),
+                    null,
+                    null
+            );
+            results.put(ANOMALY_DETECTOR_JOB, job);
+        }
+
+        Map<String, Object> historicalTaskMap = (Map<String, Object>) responseMap.get(HISTORICAL_ANALYSIS_TASK);
+        if (historicalTaskMap != null) {
+            ADTask historicalAdTask = parseAdTask(historicalTaskMap);
+            results.put(HISTORICAL_ANALYSIS_TASK, historicalAdTask);
+        }
+
+        Map<String, Object> realtimeTaskMap = (Map<String, Object>) responseMap.get(REALTIME_TASK);
+        if (realtimeTaskMap != null) {
+            ADTask realtimeAdTask = parseAdTask(realtimeTaskMap);
+            results.put(REALTIME_TASK, realtimeAdTask);
+        }
+
+        return results;
+    }
+
+    private static ADTask parseAdTask(Map<String, Object> taskMap) {
+        String id = (String) taskMap.get(ADTask.TASK_ID_FIELD);
+        String state = (String) taskMap.get(ADTask.STATE_FIELD);
+        String parsedDetectorId = (String) taskMap.get(ADTask.DETECTOR_ID_FIELD);
+        Double taskProgress = (Double) taskMap.get(ADTask.TASK_PROGRESS_FIELD);
+        Double initProgress = (Double) taskMap.get(ADTask.INIT_PROGRESS_FIELD);
+        String parsedTaskType = (String) taskMap.get(ADTask.TASK_TYPE_FIELD);
+        String coordinatingNode = (String) taskMap.get(ADTask.COORDINATING_NODE_FIELD);
+        return ADTask
+                .builder()
+                .taskId(id)
+                .state(state)
+                .detectorId(parsedDetectorId)
+                .taskProgress(taskProgress.floatValue())
+                .initProgress(initProgress.floatValue())
+                .taskType(parsedTaskType)
+                .coordinatingNode(coordinatingNode)
+                .build();
     }
 
     @SuppressWarnings("unchecked")
@@ -445,5 +487,31 @@ public class ADRestTestUtils {
             }
         }
         return adTaskProfile;
+    }
+
+    public static Response stopRealtimeJob(RestClient client, String detectorId) throws IOException {
+        Response response = TestHelpers
+                .makeRequest(
+                        client,
+                        "POST",
+                        TestHelpers.LEGACY_OPENDISTRO_AD_BASE_DETECTORS_URI + "/" + detectorId + "/_stop",
+                        ImmutableMap.of(),
+                        "",
+                        null
+                );
+        return response;
+    }
+
+    public static Response deleteDetector(RestClient client, String detectorId) throws IOException {
+        Response response = TestHelpers
+                .makeRequest(
+                        client,
+                        "DELETE",
+                        TestHelpers.LEGACY_OPENDISTRO_AD_BASE_DETECTORS_URI + "/" + detectorId,
+                        ImmutableMap.of(),
+                        "",
+                        null
+                );
+        return response;
     }
 }
