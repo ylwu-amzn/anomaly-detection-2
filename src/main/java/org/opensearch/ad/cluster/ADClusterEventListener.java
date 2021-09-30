@@ -66,10 +66,10 @@ public class ADClusterEventListener implements ClusterStateListener {
     @Override
     public void clusterChanged(ClusterChangedEvent event) {
 
-        if (!nodeFilter.isEligibleNode(event.state().nodes().getLocalNode())) {
-            LOG.debug(NODE_NOT_APPLIED_MSG);
-            return;
-        }
+//        if (!nodeFilter.isEligibleNode(event.state().nodes().getLocalNode())) {
+//            LOG.debug(NODE_NOT_APPLIED_MSG);
+//            return;
+//        }
 
         if (event.state().blocks().hasGlobalBlock(GatewayService.STATE_NOT_RECOVERED_BLOCK)) {
             LOG.info(NOT_RECOVERED_MSG);
@@ -97,24 +97,30 @@ public class ADClusterEventListener implements ClusterStateListener {
             Delta delta = event.nodesDelta();
 
             // Check whether it was a data node that was removed
-            boolean dataNodeRemoved = false;
-            for (DiscoveryNode removedNode : delta.removedNodes()) {
-                if (nodeFilter.isEligibleNode(removedNode)) {
-                    LOG.info(NODE_REMOVED_MSG + " {}", removedNode.getId());
-                    dataNodeRemoved = true;
-                    break;
-                }
-            }
+            boolean dataNodeRemoved = delta.removedNodes() != null && delta.removedNodes().size() > 0;
+//            for (DiscoveryNode removedNode : delta.removedNodes()) {
+////                if (nodeFilter.isEligibleNode(removedNode)) {
+////                    LOG.info(NODE_REMOVED_MSG + " {}", removedNode.getId());
+////                    dataNodeRemoved = true;
+////                    break;
+////                }
+//                LOG.info(NODE_REMOVED_MSG + " {}", removedNode.getId());
+//                dataNodeRemoved = true;
+//                break;
+//            }
 
             // Check whether it was a data node that was added
-            boolean dataNodeAdded = false;
-            for (DiscoveryNode addedNode : delta.addedNodes()) {
-                if (nodeFilter.isEligibleNode(addedNode)) {
-                    LOG.info(NODE_ADDED_MSG + " {}", addedNode.getId());
-                    dataNodeAdded = true;
-                    break;
-                }
-            }
+            boolean dataNodeAdded = delta.addedNodes() != null && delta.addedNodes().size() > 0;
+//            for (DiscoveryNode addedNode : delta.addedNodes()) {
+////                if (nodeFilter.isEligibleNode(addedNode)) {
+////                    LOG.info(NODE_ADDED_MSG + " {}", addedNode.getId());
+////                    dataNodeAdded = true;
+////                    break;
+////                }
+//                LOG.info(NODE_ADDED_MSG + " {}", addedNode.getId());
+//                dataNodeAdded = true;
+//                break;
+//            }
 
             if (dataNodeAdded || dataNodeRemoved) {
                 hashRing.addNodeChangeEvent();

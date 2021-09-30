@@ -65,11 +65,16 @@ public class ADTaskProfileNodeResponse extends BaseNodeResponse {
     @Override
     public void writeTo(StreamOutput out) throws IOException {
         super.writeTo(out);
+        logger.info("----------ADTaskProfileNodeResponse ylwudebug: adTaskProfile: {}", adTaskProfile == null? "null" : adTaskProfile.toString());
+        logger.info("----------ADTaskProfileNodeResponse ylwudebug: remote AD version: {}, compitble: {}", remoteAdVersion, remoteAdVersion == null? "ffffff" : remoteAdVersion.onOrAfter(Version.V_1_1_0));
+        logger.info("----------ADTaskProfileNodeResponse ylwudebug: compatible with version: {}", ADVersionUtil.compatibleWithVersionOnOrAfter1_1(remoteAdVersion));
+
         if (adTaskProfile != null
             && (ADVersionUtil.compatibleWithVersionOnOrAfter1_1(remoteAdVersion) || adTaskProfile.getNodeId() != null)) {
             out.writeBoolean(true);
             adTaskProfile.writeTo(out, remoteAdVersion);
         } else {
+            logger.info("----------ADTaskProfileNodeResponse ylwudebug: return null task profile ");
             out.writeBoolean(false);
         }
     }

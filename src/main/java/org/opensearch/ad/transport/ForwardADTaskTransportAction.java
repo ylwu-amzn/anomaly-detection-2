@@ -103,11 +103,11 @@ public class ForwardADTaskTransportAction extends HandledTransportAction<Forward
 
         switch (adTaskAction) {
             case APPLY_FOR_TASK_SLOTS:
-                logger.debug("Received APPLY_FOR_TASK_SLOTS action for detector {}", detectorId);
+                logger.debug("---------- ylwudebug: Received APPLY_FOR_TASK_SLOTS action for detector {}", detectorId);
                 adTaskManager.checkTaskSlots(adTask, detector, detectionDateRange, user, ADTaskAction.START, transportService, listener);
                 break;
             case CHECK_AVAILABLE_TASK_SLOTS:
-                logger.debug("Received CHECK_AVAILABLE_TASK_SLOTS action for detector {}", detectorId);
+                logger.debug("---------- ylwudebug: Received CHECK_AVAILABLE_TASK_SLOTS action for detector {}", detectorId);
                 adTaskManager
                     .checkTaskSlots(
                         adTask,
@@ -121,14 +121,14 @@ public class ForwardADTaskTransportAction extends HandledTransportAction<Forward
                 break;
             case START:
                 // Start historical analysis for detector
-                logger.debug("Received START action for detector {}", detectorId);
+                logger.debug("---------- ylwudebug: Received START action for detector {}", detectorId);
                 adTaskManager.startDetector(detector, detectionDateRange, user, transportService, ActionListener.wrap(r -> {
                     adTaskCacheManager.setDetectorTaskSlots(detector.getDetectorId(), availableTaskSlots);
                     listener.onResponse(r);
                 }, e -> listener.onFailure(e)));
                 break;
             case NEXT_ENTITY:
-                logger.debug("Received NEXT_ENTITY action for detector {}, task {}", detectorId, adTask.getTaskId());
+                logger.debug("---------- ylwudebug: Received NEXT_ENTITY action for detector {}, task {}", detectorId, adTask.getTaskId());
                 // Run next entity for HC detector historical analysis.
                 if (detector.isMultientityDetector()) { // AD task could be HC detector level task or entity task
                     adTaskCacheManager.removeRunningEntity(detectorId, entityValue);
@@ -167,7 +167,7 @@ public class ForwardADTaskTransportAction extends HandledTransportAction<Forward
                 }
                 break;
             case PUSH_BACK_ENTITY:
-                logger.debug("Received PUSH_BACK_ENTITY action for detector {}, task {}", detectorId, adTask.getTaskId());
+                logger.debug("---------- ylwudebug: Received PUSH_BACK_ENTITY action for detector {}, task {}", detectorId, adTask.getTaskId());
                 // Push back entity to pending entities queue and run next entity.
                 if (adTask.isEntityTask()) { // AD task must be entity level task.
                     adTaskCacheManager.removeRunningEntity(detectorId, entityValue);
@@ -199,7 +199,7 @@ public class ForwardADTaskTransportAction extends HandledTransportAction<Forward
                 }
                 break;
             case SCALE_ENTITY_TASK_SLOTS:
-                logger.debug("Received SCALE_ENTITY_TASK_LANE action for detector {}", detectorId);
+                logger.debug("---------- ylwudebug: Received SCALE_ENTITY_TASK_LANE action for detector {}", detectorId);
                 // Check current available task slots and scale entity task lane.
                 if (availableTaskSlots != null && availableTaskSlots > 0) {
                     int newSlots = Math.min(availableTaskSlots, adTaskManager.detectorTaskSlotScaleDelta(detectorId));
@@ -211,7 +211,7 @@ public class ForwardADTaskTransportAction extends HandledTransportAction<Forward
                 listener.onResponse(new AnomalyDetectorJobResponse(detector.getDetectorId(), 0, 0, 0, RestStatus.OK));
                 break;
             case CANCEL:
-                logger.debug("Received CANCEL action for detector {}", detectorId);
+                logger.debug("---------- ylwudebug: Received CANCEL action for detector {}", detectorId);
                 // Cancel HC detector's historical analysis.
                 // Don't support single detector for this action as single entity task will be cancelled directly
                 // on worker node.
@@ -227,7 +227,7 @@ public class ForwardADTaskTransportAction extends HandledTransportAction<Forward
                 }
                 break;
             case CLEAN_STALE_RUNNING_ENTITIES:
-                logger.debug("Received CLEAN_STALE_RUNNING_ENTITIES action for detector {}", detectorId);
+                logger.debug("---------- ylwudebug: Received CLEAN_STALE_RUNNING_ENTITIES action for detector {}", detectorId);
                 // Clean stale running entities of HC detector. For example, some worker node crashed or failed to send
                 // entity task done message to coordinating node, then coordinating node can't remove running entity
                 // from cache. We will check task profile when get task. If some entities exist in coordinating cache but
@@ -248,7 +248,7 @@ public class ForwardADTaskTransportAction extends HandledTransportAction<Forward
                 boolean historicalTask = adTask.isHistoricalTask();
                 logger
                     .debug(
-                        "Received CLEAN_CACHE action for detector {}, taskId: {}, historical: {}",
+                        "---------- ylwudebug: Received CLEAN_CACHE action for detector {}, taskId: {}, historical: {}",
                         detectorId,
                         adTask.getTaskId(),
                         historicalTask

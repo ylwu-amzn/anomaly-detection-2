@@ -80,6 +80,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -1397,6 +1398,11 @@ public class ADTaskManager {
         String detectorId = adDetectorLevelTask.getDetectorId();
 
         hashRing.getAllEligibleDataNodesWithKnownAdVersion(dataNodes -> {
+            List<String> nodeIdss = new ArrayList<>();
+            for (DiscoveryNode node : dataNodes) {
+                nodeIdss.add(node.getId());
+            }
+            logger.info("-------- ylwudebug: send task profile request to nodes {}", Arrays.toString(nodeIdss.toArray(new String[0])));
             ADTaskProfileRequest adTaskProfileRequest = new ADTaskProfileRequest(detectorId, dataNodes);
             client.execute(ADTaskProfileAction.INSTANCE, adTaskProfileRequest, ActionListener.wrap(response -> {
                 if (response.hasFailures()) {
@@ -1408,6 +1414,8 @@ public class ADTaskManager {
                 ADTaskProfile detectorTaskProfile = new ADTaskProfile(adDetectorLevelTask);
                 for (ADTaskProfileNodeResponse node : response.getNodes()) {
                     ADTaskProfile taskProfile = node.getAdTaskProfile();
+                    logger.info("-------- ylwudebug: node : {}", node.getNode().getId());
+                    logger.info("-------- ylwudebug: node task profile response: {}", taskProfile == null ? "null" : taskProfile.toString());
                     if (taskProfile != null) {
                         if (taskProfile.getNodeId() != null) {
                             // HC detector: task profile from coordinating node
@@ -1434,6 +1442,7 @@ public class ADTaskManager {
                 if (adEntityTaskProfiles != null && adEntityTaskProfiles.size() > 0) {
                     detectorTaskProfile.setEntityTaskProfiles(adEntityTaskProfiles);
                 }
+                logger.info("-------- ylwudebug: ad task profile is {}", detectorTaskProfile.toString());
                 listener.onResponse(detectorTaskProfile);
             }, e -> {
                 logger.error("Failed to get task profile for task " + adDetectorLevelTask.getTaskId(), e);
@@ -2620,6 +2629,9 @@ public class ADTaskManager {
      * @return list of AD task profile
      */
     public ADTaskProfile getLocalADTaskProfilesByDetectorId(String detectorId) {
+        logger.info("---------------- ylwudebug: get local AD task profile for detector {}, is HCTaskRunning: {}, is coordinating node: {}, local node id: {}",
+                detectorId, adTaskCacheManager.isHCTaskRunning(detectorId), adTaskCacheManager.isHCTaskCoordinatingNode(detectorId),
+                clusterService.localNode().getId());
         List<String> tasksOfDetector = adTaskCacheManager.getTasksOfDetector(detectorId);
         ADTaskProfile detectorTaskProfile = null;
 
@@ -2695,7 +2707,7 @@ public class ADTaskManager {
                     adTaskCacheManager.cleanExpiredHCBatchTaskRunStates();
                 }
             );
-
+        logger.info("-------- ylwudebug: local AD task profiel: {}", detectorTaskProfile == null? "null" : detectorTaskProfile.toString());
         return detectorTaskProfile;
     }
 

@@ -29,6 +29,8 @@ package org.opensearch.ad.transport;
 import java.io.IOException;
 import java.util.List;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.opensearch.Version;
 import org.opensearch.action.FailedNodeException;
 import org.opensearch.action.support.ActionFilters;
@@ -44,7 +46,7 @@ import org.opensearch.transport.TransportService;
 
 public class ADTaskProfileTransportAction extends
     TransportNodesAction<ADTaskProfileRequest, ADTaskProfileResponse, ADTaskProfileNodeRequest, ADTaskProfileNodeResponse> {
-
+    private static final Logger logger = LogManager.getLogger(ADTaskProfileTransportAction.class);
     private ADTaskManager adTaskManager;
     private HashRing hashRing;
 
@@ -94,6 +96,7 @@ public class ADTaskProfileTransportAction extends
     @Override
     protected ADTaskProfileNodeResponse nodeOperation(ADTaskProfileNodeRequest request) {
         String remoteNodeId = request.getParentTask().getNodeId();
+        logger.info("++++++++++++ ylwudebug: remote node id: {}", remoteNodeId);
         Version remoteAdVersion = hashRing.getAdVersion(remoteNodeId);
         ADTaskProfile adTaskProfile = adTaskManager.getLocalADTaskProfilesByDetectorId(request.getDetectorId());
         return new ADTaskProfileNodeResponse(clusterService.localNode(), adTaskProfile, remoteAdVersion);

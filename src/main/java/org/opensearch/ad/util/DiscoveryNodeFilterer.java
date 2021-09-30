@@ -27,6 +27,7 @@
 package org.opensearch.ad.util;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.function.Predicate;
 
@@ -69,6 +70,18 @@ public class DiscoveryNodeFilterer {
             }
         }
         return eligibleNodes.toArray(new DiscoveryNode[0]);
+    }
+
+    public DiscoveryNode[] getAllNodes() {
+        List<String> allNodesId = new ArrayList<>();
+        ClusterState state = this.clusterService.state();
+        final List<DiscoveryNode> nodes = new ArrayList<>();
+        for (DiscoveryNode node : state.nodes()) {
+            nodes.add(node);
+            allNodesId.add(node.getId());
+        }
+        LOG.info("++++++++++++++++++++ all nodes: {}", Arrays.toString(allNodesId.toArray(new String[0])));
+        return nodes.toArray(new DiscoveryNode[0]);
     }
 
     public boolean isEligibleDataNode(DiscoveryNode node) {
