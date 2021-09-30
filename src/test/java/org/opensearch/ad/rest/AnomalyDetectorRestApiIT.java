@@ -764,8 +764,9 @@ public class AnomalyDetectorRestApiIT extends AnomalyDetectorRestTestCase {
     public void testUpdateAnomalyDetectorWithRunningAdJob() throws Exception {
         AnomalyDetector detector = createRandomAnomalyDetector(true, false, client());
 
+        Thread.sleep(2000);
         Response startAdJobResponse = TestHelpers
-            .makeRequest(
+            .makeRequest( //TODO: fix flaky part https://github.com/opensearch-project/anomaly-detection/runs/3758640349
                 client(),
                 "POST",
                 TestHelpers.AD_BASE_DETECTORS_URI + "/" + detector.getDetectorId() + "/_start",
@@ -813,7 +814,7 @@ public class AnomalyDetectorRestApiIT extends AnomalyDetectorRestTestCase {
             );
     }
 
-    public void testGetDetectorWithAdJob() throws IOException {
+    public void testGetDetectorWithAdJob() throws IOException, InterruptedException {
         AnomalyDetector detector = createRandomAnomalyDetector(true, false, client());
 
         Response startAdJobResponse = TestHelpers
@@ -1023,7 +1024,7 @@ public class AnomalyDetectorRestApiIT extends AnomalyDetectorRestTestCase {
             );
     }
 
-    public void testStartDisabledAdjob() throws IOException {
+    public void testStartDisabledAdjob() throws IOException, InterruptedException {
         AnomalyDetector detector = createRandomAnomalyDetector(true, false, client());
         Response startAdJobResponse = TestHelpers
             .makeRequest(
