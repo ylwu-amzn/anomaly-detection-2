@@ -603,6 +603,7 @@ public class AnomalyDetectorProfileRunner extends AbstractProfileRunner {
         listener.onResponse(builder.build());
     }
 
+    //TODO: custom AD result index
     /**
      * Create search request to check if we have at least 1 anomaly score larger than 0 after AD job enabled time
      * @param detectorId detector id

@@ -285,6 +285,10 @@ public class AnomalyDetectionIndices implements LocalNodeMasterListener {
         return clusterService.state().metadata().hasAlias(CommonName.ANOMALY_RESULT_INDEX_ALIAS);
     }
 
+    public boolean doesIndexExist(String indexName) {
+        return clusterService.state().metadata().hasIndex(indexName);
+    }
+
     /**
      * Anomaly state index exist or not.
      *
@@ -378,16 +382,20 @@ public class AnomalyDetectionIndices implements LocalNodeMasterListener {
      * @param request The request to add the setting
      */
     private void choosePrimaryShards(CreateIndexRequest request) {
+        choosePrimaryShards(request, true);
+    }
+
+    private void choosePrimaryShards(CreateIndexRequest request, boolean hiddenIndex) {
         request
-            .settings(
-                Settings
-                    .builder()
-                    // put 1 primary shards per hot node if possible
-                    .put(IndexMetadata.SETTING_NUMBER_OF_SHARDS, getNumberOfPrimaryShards())
-                    // 1 replica for better search performance and fail-over
-                    .put(IndexMetadata.SETTING_NUMBER_OF_REPLICAS, 1)
-                    .put("index.hidden", true)
-            );
+                .settings(
+                        Settings
+                                .builder()
+                                // put 1 primary shards per hot node if possible
+                                .put(IndexMetadata.SETTING_NUMBER_OF_SHARDS, getNumberOfPrimaryShards())
+                                // 1 replica for better search performance and fail-over
+                                .put(IndexMetadata.SETTING_NUMBER_OF_REPLICAS, 1)
+                                .put("index.hidden", hiddenIndex)
+                );
     }
 
     private int getNumberOfPrimaryShards() {
@@ -406,6 +414,15 @@ public class AnomalyDetectionIndices implements LocalNodeMasterListener {
             .mapping(CommonName.MAPPING_TYPE, mapping, XContentType.JSON)
             .alias(new Alias(CommonName.ANOMALY_RESULT_INDEX_ALIAS));
         choosePrimaryShards(request);
+        adminClient.indices().create(request, markMappingUpToDate(ADIndex.RESULT, actionListener));
+    }
+
+    public void initCustomAnomalyResultIndexDirectly(String resultIndex, ActionListener<CreateIndexResponse> actionListener) throws IOException {
+        String mapping = getAnomalyResultMappings();
+        CreateIndexRequest request = new CreateIndexRequest(resultIndex)
+                .mapping(CommonName.MAPPING_TYPE, mapping, XContentType.JSON);
+        choosePrimaryShards(request, false);
+        //TODO: mark mapping up to date for each result index. Make new AD result schema BWC to old schema, upgrade AD result schema.
         adminClient.indices().create(request, markMappingUpToDate(ADIndex.RESULT, actionListener));
     }
 

@@ -141,6 +141,7 @@ public class AnomalyDetectorJobRunner implements ScheduledJobRunner {
         this.nodeFilter = nodeFilter;
     }
 
+    // TODO: get detector, get result index, create index, index result
     @Override
     public void runJob(ScheduledJobParameter jobParameter, JobExecutionContext context) {
         String detectorId = jobParameter.getName();

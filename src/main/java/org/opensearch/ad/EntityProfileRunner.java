@@ -447,6 +447,7 @@ public class EntityProfileRunner extends AbstractProfileRunner {
             .trackTotalHits(false)
             .size(0);
 
+        //TODO: support AD result index
         SearchRequest request = new SearchRequest(CommonName.ANOMALY_RESULT_INDEX_ALIAS);
         request.source(source);
         return request;

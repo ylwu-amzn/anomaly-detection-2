@@ -69,6 +69,7 @@ public class ADResultBulkTransportAction extends HandledTransportAction<ADResult
         this.primaryAndCoordinatingLimits = MAX_INDEXING_BYTES.get(settings).getBytes();
         this.softLimit = INDEX_PRESSURE_SOFT_LIMIT.get(settings);
         this.hardLimit = INDEX_PRESSURE_HARD_LIMIT.get(settings);
+        //TODO: support custom index
         this.indexName = CommonName.ANOMALY_RESULT_INDEX_ALIAS;
         this.client = client;
         clusterService.getClusterSettings().addSettingsUpdateConsumer(INDEX_PRESSURE_SOFT_LIMIT, it -> softLimit = it);

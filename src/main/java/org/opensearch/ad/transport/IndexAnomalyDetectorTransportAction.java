@@ -20,18 +20,28 @@ import static org.opensearch.ad.util.ParseUtils.getUserContext;
 import static org.opensearch.ad.util.RestHandlerUtils.wrapRestActionListener;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.List;
 import java.util.function.Consumer;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.util.Strings;
+import org.opensearch.ExceptionsHelper;
+import org.opensearch.ResourceAlreadyExistsException;
 import org.opensearch.action.ActionListener;
+import org.opensearch.action.admin.cluster.repositories.delete.DeleteRepositoryAction;
+import org.opensearch.action.delete.DeleteRequest;
+import org.opensearch.action.index.IndexRequest;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.support.ActionFilters;
 import org.opensearch.action.support.HandledTransportAction;
 import org.opensearch.action.support.WriteRequest;
+import org.opensearch.ad.common.exception.AnomalyDetectionException;
+import org.opensearch.ad.constant.CommonValue;
 import org.opensearch.ad.indices.AnomalyDetectionIndices;
 import org.opensearch.ad.model.AnomalyDetector;
+import org.opensearch.ad.model.AnomalyResult;
 import org.opensearch.ad.rest.handler.AnomalyDetectorFunction;
 import org.opensearch.ad.rest.handler.IndexAnomalyDetectorActionHandler;
 import org.opensearch.ad.settings.AnomalyDetectorSettings;
@@ -43,6 +53,9 @@ import org.opensearch.common.settings.Settings;
 import org.opensearch.common.unit.TimeValue;
 import org.opensearch.common.util.concurrent.ThreadContext;
 import org.opensearch.common.xcontent.NamedXContentRegistry;
+import org.opensearch.common.xcontent.ToXContent;
+import org.opensearch.common.xcontent.XContentBuilder;
+import org.opensearch.common.xcontent.XContentType;
 import org.opensearch.commons.authuser.User;
 import org.opensearch.index.query.QueryBuilders;
 import org.opensearch.rest.RestRequest;
@@ -148,16 +161,73 @@ public class IndexAnomalyDetectorTransportAction extends HandledTransportAction<
 
         storedContext.restore();
         checkIndicesAndExecute(detector.getIndices(), () -> {
-            try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
-                // Don't replace detector's user when update detector
-                // Github issue: https://github.com/opensearch-project/anomaly-detection/issues/124
-                User detectorUser = currentDetector == null ? user : currentDetector.getUser();
-                IndexAnomalyDetectorActionHandler indexAnomalyDetectorActionHandler = new IndexAnomalyDetectorActionHandler(
-                    clusterService,
-                    client,
-                    transportService,
+            String resultIndex = detector.getResultIndex();
+            if (Strings.isNotBlank(resultIndex)) {
+                try {
+                    if (!anomalyDetectionIndices.doesIndexExist(resultIndex)) {
+                        LOG.info("ylwudebug1: start to create custom AD result index {}", resultIndex);
+                        anomalyDetectionIndices.initCustomAnomalyResultIndexDirectly(resultIndex, ActionListener.wrap(response -> {
+                            if (response.isAcknowledged()) {
+                                LOG.info("ylwudebug1: successfully created custom AD result index {}", resultIndex);
+                                indexDetector(user, currentDetector, listener, detectorId, seqNo, primaryTerm, refreshPolicy, detector, method, requestTimeout, maxSingleEntityAnomalyDetectors, maxMultiEntityAnomalyDetectors, maxAnomalyFeatures);
+                            } else {
+                                String error = "Creating custom anomaly result index with mappings call not acknowledged: " + resultIndex;
+                                LOG.error(error);
+                                listener.onFailure(new AnomalyDetectionException(error));
+                            }
+                        }, exception -> {
+                            LOG.error("ylwudebug1: Failed to create custom AD result index "+resultIndex, exception);
+                            if (ExceptionsHelper.unwrapCause(exception) instanceof ResourceAlreadyExistsException) {
+                                // It is possible the index has been created while we sending the create request
+                                indexDetector(user, currentDetector, listener, detectorId, seqNo, primaryTerm, refreshPolicy, detector, method, requestTimeout, maxSingleEntityAnomalyDetectors, maxMultiEntityAnomalyDetectors, maxAnomalyFeatures);
+                            } else {
+                                listener.onFailure(exception);
+                            }
+                        }));
+                    } else {
+                        //TODO: check if user has write permission on the resultIndex
+                        String testId = "test";
+                        DeleteRequest deleteRequest = new DeleteRequest(resultIndex, testId);
+                        IndexRequest indexRequest = new IndexRequest(resultIndex);
+                        AnomalyResult anomalyResult = new AnomalyResult("test", Double.NaN, Double.NaN, Double.NaN, null, null, null, null, null, null, null, CommonValue.NO_SCHEMA_VERSION);
+                        indexRequest.id(testId).source(anomalyResult.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS));
+                        client.index(indexRequest, ActionListener.wrap(response -> {
+                            LOG.info("ylwudebug1: result status is : {}", response.getResult());
+                            indexDetector(user, currentDetector, listener, detectorId, seqNo, primaryTerm, refreshPolicy, detector, method, requestTimeout, maxSingleEntityAnomalyDetectors, maxMultiEntityAnomalyDetectors, maxAnomalyFeatures);
+                        }, exception -> {
+                            LOG.error("ylwudebug1: Failed to write custom AD result index " + resultIndex, exception);
+                            listener.onFailure(exception);
+                        }));
+//                        client.delete(deleteRequest, ActionListener.wrap(response -> {
+//                            LOG.info("ylwudebug1: result status is : {}", response.getResult());
+//                            indexDetector(user, currentDetector, listener, detectorId, seqNo, primaryTerm, refreshPolicy, detector, method, requestTimeout, maxSingleEntityAnomalyDetectors, maxMultiEntityAnomalyDetectors, maxAnomalyFeatures);
+//                        }, exception -> {
+//                            LOG.error("ylwudebug1: Failed to write custom AD result index " + resultIndex, exception);
+//                            listener.onFailure(exception);
+//                        }));
+                    }
+                } catch (Exception e) {
+                    LOG.error("Failed to create index " + resultIndex, e);
+                    listener.onFailure(e);
+                }
+                return;
+            }
+            indexDetector(user, currentDetector, listener, detectorId, seqNo, primaryTerm, refreshPolicy, detector, method, requestTimeout, maxSingleEntityAnomalyDetectors, maxMultiEntityAnomalyDetectors, maxAnomalyFeatures);
+
+        }, listener);
+    }
+
+    private void indexDetector(User user, AnomalyDetector currentDetector, ActionListener<IndexAnomalyDetectorResponse> listener, String detectorId, long seqNo, long primaryTerm, WriteRequest.RefreshPolicy refreshPolicy, AnomalyDetector detector, RestRequest.Method method, TimeValue requestTimeout, Integer maxSingleEntityAnomalyDetectors, Integer maxMultiEntityAnomalyDetectors, Integer maxAnomalyFeatures) {
+        try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
+            // Don't replace detector's user when update detector
+            // Github issue: https://github.com/opensearch-project/anomaly-detection/issues/124
+            User detectorUser = currentDetector == null ? user : currentDetector.getUser();
+            IndexAnomalyDetectorActionHandler indexAnomalyDetectorActionHandler = new IndexAnomalyDetectorActionHandler(
+                clusterService,
+                client,
+                transportService,
                     listener,
-                    anomalyDetectionIndices,
+                anomalyDetectionIndices,
                     detectorId,
                     seqNo,
                     primaryTerm,
@@ -168,22 +238,20 @@ public class IndexAnomalyDetectorTransportAction extends HandledTransportAction<
                     maxMultiEntityAnomalyDetectors,
                     maxAnomalyFeatures,
                     method,
-                    xContentRegistry,
-                    detectorUser,
-                    adTaskManager
-                );
-                try {
-                    indexAnomalyDetectorActionHandler.start();
-                } catch (IOException exception) {
-                    LOG.error("Fail to index detector", exception);
-                    listener.onFailure(exception);
-                }
-            } catch (Exception e) {
-                LOG.error(e);
-                listener.onFailure(e);
+                xContentRegistry,
+                detectorUser,
+                adTaskManager
+            );
+            try {
+                indexAnomalyDetectorActionHandler.start();
+            } catch (IOException exception) {
+                LOG.error("Fail to index detector", exception);
+                listener.onFailure(exception);
             }
-
-        }, listener);
+        } catch (Exception e) {
+            LOG.error(e);
+            listener.onFailure(e);
+        }
     }
 
     private void checkIndicesAndExecute(

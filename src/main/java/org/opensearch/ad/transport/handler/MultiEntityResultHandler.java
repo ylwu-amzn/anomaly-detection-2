@@ -84,6 +84,7 @@ public class MultiEntityResultHandler extends AnomalyIndexHandler<AnomalyResult>
 
         try {
             if (!indexExists.getAsBoolean()) {
+                //TODO: create custom AD result index
                 createIndex.accept(ActionListener.wrap(initResponse -> {
                     if (initResponse.isAcknowledged()) {
                         bulk(currentBulkRequest, listener);
