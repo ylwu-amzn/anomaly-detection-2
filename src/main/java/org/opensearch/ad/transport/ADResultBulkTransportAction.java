@@ -23,6 +23,7 @@ import java.util.Random;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.util.Strings;
 import org.opensearch.action.ActionListener;
 import org.opensearch.action.bulk.BulkAction;
 import org.opensearch.action.bulk.BulkRequest;
@@ -87,6 +88,8 @@ public class ADResultBulkTransportAction extends HandledTransportAction<ADResult
         long totalBytes = indexingPressure.getCurrentCombinedCoordinatingAndPrimaryBytes() + indexingPressure.getCurrentReplicaBytes();
         float indexingPressurePercent = (float) totalBytes / primaryAndCoordinatingLimits;
         List<AnomalyResult> results = request.getAnomalyResults();
+        String resultIndex = request.getResultIndex();
+        resultIndex = Strings.isNotBlank(resultIndex) ? resultIndex : indexName;
 
         if (results == null || results.size() < 1) {
             listener.onResponse(new ADResultBulkResponse());
@@ -96,21 +99,21 @@ public class ADResultBulkTransportAction extends HandledTransportAction<ADResult
 
         if (indexingPressurePercent <= softLimit) {
             for (AnomalyResult result : results) {
-                addResult(bulkRequest, result);
+                addResult(bulkRequest, result, resultIndex);
             }
         } else if (indexingPressurePercent <= hardLimit) {
             // exceed soft limit (60%) but smaller than hard limit (90%)
             float acceptProbability = 1 - indexingPressurePercent;
             for (AnomalyResult result : results) {
                 if (result.isHighPriority() || random.nextFloat() < acceptProbability) {
-                    addResult(bulkRequest, result);
+                    addResult(bulkRequest, result, resultIndex);
                 }
             }
         } else {
             // if exceeding hard limit, only index non-zero grade or error result
             for (AnomalyResult result : results) {
                 if (result.isHighPriority()) {
-                    addResult(bulkRequest, result);
+                    addResult(bulkRequest, result, resultIndex);
                 }
             }
         }
@@ -125,12 +128,12 @@ public class ADResultBulkTransportAction extends HandledTransportAction<ADResult
         }
     }
 
-    private void addResult(BulkRequest bulkRequest, AnomalyResult result) {
+    private void addResult(BulkRequest bulkRequest, AnomalyResult result, String resultIndex) {
         try (XContentBuilder builder = jsonBuilder()) {
-            IndexRequest indexRequest = new IndexRequest(indexName).source(result.toXContent(builder, RestHandlerUtils.XCONTENT_WITH_TYPE));
+            IndexRequest indexRequest = new IndexRequest(resultIndex).source(result.toXContent(builder, RestHandlerUtils.XCONTENT_WITH_TYPE));
             bulkRequest.add(indexRequest);
         } catch (IOException e) {
-            LOG.error(String.format(Locale.ROOT, "Failed to prepare bulk %s", indexName), e);
+            LOG.error(String.format(Locale.ROOT, "Failed to prepare bulk %s", resultIndex), e);
         }
     }
 }

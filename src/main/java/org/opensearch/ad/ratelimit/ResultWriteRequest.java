@@ -15,13 +15,19 @@ import org.opensearch.ad.model.AnomalyResult;
 
 public class ResultWriteRequest extends QueuedRequest {
     private final AnomalyResult result;
+    private final String resultIndex;
 
-    public ResultWriteRequest(long expirationEpochMs, String detectorId, RequestPriority priority, AnomalyResult result) {
+    public ResultWriteRequest(long expirationEpochMs, String detectorId, RequestPriority priority, AnomalyResult result, String resultIndex) {
         super(expirationEpochMs, detectorId, priority);
         this.result = result;
+        this.resultIndex = resultIndex;
     }
 
     public AnomalyResult getResult() {
         return result;
+    }
+
+    public String getResultIndex() {
+        return resultIndex;
     }
 }

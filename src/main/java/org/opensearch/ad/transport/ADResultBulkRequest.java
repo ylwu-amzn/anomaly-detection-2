@@ -26,9 +26,11 @@ import org.opensearch.common.io.stream.Writeable;
 public class ADResultBulkRequest extends ActionRequest implements Writeable {
     private final List<AnomalyResult> anomalyResults;
     static final String NO_REQUESTS_ADDED_ERR = "no requests added";
+    private String resultIndex;
 
-    public ADResultBulkRequest() {
+    public ADResultBulkRequest(String resultIndex) {
         anomalyResults = new ArrayList<>();
+        this.resultIndex = resultIndex;
     }
 
     public ADResultBulkRequest(StreamInput in) throws IOException {
@@ -37,6 +39,9 @@ public class ADResultBulkRequest extends ActionRequest implements Writeable {
         anomalyResults = new ArrayList<>(size);
         for (int i = 0; i < size; i++) {
             anomalyResults.add(new AnomalyResult(in));
+        }
+        if (in.available() > 0) {
+            this.resultIndex = in.readOptionalString();
         }
     }
 
@@ -56,6 +61,7 @@ public class ADResultBulkRequest extends ActionRequest implements Writeable {
         for (AnomalyResult result : anomalyResults) {
             result.writeTo(out);
         }
+        out.writeOptionalString(resultIndex);
     }
 
     /**
@@ -64,6 +70,10 @@ public class ADResultBulkRequest extends ActionRequest implements Writeable {
      */
     public List<AnomalyResult> getAnomalyResults() {
         return anomalyResults;
+    }
+
+    public String getResultIndex() {
+        return resultIndex;
     }
 
     /**

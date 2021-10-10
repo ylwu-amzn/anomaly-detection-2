@@ -884,7 +884,6 @@ public class ADTaskManager {
         }));
     }
 
-
     /**
      * Get latest AD task and execute consumer function.
      * [Important!] Make sure listener returns in function

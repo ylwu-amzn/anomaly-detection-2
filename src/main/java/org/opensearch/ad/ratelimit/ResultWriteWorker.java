@@ -103,12 +103,13 @@ public class ResultWriteWorker extends BatchWorker<ResultWriteRequest, ADResultB
             listener.onResponse(null);
             return;
         }
-        resultHandler.flush(request, listener);
+        resultHandler.flush(request, listener); //TODO: write result to custom AD result index
     }
 
     @Override
     protected ADResultBulkRequest toBatchRequest(List<ResultWriteRequest> toProcess) {
-        final ADResultBulkRequest bulkRequest = new ADResultBulkRequest();
+        // toProcess won't be null or empty, check BatchWorker, line 108
+        final ADResultBulkRequest bulkRequest = new ADResultBulkRequest(toProcess.get(0).getResultIndex());
         for (ResultWriteRequest request : toProcess) {
             bulkRequest.add(request.getResult());
         }
@@ -178,7 +179,8 @@ public class ResultWriteWorker extends BatchWorker<ResultWriteRequest, ADResultB
                     resultToRetry.getExecutionStartTime().toEpochMilli() + detector.getDetectorIntervalInMilliseconds(),
                     detectorId,
                     resultToRetry.isHighPriority() ? RequestPriority.HIGH : RequestPriority.MEDIUM,
-                    resultToRetry
+                    resultToRetry,
+                    detector.getResultIndex()
                 )
             );
 

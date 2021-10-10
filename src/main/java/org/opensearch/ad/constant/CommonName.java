@@ -134,6 +134,7 @@ public class CommonName {
     // ======================================
     // Used for custom AD result index
     // ======================================
+    // TODO: check if result index schema matches AD result index schema before checking if has write permission.
     public static final String DUMMY_AD_RESULT_ID = "dummy_ad_result_id";
     public static final String DUMMY_DETECTOR_ID = "dummy_detector_id";
 }
