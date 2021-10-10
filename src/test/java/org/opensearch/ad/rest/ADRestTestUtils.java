@@ -358,6 +358,7 @@ public class ADRestTestUtils {
                 null,
                 Instant.ofEpochMilli(lastUpdateTime),
                 null,
+                null,
                 null
             );
             results.put(ANOMALY_DETECTOR_JOB, job);

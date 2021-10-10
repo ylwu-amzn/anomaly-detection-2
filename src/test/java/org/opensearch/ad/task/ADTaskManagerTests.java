@@ -1252,7 +1252,8 @@ public class ADTaskManagerTests extends ADUnitTestCase {
                                 Instant.now(),
                                 Instant.now(),
                                 60L,
-                                TestHelpers.randomUser()
+                                TestHelpers.randomUser(),
+                                null
                             ).toXContent(TestHelpers.builder(), ToXContent.EMPTY_PARAMS)
                         ),
                     Collections.emptyMap(),

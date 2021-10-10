@@ -339,7 +339,8 @@ public class AnomalyDetectorJobRunnerTests extends AbstractADTest {
                                 Instant.now(),
                                 Instant.now(),
                                 60L,
-                                TestHelpers.randomUser()
+                                TestHelpers.randomUser(),
+                                jobParameter.getResultIndex()
                             ).toXContent(TestHelpers.builder(), ToXContent.EMPTY_PARAMS)
                         ),
                     Collections.emptyMap(),

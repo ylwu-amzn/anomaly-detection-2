@@ -682,7 +682,8 @@ public class TestHelpers {
             disabledTime,
             Instant.now().truncatedTo(ChronoUnit.SECONDS),
             60L,
-            randomUser()
+            randomUser(),
+            null
         );
     }
 

@@ -222,7 +222,6 @@ public class AnomalyDetectorPlugin extends Plugin implements ActionPlugin, Scrip
     private AnomalyDetectorRunner anomalyDetectorRunner;
     private Client client;
     private ClusterService clusterService;
-    private NamedXContentRegistry xContentRegistry;
     private ThreadPool threadPool;
     private ADStats adStats;
     private ClientUtil clientUtil;
@@ -240,7 +239,6 @@ public class AnomalyDetectorPlugin extends Plugin implements ActionPlugin, Scrip
         // initialize ConstructorConstructor
         AccessController.doPrivileged((PrivilegedAction<Void>) AnomalyDetectorPlugin::initGson);
     }
-
 
     public AnomalyDetectorPlugin() {}
 
@@ -274,7 +272,6 @@ public class AnomalyDetectorPlugin extends Plugin implements ActionPlugin, Scrip
         jobRunner.setIndexUtil(anomalyDetectionIndices);
         jobRunner.setNodeFilter(nodeFilter);
         jobRunner.setAdTaskManager(adTaskManager);
-        jobRunner.setNamedXContentRegistry(xContentRegistry);
 
         RestGetAnomalyDetectorAction restGetAnomalyDetectorAction = new RestGetAnomalyDetectorAction();
         RestIndexAnomalyDetectorAction restIndexAnomalyDetectorAction = new RestIndexAnomalyDetectorAction(settings, clusterService);
@@ -343,7 +340,6 @@ public class AnomalyDetectorPlugin extends Plugin implements ActionPlugin, Scrip
             AnomalyDetectorSettings.MAX_UPDATE_RETRY_TIMES
         );
         this.clusterService = clusterService;
-        this.xContentRegistry = xContentRegistry;
 
         SingleFeatureLinearUniformInterpolator singleFeatureLinearUniformInterpolator =
             new IntegerSensitiveSingleFeatureLinearUniformInterpolator();
