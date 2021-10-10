@@ -13,6 +13,8 @@ package org.opensearch.ad.transport;
 
 import static org.opensearch.ad.constant.CommonErrorMessages.FAIL_TO_CREATE_DETECTOR;
 import static org.opensearch.ad.constant.CommonErrorMessages.FAIL_TO_UPDATE_DETECTOR;
+import static org.opensearch.ad.constant.CommonName.DUMMY_AD_RESULT_ID;
+import static org.opensearch.ad.constant.CommonName.DUMMY_DETECTOR_ID;
 import static org.opensearch.ad.settings.AnomalyDetectorSettings.FILTER_BY_BACKEND_ROLES;
 import static org.opensearch.ad.util.ParseUtils.checkFilterByBackendRoles;
 import static org.opensearch.ad.util.ParseUtils.getDetector;
@@ -186,11 +188,9 @@ public class IndexAnomalyDetectorTransportAction extends HandledTransportAction<
                         }));
                     } else {
                         //TODO: check if user has write permission on the resultIndex
-                        String testId = "test";
-                        DeleteRequest deleteRequest = new DeleteRequest(resultIndex, testId);
-                        IndexRequest indexRequest = new IndexRequest(resultIndex);
-                        AnomalyResult anomalyResult = new AnomalyResult("test", Double.NaN, Double.NaN, Double.NaN, null, null, null, null, null, null, null, CommonValue.NO_SCHEMA_VERSION);
-                        indexRequest.id(testId).source(anomalyResult.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS));
+//                        DeleteRequest deleteRequest = new DeleteRequest(resultIndex, testId);
+                        AnomalyResult anomalyResult = new AnomalyResult(DUMMY_DETECTOR_ID, Double.NaN, Double.NaN, Double.NaN, null, null, null, null, null, null, null, CommonValue.NO_SCHEMA_VERSION);
+                        IndexRequest indexRequest = new IndexRequest(resultIndex).id(DUMMY_AD_RESULT_ID).source(anomalyResult.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS));
                         client.index(indexRequest, ActionListener.wrap(response -> {
                             LOG.info("ylwudebug1: result status is : {}", response.getResult());
                             indexDetector(user, currentDetector, listener, detectorId, seqNo, primaryTerm, refreshPolicy, detector, method, requestTimeout, maxSingleEntityAnomalyDetectors, maxMultiEntityAnomalyDetectors, maxAnomalyFeatures);

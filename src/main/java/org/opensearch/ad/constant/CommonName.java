@@ -130,4 +130,10 @@ public class CommonName {
     // Used for backward-compatibility in messaging
     // ======================================
     public static final String EMPTY_FIELD = "";
+
+    // ======================================
+    // Used for custom AD result index
+    // ======================================
+    public static final String DUMMY_AD_RESULT_ID = "dummy_ad_result_id";
+    public static final String DUMMY_DETECTOR_ID = "dummy_detector_id";
 }

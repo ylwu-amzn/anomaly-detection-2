@@ -650,6 +650,10 @@ public class AnomalyDetector implements Writeable, ToXContentObject {
         return resultIndex;
     }
 
+    public boolean useCustomResultIndex() {
+        return Strings.isNotBlank(getResultIndex());
+    }
+
     public boolean isMultientityDetector() {
         return AnomalyDetector.isMultientityDetector(getCategoryField());
     }

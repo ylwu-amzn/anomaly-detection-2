@@ -113,36 +113,44 @@ public class AnomalyIndexHandler<T extends ToXContentObject> {
         this.fixedDoc = fixedDoc;
     }
 
-    public void index(T toSave, String detectorId) {
+//    public void index(T toSave, String detectorId) {
+//        index(toSave, detectorId, null);
+//    }
+
+    public void index(T toSave, String detectorId, String customIndexName) {
         if (indexUtils.checkIndicesBlocked(clusterService.state(), ClusterBlockLevel.WRITE, this.indexName)) {
             LOG.warn(String.format(Locale.ROOT, CANNOT_SAVE_ERR_MSG, detectorId));
             return;
         }
-
-        try {
-            if (!indexExists.getAsBoolean()) {
-                createIndex
-                    .accept(ActionListener.wrap(initResponse -> onCreateIndexResponse(initResponse, toSave, detectorId), exception -> {
-                        if (ExceptionsHelper.unwrapCause(exception) instanceof ResourceAlreadyExistsException) {
-                            // It is possible the index has been created while we sending the create request
-                            save(toSave, detectorId);
-                        } else {
-                            throw new AnomalyDetectionException(
-                                detectorId,
-                                String.format(Locale.ROOT, "Unexpected error creating index %s", indexName),
-                                exception
-                            );
-                        }
-                    }));
-            } else {
-                save(toSave, detectorId);
+        if (customIndexName != null) {
+            LOG.info("ylwudebug3: save to custom index: ------------------------------ {}", customIndexName);
+            save(toSave, detectorId, customIndexName);
+        } else {
+            try {
+                if (!indexExists.getAsBoolean()) {
+                    createIndex
+                            .accept(ActionListener.wrap(initResponse -> onCreateIndexResponse(initResponse, toSave, detectorId), exception -> {
+                                if (ExceptionsHelper.unwrapCause(exception) instanceof ResourceAlreadyExistsException) {
+                                    // It is possible the index has been created while we sending the create request
+                                    save(toSave, detectorId);
+                                } else {
+                                    throw new AnomalyDetectionException(
+                                            detectorId,
+                                            String.format(Locale.ROOT, "Unexpected error creating index %s", indexName),
+                                            exception
+                                    );
+                                }
+                            }));
+                } else {
+                    save(toSave, detectorId);
+                }
+            } catch (Exception e) {
+                throw new AnomalyDetectionException(
+                        detectorId,
+                        String.format(Locale.ROOT, "Error in saving %s for detector %s", indexName, detectorId),
+                        e
+                );
             }
-        } catch (Exception e) {
-            throw new AnomalyDetectionException(
-                detectorId,
-                String.format(Locale.ROOT, "Error in saving %s for detector %s", indexName, detectorId),
-                e
-            );
         }
     }
 
@@ -158,6 +166,10 @@ public class AnomalyIndexHandler<T extends ToXContentObject> {
     }
 
     protected void save(T toSave, String detectorId) {
+        save(toSave, detectorId, indexName);
+    }
+
+    protected void save(T toSave, String detectorId, String indexName) {
         try (XContentBuilder builder = jsonBuilder()) {
             IndexRequest indexRequest = new IndexRequest(indexName).source(toSave.toXContent(builder, RestHandlerUtils.XCONTENT_WITH_TYPE));
             if (fixedDoc) {

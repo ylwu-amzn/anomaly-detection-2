@@ -104,7 +104,8 @@ public class AnomalyDetectorJobTransportAction extends HandledTransportAction<An
                     primaryTerm,
                     rawPath,
                     requestTimeout,
-                    user
+                    user,
+                    context
                 ),
                 client,
                 clusterService,
@@ -117,16 +118,16 @@ public class AnomalyDetectorJobTransportAction extends HandledTransportAction<An
     }
 
     private void executeDetector(
-        ActionListener<AnomalyDetectorJobResponse> listener,
-        String detectorId,
-        DetectionDateRange detectionDateRange,
-        boolean historical,
-        long seqNo,
-        long primaryTerm,
-        String rawPath,
-        TimeValue requestTimeout,
-        User user
-    ) {
+            ActionListener<AnomalyDetectorJobResponse> listener,
+            String detectorId,
+            DetectionDateRange detectionDateRange,
+            boolean historical,
+            long seqNo,
+            long primaryTerm,
+            String rawPath,
+            TimeValue requestTimeout,
+            User user,
+            ThreadContext.StoredContext context) {
         IndexAnomalyDetectorJobActionHandler handler = new IndexAnomalyDetectorJobActionHandler(
             client,
             listener,
@@ -140,7 +141,7 @@ public class AnomalyDetectorJobTransportAction extends HandledTransportAction<An
             adTaskManager
         );
         if (rawPath.endsWith(RestHandlerUtils.START_JOB)) {
-            adTaskManager.startDetector(detectorId, detectionDateRange, handler, user, transportService, listener);
+            adTaskManager.startDetector(detectorId, detectionDateRange, handler, user, transportService, context, listener);
         } else if (rawPath.endsWith(RestHandlerUtils.STOP_JOB)) {
             adTaskManager.stopDetector(detectorId, historical, handler, user, transportService, listener);
         }

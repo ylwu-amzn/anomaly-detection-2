@@ -21,6 +21,8 @@ import static org.opensearch.ad.constant.CommonErrorMessages.FAIL_TO_FIND_DETECT
 import static org.opensearch.ad.constant.CommonErrorMessages.HC_DETECTOR_TASK_IS_UPDATING;
 import static org.opensearch.ad.constant.CommonErrorMessages.NO_ELIGIBLE_NODE_TO_RUN_DETECTOR;
 import static org.opensearch.ad.constant.CommonName.DETECTION_STATE_INDEX;
+import static org.opensearch.ad.constant.CommonName.DUMMY_AD_RESULT_ID;
+import static org.opensearch.ad.constant.CommonName.DUMMY_DETECTOR_ID;
 import static org.opensearch.ad.indices.AnomalyDetectionIndices.ALL_AD_RESULTS_INDEX_PATTERN;
 import static org.opensearch.ad.model.ADTask.COORDINATING_NODE_FIELD;
 import static org.opensearch.ad.model.ADTask.DETECTOR_ID_FIELD;
@@ -108,6 +110,7 @@ import org.opensearch.ad.common.exception.AnomalyDetectionException;
 import org.opensearch.ad.common.exception.DuplicateTaskException;
 import org.opensearch.ad.common.exception.LimitExceededException;
 import org.opensearch.ad.common.exception.ResourceNotFoundException;
+import org.opensearch.ad.constant.CommonValue;
 import org.opensearch.ad.indices.AnomalyDetectionIndices;
 import org.opensearch.ad.model.ADEntityTaskProfile;
 import org.opensearch.ad.model.ADTask;
@@ -117,6 +120,7 @@ import org.opensearch.ad.model.ADTaskState;
 import org.opensearch.ad.model.ADTaskType;
 import org.opensearch.ad.model.AnomalyDetector;
 import org.opensearch.ad.model.AnomalyDetectorJob;
+import org.opensearch.ad.model.AnomalyResult;
 import org.opensearch.ad.model.DetectionDateRange;
 import org.opensearch.ad.model.DetectorProfile;
 import org.opensearch.ad.model.Entity;
@@ -143,6 +147,7 @@ import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.bytes.BytesReference;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.unit.TimeValue;
+import org.opensearch.common.util.concurrent.ThreadContext;
 import org.opensearch.common.xcontent.LoggingDeprecationHandler;
 import org.opensearch.common.xcontent.NamedXContentRegistry;
 import org.opensearch.common.xcontent.ToXContent;
@@ -286,6 +291,7 @@ public class ADTaskManager {
         IndexAnomalyDetectorJobActionHandler handler,
         User user,
         TransportService transportService,
+        ThreadContext.StoredContext context,
         ActionListener<AnomalyDetectorJobResponse> listener
     ) {
         getDetector(detectorId, (detector) -> {
@@ -294,13 +300,42 @@ public class ADTaskManager {
                 return;
             }
             if (validateDetector(detector.get(), listener)) { // validate if detector is ready to start
-                if (detectionDateRange == null) {
-                    // start realtime job
-                    handler.startAnomalyDetectorJob(detector.get());
-                } else {
-                    // start historical analysis task
-                    forwardApplyForTaskSlotsRequestToLeadNode(detector.get(), detectionDateRange, user, transportService, listener);
+                if (detector.get().useCustomResultIndex()) {
+                    context.restore();
+                    String resultIndex = detector.get().getResultIndex();
+                    try {
+                        AnomalyResult anomalyResult = new AnomalyResult(DUMMY_DETECTOR_ID, Double.NaN, Double.NaN, Double.NaN, null, null, null, null, null, null, null, CommonValue.NO_SCHEMA_VERSION);
+                        IndexRequest indexRequest = new IndexRequest(resultIndex).id(DUMMY_AD_RESULT_ID).source(anomalyResult.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS));
+                        client.index(indexRequest, ActionListener.wrap(response -> {
+                            logger.info("ylwudebug2: write result status for start detector is : {}", response.getResult());
+                            try (ThreadContext.StoredContext threadContext = client.threadPool().getThreadContext().stashContext()) {
+                                if (detectionDateRange == null) {
+                                    // start realtime job
+                                    handler.startAnomalyDetectorJob(detector.get());
+                                } else {
+                                    // start historical analysis task
+                                    forwardApplyForTaskSlotsRequestToLeadNode(detector.get(), detectionDateRange, user, transportService, listener);
+                                }
+                            } catch (Exception e) {
+                                logger.error("Failed to stash context", e);
+                                listener.onFailure(e);
+                            }
+                        }, exception -> {
+                            logger.error("ylwudebug2: Failed to write custom AD result index when start detectorm " + resultIndex, exception);
+                            listener.onFailure(exception);
+                        }));
+                    } catch (IOException e) {
+                        logger.error("Failed to index result", e);
+                        listener.onFailure(e);
+                    }
                 }
+//                if (detectionDateRange == null) {
+//                    // start realtime job
+//                    handler.startAnomalyDetectorJob(detector.get());
+//                } else {
+//                    // start historical analysis task
+//                    forwardApplyForTaskSlotsRequestToLeadNode(detector.get(), detectionDateRange, user, transportService, listener);
+//                }
             }
         }, listener);
     }
@@ -848,6 +883,7 @@ public class ADTaskManager {
             listener.onFailure(exception);
         }));
     }
+
 
     /**
      * Get latest AD task and execute consumer function.
