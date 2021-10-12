@@ -57,7 +57,7 @@ public class AnomalyResultBulkIndexHandler extends AnomalyIndexHandler<AnomalyRe
         ClusterService clusterService,
         AnomalyDetectionIndices anomalyDetectionIndices
     ) {
-        super(client, settings, threadPool, ANOMALY_RESULT_INDEX_ALIAS, createIndex, indexExists, clientUtil, indexUtils, clusterService);
+        super(client, settings, threadPool, ANOMALY_RESULT_INDEX_ALIAS, anomalyDetectionIndices, clientUtil, indexUtils, clusterService);
         this.anomalyDetectionIndices = anomalyDetectionIndices;
     }
 

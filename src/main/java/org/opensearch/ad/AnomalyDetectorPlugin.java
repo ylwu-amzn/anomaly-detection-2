@@ -257,8 +257,7 @@ public class AnomalyDetectorPlugin extends Plugin implements ActionPlugin, Scrip
             settings,
             threadPool,
             CommonName.ANOMALY_RESULT_INDEX_ALIAS, //TODO: support custom index
-            ThrowingConsumerWrapper.throwingConsumerWrapper(anomalyDetectionIndices::initAnomalyResultIndexDirectly),
-            anomalyDetectionIndices::doesAnomalyResultIndexExist,
+            anomalyDetectionIndices,
             this.clientUtil,
             this.indexUtils,
             clusterService

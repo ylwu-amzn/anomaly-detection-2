@@ -28,6 +28,8 @@ import org.opensearch.action.bulk.BackoffPolicy;
 import org.opensearch.action.index.IndexRequest;
 import org.opensearch.action.index.IndexResponse;
 import org.opensearch.ad.common.exception.AnomalyDetectionException;
+import org.opensearch.ad.common.exception.EndRunException;
+import org.opensearch.ad.indices.AnomalyDetectionIndices;
 import org.opensearch.ad.settings.AnomalyDetectorSettings;
 import org.opensearch.ad.util.BulkUtil;
 import org.opensearch.ad.util.ClientUtil;
@@ -55,8 +57,7 @@ public class AnomalyIndexHandler<T extends ToXContentObject> {
     protected final ThreadPool threadPool;
     protected final BackoffPolicy savingBackoffPolicy;
     protected final String indexName;
-    protected final Consumer<ActionListener<CreateIndexResponse>> createIndex;
-    protected final BooleanSupplier indexExists;
+    protected final AnomalyDetectionIndices anomalyDetectionIndices;
     // whether save to a specific doc id or not. False by default.
     protected boolean fixedDoc;
     protected final ClientUtil clientUtil;
@@ -70,8 +71,7 @@ public class AnomalyIndexHandler<T extends ToXContentObject> {
      * @param settings accessor for node settings.
      * @param threadPool used to invoke specific threadpool to execute
      * @param indexName name of index to save to
-     * @param createIndex functional interface to create the index to save to
-     * @param indexExists funcitonal interface to find out if the index exists
+     * @param anomalyDetectionIndices anomaly detection indices
      * @param clientUtil client wrapper
      * @param indexUtils Index util classes
      * @param clusterService accessor to ES cluster service
@@ -81,8 +81,7 @@ public class AnomalyIndexHandler<T extends ToXContentObject> {
         Settings settings,
         ThreadPool threadPool,
         String indexName,
-        Consumer<ActionListener<CreateIndexResponse>> createIndex,
-        BooleanSupplier indexExists,
+        AnomalyDetectionIndices anomalyDetectionIndices,
         ClientUtil clientUtil,
         IndexUtils indexUtils,
         ClusterService clusterService
@@ -95,8 +94,7 @@ public class AnomalyIndexHandler<T extends ToXContentObject> {
                 AnomalyDetectorSettings.MAX_RETRY_FOR_BACKOFF.get(settings)
             );
         this.indexName = indexName;
-        this.createIndex = createIndex;
-        this.indexExists = indexExists;
+        this.anomalyDetectionIndices = anomalyDetectionIndices;
         this.fixedDoc = false;
         this.clientUtil = clientUtil;
         this.indexUtils = indexUtils;
@@ -122,14 +120,33 @@ public class AnomalyIndexHandler<T extends ToXContentObject> {
             LOG.warn(String.format(Locale.ROOT, CANNOT_SAVE_ERR_MSG, detectorId));
             return;
         }
-        if (customIndexName != null) {
-            LOG.info("ylwudebug3: save to custom index: ------------------------------ {}", customIndexName);
-            save(toSave, detectorId, customIndexName);
-        } else {
-            try {
-                if (!indexExists.getAsBoolean()) {
-                    createIndex
-                            .accept(ActionListener.wrap(initResponse -> onCreateIndexResponse(initResponse, toSave, detectorId), exception -> {
+        try {
+            if (customIndexName != null) {
+                LOG.info("ylwudebug3: save to custom index: ------------------------------ {}", customIndexName);
+                if (!anomalyDetectionIndices.doesIndexExist(customIndexName)) {
+                    LOG.info("ylwudebug3: create custom index: ------------------------------++++++++++ {}", customIndexName);
+                    anomalyDetectionIndices.initCustomAnomalyResultIndexDirectly(
+                            customIndexName,
+                            ActionListener.wrap(initResponse -> onCreateIndexResponse(initResponse, toSave, detectorId, customIndexName), exception -> {
+                                if (ExceptionsHelper.unwrapCause(exception) instanceof ResourceAlreadyExistsException) {
+                                    // It is possible the index has been created while we sending the create request
+                                    save(toSave, detectorId, customIndexName);
+                                } else {
+                                    throw new AnomalyDetectionException(
+                                            detectorId,
+                                            String.format(Locale.ROOT, "Unexpected error creating index %s", indexName),
+                                            exception
+                                    );
+                                }
+                            })
+                    );
+                } else {
+                    save(toSave, detectorId, customIndexName);
+                }
+            } else {
+                if (!anomalyDetectionIndices.doesAnomalyResultIndexExist()) {
+                    anomalyDetectionIndices.initAnomalyResultIndexDirectly(
+                            ActionListener.wrap(initResponse -> onCreateIndexResponse(initResponse, toSave, detectorId, indexName), exception -> {
                                 if (ExceptionsHelper.unwrapCause(exception) instanceof ResourceAlreadyExistsException) {
                                     // It is possible the index has been created while we sending the create request
                                     save(toSave, detectorId);
@@ -140,23 +157,25 @@ public class AnomalyIndexHandler<T extends ToXContentObject> {
                                             exception
                                     );
                                 }
-                            }));
+                            })
+                    );
                 } else {
                     save(toSave, detectorId);
                 }
-            } catch (Exception e) {
-                throw new AnomalyDetectionException(
-                        detectorId,
-                        String.format(Locale.ROOT, "Error in saving %s for detector %s", indexName, detectorId),
-                        e
-                );
             }
+        } catch (Exception e) {
+            throw new AnomalyDetectionException(
+                    detectorId,
+                    String.format(Locale.ROOT, "Error in saving %s for detector %s", indexName, detectorId),
+                    e
+            );
         }
     }
 
-    private void onCreateIndexResponse(CreateIndexResponse response, T toSave, String detectorId) {
+    private void onCreateIndexResponse(CreateIndexResponse response, T toSave, String detectorId, String resultIndex) {
         if (response.isAcknowledged()) {
-            save(toSave, detectorId);
+            LOG.info("ylwudebug3: store result into index: ------------------------------++++++++++ {}", resultIndex);
+            save(toSave, detectorId, resultIndex);
         } else {
             throw new AnomalyDetectionException(
                 detectorId,

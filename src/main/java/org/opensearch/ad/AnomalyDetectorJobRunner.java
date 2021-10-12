@@ -216,6 +216,7 @@ public class AnomalyDetectorJobRunner implements ScheduledJobRunner {
             );
             return;
         }
+        //TODO: update AD custom AD result index schema?
         indexUtil.update();
         /*
          * We need to handle 3 cases:

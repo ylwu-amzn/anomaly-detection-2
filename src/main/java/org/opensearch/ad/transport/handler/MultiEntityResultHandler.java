@@ -63,8 +63,7 @@ public class MultiEntityResultHandler extends AnomalyIndexHandler<AnomalyResult>
             settings,
             threadPool,
             CommonName.ANOMALY_RESULT_INDEX_ALIAS,
-            ThrowingConsumerWrapper.throwingConsumerWrapper(anomalyDetectionIndices::initAnomalyResultIndexDirectly),
-            anomalyDetectionIndices::doesAnomalyResultIndexExist,
+            anomalyDetectionIndices,
             clientUtil,
             indexUtils,
             clusterService
@@ -83,9 +82,9 @@ public class MultiEntityResultHandler extends AnomalyIndexHandler<AnomalyResult>
         }
 
         try {
-            if (!indexExists.getAsBoolean()) {
+            if (!anomalyDetectionIndices.doesAnomalyResultIndexExist()) {
                 //TODO: create custom AD result index
-                createIndex.accept(ActionListener.wrap(initResponse -> {
+                anomalyDetectionIndices.initAnomalyResultIndexDirectly(ActionListener.wrap(initResponse -> {
                     if (initResponse.isAcknowledged()) {
                         bulk(currentBulkRequest, listener);
                     } else {

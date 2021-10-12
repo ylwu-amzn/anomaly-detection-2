@@ -28,6 +28,8 @@ import java.util.Random;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.util.Strings;
+import org.opensearch.ExceptionsHelper;
+import org.opensearch.ResourceAlreadyExistsException;
 import org.opensearch.action.ActionListener;
 import org.opensearch.action.bulk.BulkAction;
 import org.opensearch.action.bulk.BulkItemResponse;
@@ -145,7 +147,40 @@ public class ADResultBulkTransportAction extends HandledTransportAction<ADResult
 
         if (bulkRequest.numberOfActions() > 0) {
             if (!detectionIndices.doesIndexExist(resultIndex)) {
-                if (!adTaskManager.hasRealtimeTaskCache(detectorId)) {
+                try {
+                    String finalResultIndex1 = resultIndex;
+
+                    detectionIndices.initCustomAnomalyResultIndexDirectly(resultIndex, ActionListener.wrap(r -> {
+                        LOG.info("-------------------++++++++++---------- 0000000000 recreated result index: {}", finalResultIndex1);
+                        client.execute(BulkAction.INSTANCE, bulkRequest, ActionListener.<BulkResponse>wrap(bulkResponse -> {
+                            List<IndexRequest> failedRequests = BulkUtil.getFailedIndexRequest(bulkRequest, bulkResponse);
+                            listener.onResponse(new ADResultBulkResponse(failedRequests));
+                        }, ex -> {
+                            LOG.error("Failed to bulk index AD result", ex);
+                            listener.onFailure(ex);
+                        }));
+                    }, e -> {
+                        if (ExceptionsHelper.unwrapCause(e) instanceof ResourceAlreadyExistsException) {
+                            LOG.info("-------------------++++++++++ 0000000000 result index already exists: {}", finalResultIndex1);
+                            client.execute(BulkAction.INSTANCE, bulkRequest, ActionListener.<BulkResponse>wrap(bulkResponse -> {
+                                List<IndexRequest> failedRequests = BulkUtil.getFailedIndexRequest(bulkRequest, bulkResponse);
+                                listener.onResponse(new ADResultBulkResponse(failedRequests));
+                            }, ex -> {
+                                LOG.error("Failed to bulk index AD result", ex);
+                                listener.onFailure(ex);
+                            }));
+                        } else {
+                            LOG.warn("-------------------00000000001111111115555555555777777 realtime task failed to stopped: " + detectorId, e);
+                            listener.onFailure(e);
+                        }
+                    }));
+                } catch (Exception e) {
+                    LOG.warn("-------------------00000000001111111115555555555777777 realtime task failed to stopped: " + detectorId, e);
+                    listener.onFailure(e);
+                }
+
+
+                /*if (!adTaskManager.hasRealtimeTaskCache(detectorId)) {
                     LOG.warn("-------------------00000000001111111115555555555 realtime task cache doesn't exists: {}", resultIndex);
                     listener.onResponse(new ADResultBulkResponse());
                     return;
@@ -174,7 +209,7 @@ public class ADResultBulkTransportAction extends HandledTransportAction<ADResult
                     LOG.warn("-------------------00000000001111111115555555555777777 realtime task stopped: {}", detectorId);
                 }, ex-> {
                     LOG.warn("-------------------00000000001111111115555555555777777 realtime task failed to stopped: " + detectorId, ex);
-                }));
+                }));*/
             } else {
                 LOG.info("-------------------0000000000 result index exists: {}", resultIndex);
                 client.execute(BulkAction.INSTANCE, bulkRequest, ActionListener.<BulkResponse>wrap(bulkResponse -> {
