@@ -218,6 +218,15 @@ public class AnomalyDetectorJobRunner implements ScheduledJobRunner {
         }
         //TODO: update AD custom AD result index schema?
         indexUtil.update();
+
+
+        if (!indexUtil.isCustomResultIndexMappingCorrect(jobParameter.getResultIndex())) {
+            log.info("---------- yyyyyyyyyy5555 wrong result index mapping : " + jobParameter.getResultIndex());
+            Exception exception = new EndRunException(detectorId, "abc wrong custom AD result index mapping", true);
+            handleAdException(jobParameter, lockService, lock, detectionStartTime, executionStartTime, exception);
+            return;
+        };
+        indexUtil.upgradeCustomResultIndexMapping(jobParameter.getResultIndex());
         /*
          * We need to handle 3 cases:
          * 1. Detectors created by older versions and never updated. These detectors wont have User details in the

@@ -11,6 +11,7 @@
 
 package org.opensearch.ad.indices;
 
+import static org.opensearch.ad.constant.CommonName.AD_RESULT_INDEX_MAPPING_V4;
 import static org.opensearch.ad.settings.AnomalyDetectorSettings.AD_RESULT_HISTORY_MAX_DOCS_PER_SHARD;
 import static org.opensearch.ad.settings.AnomalyDetectorSettings.AD_RESULT_HISTORY_RETENTION_PERIOD;
 import static org.opensearch.ad.settings.AnomalyDetectorSettings.AD_RESULT_HISTORY_ROLLOVER_PERIOD;
@@ -424,6 +425,23 @@ public class AnomalyDetectionIndices implements LocalNodeMasterListener {
         choosePrimaryShards(request, false);
         //TODO: mark mapping up to date for each result index. Make new AD result schema BWC to old schema, upgrade AD result schema.
         adminClient.indices().create(request, markMappingUpToDate(ADIndex.RESULT, actionListener));
+    }
+
+    public boolean isCustomResultIndexMappingCorrect(String resultIndex) {
+        IndexMetadata indexMetadata = clusterService.state().metadata().index(resultIndex);
+        logger.info("---------- yyyyyyyyyy indexMetadata.mapping() : " + indexMetadata.mapping());
+        Map<String, Object> stringObjectMap = indexMetadata.mapping().sourceAsMap();
+        logger.info("---------- yyyyyyyyyy2 indexMetadata.mapping() : " + stringObjectMap);
+        logger.info("---------- yyyyyyyyyy3 indexMetadata.mapping() : " + stringObjectMap.toString());
+        logger.info("---------- yyyyyyyyyy4 equals ad result index mapping : " + stringObjectMap.toString().equals(AD_RESULT_INDEX_MAPPING_V4));
+        return AD_RESULT_INDEX_MAPPING_V4.equals(stringObjectMap.toString());
+    }
+
+    public void upgradeCustomResultIndexMapping(String resultIndex) {
+        IndexMetadata indexMetadata = clusterService.state().metadata().index(resultIndex);
+        Map<String, Object> meta = (Map<String, Object>) indexMetadata.mapping().sourceAsMap().get("_meta");
+        int schemaVersion = (int) meta.get("schema_version");
+        logger.info("---------- yyyyyyyyyy444 schemaVersion: {}", schemaVersion);
     }
 
     /**

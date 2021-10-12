@@ -149,7 +149,6 @@ public class ADResultBulkTransportAction extends HandledTransportAction<ADResult
             if (!detectionIndices.doesIndexExist(resultIndex)) {
                 try {
                     String finalResultIndex1 = resultIndex;
-
                     detectionIndices.initCustomAnomalyResultIndexDirectly(resultIndex, ActionListener.wrap(r -> {
                         LOG.info("-------------------++++++++++---------- 0000000000 recreated result index: {}", finalResultIndex1);
                         client.execute(BulkAction.INSTANCE, bulkRequest, ActionListener.<BulkResponse>wrap(bulkResponse -> {
