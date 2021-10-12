@@ -303,31 +303,34 @@ public class ADTaskManager {
                 if (detector.get().useCustomResultIndex()) {
                     context.restore();
                     String resultIndex = detector.get().getResultIndex();
-                    try {
-                        AnomalyResult anomalyResult = new AnomalyResult(DUMMY_DETECTOR_ID, Double.NaN, Double.NaN, Double.NaN, null, null, null, null, null, null, null, CommonValue.NO_SCHEMA_VERSION);
-                        IndexRequest indexRequest = new IndexRequest(resultIndex).id(DUMMY_AD_RESULT_ID).source(anomalyResult.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS));
-                        client.index(indexRequest, ActionListener.wrap(response -> {
-                            logger.info("ylwudebug2: write result status for start detector is : {}", response.getResult());
-                            try (ThreadContext.StoredContext threadContext = client.threadPool().getThreadContext().stashContext()) {
-                                if (detectionDateRange == null) {
-                                    // start realtime job
-                                    handler.startAnomalyDetectorJob(detector.get());
+                    if (!detectionIndices.doesIndexExist(resultIndex)) {
+                        try {
+                            //TODO: For realtime job, if the custom result index deleted/not found, we should stop realtime job, single-entity can stop now, need to support HC
+                            detectionIndices.initCustomAnomalyResultIndexDirectly(resultIndex, ActionListener.wrap(r -> {
+                                if (r.isAcknowledged()) {
+                                    checkWritePermissionAndStartDetector(detectionDateRange, handler, user, transportService, listener, detector, resultIndex);
                                 } else {
-                                    // start historical analysis task
-                                    forwardApplyForTaskSlotsRequestToLeadNode(detector.get(), detectionDateRange, user, transportService, listener);
+                                    String error = "Creating custom anomaly result index with mappings call not acknowledged: " + resultIndex;
+                                    logger.error(error);
+                                    listener.onFailure(new AnomalyDetectionException(error));
                                 }
-                            } catch (Exception e) {
-                                logger.error("Failed to stash context", e);
-                                listener.onFailure(e);
-                            }
-                        }, exception -> {
-                            logger.error("ylwudebug2: Failed to write custom AD result index when start detectorm " + resultIndex, exception);
-                            listener.onFailure(exception);
-                        }));
-                    } catch (IOException e) {
-                        logger.error("Failed to index result", e);
-                        listener.onFailure(e);
+                            }, e-> {
+                                logger.error("------------ ylwudebug1: Failed to create custom AD result index "+resultIndex, e);
+                                if (ExceptionsHelper.unwrapCause(e) instanceof ResourceAlreadyExistsException) {
+                                    checkWritePermissionAndStartDetector(detectionDateRange, handler, user, transportService, listener, detector, resultIndex);
+                                } else {
+                                    listener.onFailure(e);
+                                }
+                            }));
+                        } catch (IOException e) {
+                            logger.error("Failed to init custom AD result index "+resultIndex, e);
+                            listener.onFailure(e);
+                        }
+                    } else {
+                        checkWritePermissionAndStartDetector(detectionDateRange, handler, user, transportService, listener, detector, resultIndex);
                     }
+                } else {
+                    startRealtimeOrHistoricalDetection(detectionDateRange, handler, user, transportService, listener, detector);
                 }
 //                if (detectionDateRange == null) {
 //                    // start realtime job
@@ -338,6 +341,38 @@ public class ADTaskManager {
 //                }
             }
         }, listener);
+    }
+
+    private void checkWritePermissionAndStartDetector(DetectionDateRange detectionDateRange, IndexAnomalyDetectorJobActionHandler handler, User user, TransportService transportService, ActionListener<AnomalyDetectorJobResponse> listener, Optional<AnomalyDetector> detector, String resultIndex) {
+        try {
+            AnomalyResult anomalyResult = new AnomalyResult(DUMMY_DETECTOR_ID, Double.NaN, Double.NaN, Double.NaN, null, null, null, null, null, null, null, CommonValue.NO_SCHEMA_VERSION);
+            IndexRequest indexRequest = new IndexRequest(resultIndex).id(DUMMY_AD_RESULT_ID).source(anomalyResult.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS));
+            client.index(indexRequest, ActionListener.wrap(response -> {
+                logger.info("ylwudebug2: write result status for start detector is : {}", response.getResult());
+                startRealtimeOrHistoricalDetection(detectionDateRange, handler, user, transportService, listener, detector);
+            }, exception -> {
+                logger.error("ylwudebug2: Failed to write custom AD result index when start detectorm " + resultIndex, exception);
+                listener.onFailure(exception);
+            }));
+        } catch (IOException e) {
+            logger.error("Failed to index result", e);
+            listener.onFailure(e);
+        }
+    }
+
+    private void startRealtimeOrHistoricalDetection(DetectionDateRange detectionDateRange, IndexAnomalyDetectorJobActionHandler handler, User user, TransportService transportService, ActionListener<AnomalyDetectorJobResponse> listener, Optional<AnomalyDetector> detector) {
+        try (ThreadContext.StoredContext threadContext = client.threadPool().getThreadContext().stashContext()) {
+            if (detectionDateRange == null) {
+                // start realtime job
+                handler.startAnomalyDetectorJob(detector.get());
+            } else {
+                // start historical analysis task
+                forwardApplyForTaskSlotsRequestToLeadNode(detector.get(), detectionDateRange, user, transportService, listener);
+            }
+        } catch (Exception e) {
+            logger.error("Failed to stash context", e);
+            listener.onFailure(e);
+        }
     }
 
     /**
@@ -2201,6 +2236,10 @@ public class ADTaskManager {
 
     public void removeRealtimeTaskCache(String detectorId) {
         adTaskCacheManager.removeRealtimeTaskCache(detectorId);
+    }
+
+    public boolean hasRealtimeTaskCache(String detectorId) {
+        return adTaskCacheManager.getRealtimeTaskCache(detectorId) != null;
     }
 
     /**

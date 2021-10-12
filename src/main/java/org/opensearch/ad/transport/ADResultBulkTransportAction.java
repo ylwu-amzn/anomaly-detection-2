@@ -11,8 +11,12 @@
 
 package org.opensearch.ad.transport;
 
+import static org.opensearch.ad.constant.CommonName.DETECTION_STATE_INDEX;
+import static org.opensearch.ad.model.ADTask.PARENT_TASK_ID_FIELD;
+import static org.opensearch.ad.model.ADTask.STATE_FIELD;
 import static org.opensearch.ad.settings.AnomalyDetectorSettings.INDEX_PRESSURE_HARD_LIMIT;
 import static org.opensearch.ad.settings.AnomalyDetectorSettings.INDEX_PRESSURE_SOFT_LIMIT;
+import static org.opensearch.ad.util.ParseUtils.isNullOrEmpty;
 import static org.opensearch.common.xcontent.XContentFactory.jsonBuilder;
 import static org.opensearch.index.IndexingPressure.MAX_INDEXING_BYTES;
 
@@ -26,13 +30,19 @@ import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.util.Strings;
 import org.opensearch.action.ActionListener;
 import org.opensearch.action.bulk.BulkAction;
+import org.opensearch.action.bulk.BulkItemResponse;
 import org.opensearch.action.bulk.BulkRequest;
 import org.opensearch.action.bulk.BulkResponse;
 import org.opensearch.action.index.IndexRequest;
 import org.opensearch.action.support.ActionFilters;
 import org.opensearch.action.support.HandledTransportAction;
+import org.opensearch.ad.common.exception.EndRunException;
 import org.opensearch.ad.constant.CommonName;
+import org.opensearch.ad.indices.AnomalyDetectionIndices;
+import org.opensearch.ad.model.ADTaskState;
+import org.opensearch.ad.model.AnomalyDetectorJob;
 import org.opensearch.ad.model.AnomalyResult;
+import org.opensearch.ad.task.ADTaskManager;
 import org.opensearch.ad.util.BulkUtil;
 import org.opensearch.ad.util.RestHandlerUtils;
 import org.opensearch.client.Client;
@@ -41,6 +51,11 @@ import org.opensearch.common.inject.Inject;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.xcontent.XContentBuilder;
 import org.opensearch.index.IndexingPressure;
+import org.opensearch.index.query.BoolQueryBuilder;
+import org.opensearch.index.query.TermQueryBuilder;
+import org.opensearch.index.reindex.UpdateByQueryAction;
+import org.opensearch.index.reindex.UpdateByQueryRequest;
+import org.opensearch.script.Script;
 import org.opensearch.tasks.Task;
 import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.TransportService;
@@ -55,6 +70,9 @@ public class ADResultBulkTransportAction extends HandledTransportAction<ADResult
     private String indexName;
     private Client client;
     private Random random;
+    private final AnomalyDetectionIndices detectionIndices;
+    private TransportService transportService;
+    private ADTaskManager adTaskManager;
 
     @Inject
     public ADResultBulkTransportAction(
@@ -63,7 +81,9 @@ public class ADResultBulkTransportAction extends HandledTransportAction<ADResult
         IndexingPressure indexingPressure,
         Settings settings,
         ClusterService clusterService,
-        Client client
+        Client client,
+        AnomalyDetectionIndices detectionIndices,
+        ADTaskManager adTaskManager
     ) {
         super(ADResultBulkAction.NAME, transportService, actionFilters, ADResultBulkRequest::new, ThreadPool.Names.SAME);
         this.indexingPressure = indexingPressure;
@@ -77,6 +97,9 @@ public class ADResultBulkTransportAction extends HandledTransportAction<ADResult
         clusterService.getClusterSettings().addSettingsUpdateConsumer(INDEX_PRESSURE_HARD_LIMIT, it -> hardLimit = it);
         // random seed is 42. Can be any number
         this.random = new Random(42);
+        this.detectionIndices = detectionIndices;
+        this.adTaskManager = adTaskManager;
+        this.transportService = transportService;
     }
 
     @Override
@@ -94,6 +117,8 @@ public class ADResultBulkTransportAction extends HandledTransportAction<ADResult
         if (results == null || results.size() < 1) {
             listener.onResponse(new ADResultBulkResponse());
         }
+
+        String detectorId = results.get(0).getDetectorId();
 
         BulkRequest bulkRequest = new BulkRequest();
 
@@ -119,10 +144,47 @@ public class ADResultBulkTransportAction extends HandledTransportAction<ADResult
         }
 
         if (bulkRequest.numberOfActions() > 0) {
-            client.execute(BulkAction.INSTANCE, bulkRequest, ActionListener.<BulkResponse>wrap(bulkResponse -> {
-                List<IndexRequest> failedRequests = BulkUtil.getFailedIndexRequest(bulkRequest, bulkResponse);
-                listener.onResponse(new ADResultBulkResponse(failedRequests));
-            }, listener::onFailure));
+            if (!detectionIndices.doesIndexExist(resultIndex)) {
+                if (!adTaskManager.hasRealtimeTaskCache(detectorId)) {
+                    LOG.warn("-------------------00000000001111111115555555555 realtime task cache doesn't exists: {}", resultIndex);
+                    listener.onResponse(new ADResultBulkResponse());
+                    return;
+                }
+                LOG.warn("-------------------0000000000111111111 result index doesn't exist: {}", resultIndex);
+                UpdateByQueryRequest updateByQueryRequest = new UpdateByQueryRequest();
+                updateByQueryRequest.indices(AnomalyDetectorJob.ANOMALY_DETECTOR_JOB_INDEX);
+                BoolQueryBuilder query = new BoolQueryBuilder();
+                query.filter(new TermQueryBuilder(AnomalyDetectorJob.NAME_FIELD, detectorId));
+                updateByQueryRequest.setQuery(query);
+                updateByQueryRequest.setRefresh(true);
+                String script = String.format(Locale.ROOT, "ctx._source.%s=%s;", AnomalyDetectorJob.IS_ENABLED_FIELD, false);
+                updateByQueryRequest.setScript(new Script(script));
+
+                String finalResultIndex = resultIndex;
+                adTaskManager.stopLatestRealtimeTask(detectorId, ADTaskState.STOPPED, null, transportService, ActionListener.wrap(response -> {
+                    client.execute(UpdateByQueryAction.INSTANCE, updateByQueryRequest, ActionListener.wrap(r -> {
+                        // TODO: remove this, recreate result index if missing,
+                        LOG.warn("-------------------000000000011111111122222222222 disabled realtime job successfully for detector " + detectorId);
+                        listener.onFailure(new EndRunException(detectorId, "can't find result index " + finalResultIndex, false));
+                        adTaskManager.removeRealtimeTaskCache(detectorId);
+                    }, e -> {
+                        LOG.error("Failed to disable realtime job for " + detectorId, e);
+                        listener.onFailure(new EndRunException(detectorId, "can't find result index " + finalResultIndex, true));
+                    }));
+                    LOG.warn("-------------------00000000001111111115555555555777777 realtime task stopped: {}", detectorId);
+                }, ex-> {
+                    LOG.warn("-------------------00000000001111111115555555555777777 realtime task failed to stopped: " + detectorId, ex);
+                }));
+            } else {
+                LOG.info("-------------------0000000000 result index exists: {}", resultIndex);
+                client.execute(BulkAction.INSTANCE, bulkRequest, ActionListener.<BulkResponse>wrap(bulkResponse -> {
+                    List<IndexRequest> failedRequests = BulkUtil.getFailedIndexRequest(bulkRequest, bulkResponse);
+                    listener.onResponse(new ADResultBulkResponse(failedRequests));
+                }, e -> {
+                    LOG.error("Failed to bulk index AD result", e);
+                    listener.onFailure(e);
+                }));
+            }
         } else {
             listener.onResponse(new ADResultBulkResponse());
         }
