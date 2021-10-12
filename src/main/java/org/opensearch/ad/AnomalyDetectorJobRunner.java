@@ -29,6 +29,7 @@ import java.util.concurrent.ExecutorService;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.message.ParameterizedMessage;
 import org.opensearch.action.ActionListener;
 import org.opensearch.action.get.GetRequest;
 import org.opensearch.action.get.GetResponse;
@@ -226,53 +227,70 @@ public class AnomalyDetectorJobRunner implements ScheduledJobRunner {
             handleAdException(jobParameter, lockService, lock, detectionStartTime, executionStartTime, exception);
             return;
         };
-        indexUtil.upgradeCustomResultIndexMapping(jobParameter.getResultIndex());
-        /*
-         * We need to handle 3 cases:
-         * 1. Detectors created by older versions and never updated. These detectors wont have User details in the
-         * detector object. `detector.user` will be null. Insert `all_access, AmazonES_all_access` role.
-         * 2. Detectors are created when security plugin is disabled, these will have empty User object.
-         * (`detector.user.name`, `detector.user.roles` are empty )
-         * 3. Detectors are created when security plugin is enabled, these will have an User object.
-         * This will inject user role and check if the user role has permissions to call the execute
-         * Anomaly Result API.
-         */
-        String user;
-        List<String> roles;
-        if (jobParameter.getUser() == null) {
-            user = "";
-            roles = settings.getAsList("", ImmutableList.of("all_access", "AmazonES_all_access"));
-        } else {
-            user = jobParameter.getUser().getName();
-            roles = jobParameter.getUser().getRoles();
-        }
-
-        try (InjectSecurity injectSecurity = new InjectSecurity(detectorId, settings, client.threadPool().getThreadContext())) {
-            // Injecting user role to verify if the user has permissions for our API.
-            injectSecurity.inject(user, roles);
-
-            AnomalyResultRequest request = new AnomalyResultRequest(
-                detectorId,
-                detectionStartTime.toEpochMilli(),
-                executionStartTime.toEpochMilli()
-            );
-            client
-                .execute(
-                    AnomalyResultAction.INSTANCE,
-                    request,
-                    ActionListener
-                        .wrap(
-                            response -> {
-                                indexAnomalyResult(jobParameter, lockService, lock, detectionStartTime, executionStartTime, response);
-                            },
-                            exception -> {
-                                handleAdException(jobParameter, lockService, lock, detectionStartTime, executionStartTime, exception);
+        try {
+            String resultIndex = jobParameter.getResultIndex();
+            indexUtil.upgradeCustomResultIndexMapping(resultIndex,
+                    ActionListener.wrap(putMappingResponse -> {
+                        if (putMappingResponse.isAcknowledged()) {
+                            log.info(new ParameterizedMessage("---------- yyyyyyyyyy6 Succeeded in updating [{}]'s mapping", resultIndex));
+                            /*
+                             * We need to handle 3 cases:
+                             * 1. Detectors created by older versions and never updated. These detectors wont have User details in the
+                             * detector object. `detector.user` will be null. Insert `all_access, AmazonES_all_access` role.
+                             * 2. Detectors are created when security plugin is disabled, these will have empty User object.
+                             * (`detector.user.name`, `detector.user.roles` are empty )
+                             * 3. Detectors are created when security plugin is enabled, these will have an User object.
+                             * This will inject user role and check if the user role has permissions to call the execute
+                             * Anomaly Result API.
+                             */
+                            String user;
+                            List<String> roles;
+                            if (jobParameter.getUser() == null) {
+                                user = "";
+                                roles = settings.getAsList("", ImmutableList.of("all_access", "AmazonES_all_access"));
+                            } else {
+                                user = jobParameter.getUser().getName();
+                                roles = jobParameter.getUser().getRoles();
                             }
-                        )
-                );
+
+                            try (InjectSecurity injectSecurity = new InjectSecurity(detectorId, settings, client.threadPool().getThreadContext())) {
+                                // Injecting user role to verify if the user has permissions for our API.
+                                injectSecurity.inject(user, roles);
+
+                                AnomalyResultRequest request = new AnomalyResultRequest(
+                                        detectorId,
+                                        detectionStartTime.toEpochMilli(),
+                                        executionStartTime.toEpochMilli()
+                                );
+                                client
+                                        .execute(
+                                                AnomalyResultAction.INSTANCE,
+                                                request,
+                                                ActionListener
+                                                        .wrap(
+                                                                response -> {
+                                                                    indexAnomalyResult(jobParameter, lockService, lock, detectionStartTime, executionStartTime, response);
+                                                                },
+                                                                exception -> {
+                                                                    handleAdException(jobParameter, lockService, lock, detectionStartTime, executionStartTime, exception);
+                                                                }
+                                                        )
+                                        );
+                            } catch (Exception e) {
+                                indexAnomalyResultException(jobParameter, lockService, lock, detectionStartTime, executionStartTime, e, true);
+                                log.error("Failed to execute AD job " + detectorId, e);
+                            }
+                        } else {
+                            log.error(new ParameterizedMessage("---------- yyyyyyyyyy6 Fail to update [{}]'s mapping", resultIndex));
+                            Exception exception = new EndRunException(detectorId, "Can't upgrade custom AD result index mapping", false);
+                            handleAdException(jobParameter, lockService, lock, detectionStartTime, executionStartTime, exception);
+                        }
+                    }, exception -> {
+                        log.error(new ParameterizedMessage("---------- yyyyyyyyyy6 Fail to update [{}]'s mapping due to [{}]", resultIndex, exception.getMessage()));
+                        handleAdException(jobParameter, lockService, lock, detectionStartTime, executionStartTime, exception);
+                    }));
         } catch (Exception e) {
-            indexAnomalyResultException(jobParameter, lockService, lock, detectionStartTime, executionStartTime, e, true);
-            log.error("Failed to execute AD job " + detectorId, e);
+            handleAdException(jobParameter, lockService, lock, detectionStartTime, executionStartTime, e);
         }
     }
 

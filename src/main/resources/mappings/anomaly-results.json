@@ -1,7 +1,7 @@
 {
   "dynamic": false,
   "_meta": {
-    "schema_version": 4
+    "schema_version": 5
   },
   "properties": {
     "detector_id": {
@@ -14,6 +14,9 @@
       "type": "double"
     },
     "anomaly_grade": {
+      "type": "double"
+    },
+    "anomaly_grade22": {
       "type": "double"
     },
     "confidence": {

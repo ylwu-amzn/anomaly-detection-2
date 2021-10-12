@@ -12,6 +12,9 @@
 package org.opensearch.ad.indices;
 
 import static org.opensearch.ad.constant.CommonName.AD_RESULT_INDEX_MAPPING_V4;
+import static org.opensearch.ad.constant.CommonName.AD_RESULT_INDEX_MAPPING_V5;
+import static org.opensearch.ad.constant.CommonName.LATEST_AD_RESULT_INDEX_MAPPING;
+import static org.opensearch.ad.constant.CommonName.VALID_AD_RESULT_MAPPINGS;
 import static org.opensearch.ad.settings.AnomalyDetectorSettings.AD_RESULT_HISTORY_MAX_DOCS_PER_SHARD;
 import static org.opensearch.ad.settings.AnomalyDetectorSettings.AD_RESULT_HISTORY_RETENTION_PERIOD;
 import static org.opensearch.ad.settings.AnomalyDetectorSettings.AD_RESULT_HISTORY_ROLLOVER_PERIOD;
@@ -35,6 +38,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.message.ParameterizedMessage;
@@ -53,6 +57,7 @@ import org.opensearch.action.admin.indices.settings.get.GetSettingsResponse;
 import org.opensearch.action.admin.indices.settings.put.UpdateSettingsRequest;
 import org.opensearch.action.support.GroupedActionListener;
 import org.opensearch.action.support.IndicesOptions;
+import org.opensearch.action.support.master.AcknowledgedResponse;
 import org.opensearch.ad.common.exception.EndRunException;
 import org.opensearch.ad.constant.CommonName;
 import org.opensearch.ad.constant.CommonValue;
@@ -433,15 +438,43 @@ public class AnomalyDetectionIndices implements LocalNodeMasterListener {
         Map<String, Object> stringObjectMap = indexMetadata.mapping().sourceAsMap();
         logger.info("---------- yyyyyyyyyy2 indexMetadata.mapping() : " + stringObjectMap);
         logger.info("---------- yyyyyyyyyy3 indexMetadata.mapping() : " + stringObjectMap.toString());
-        logger.info("---------- yyyyyyyyyy4 equals ad result index mapping : " + stringObjectMap.toString().equals(AD_RESULT_INDEX_MAPPING_V4));
-        return AD_RESULT_INDEX_MAPPING_V4.equals(stringObjectMap.toString());
+        boolean valid = VALID_AD_RESULT_MAPPINGS.stream().filter(m -> StringUtils.equals(m, stringObjectMap.toString())).findAny().isPresent();
+        logger.info("---------- yyyyyyyyyy4 equals ad result index mapping : " + valid);
+        return valid;
     }
 
-    public void upgradeCustomResultIndexMapping(String resultIndex) {
+    public int getADResultIndexSchemaVersion(String mapping) {
+        String[] lines = mapping.split("\n");
+        for (String line : lines) {
+            if (line.contains("schema_version")) {
+                return Integer.parseInt(line.replace("\"schema_version\":", "").trim());
+            }
+        }
+        throw new IllegalArgumentException("Can't find AD result index schema version");
+    }
+
+    public void upgradeCustomResultIndexMapping(String resultIndex, ActionListener<AcknowledgedResponse> listener) throws IOException {
         IndexMetadata indexMetadata = clusterService.state().metadata().index(resultIndex);
         Map<String, Object> meta = (Map<String, Object>) indexMetadata.mapping().sourceAsMap().get("_meta");
         int schemaVersion = (int) meta.get("schema_version");
-        logger.info("---------- yyyyyyyyyy444 schemaVersion: {}", schemaVersion);
+
+        String mapping = getAnomalyResultMappings();
+
+        int adResultIndexSchemaVersion = getADResultIndexSchemaVersion(mapping);
+        logger.info("---------- yyyyyyyyyy444 schemaVersion: {}, adResultIndexSchemaVersion: {}", schemaVersion, adResultIndexSchemaVersion);
+        if (schemaVersion < adResultIndexSchemaVersion) {
+            adminClient.indices().putMapping(
+                    new PutMappingRequest()
+                            .indices(resultIndex)
+                            .type(CommonName.MAPPING_TYPE)
+//                            .source(adIndex.getMapping(), XContentType.JSON),
+                            .source(mapping, XContentType.JSON),
+                    listener
+            );
+        } else {
+            logger.info("---------- yyyyyyyyyy6 no need to upgrade custom index mappig");
+            listener.onResponse(new AcknowledgedResponse(true));
+        }
     }
 
     /**

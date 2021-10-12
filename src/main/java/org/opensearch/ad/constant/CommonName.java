@@ -11,7 +11,10 @@
 
 package org.opensearch.ad.constant;
 
+import com.google.common.collect.ImmutableSet;
 import org.opensearch.ad.stats.StatNames;
+
+import java.util.Set;
 
 public class CommonName {
     // ======================================
@@ -147,4 +150,16 @@ public class CommonName {
             "properties={backend_roles={type=text, fields={keyword={type=keyword}}}, custom_attribute_names={type=text, " +
             "fields={keyword={type=keyword}}}, name={type=text, fields={keyword={type=keyword, ignore_above=256}}}, roles={type=text, " +
             "fields={keyword={type=keyword}}}}}}}";
+    public static final String AD_RESULT_INDEX_MAPPING_V5 = "{dynamic=false, _meta={schema_version=5}, properties={anomaly_grade={type=double}, anomaly_grade22={type=double}, " +
+            "anomaly_score={type=double}, confidence={type=double}, data_end_time={type=date, format=strict_date_time||epoch_millis}, " +
+            "data_start_time={type=date, format=strict_date_time||epoch_millis}, detector_id={type=keyword}, entity={type=nested, " +
+            "properties={name={type=keyword}, value={type=keyword}}}, error={type=text}, execution_end_time={type=date, " +
+            "format=strict_date_time||epoch_millis}, execution_start_time={type=date, format=strict_date_time||epoch_millis}, " +
+            "feature_data={type=nested, properties={data={type=double}, feature_id={type=keyword}}}, is_anomaly={type=boolean}, " +
+            "model_id={type=keyword}, schema_version={type=integer}, task_id={type=keyword}, user={type=nested, " +
+            "properties={backend_roles={type=text, fields={keyword={type=keyword}}}, custom_attribute_names={type=text, " +
+            "fields={keyword={type=keyword}}}, name={type=text, fields={keyword={type=keyword, ignore_above=256}}}, roles={type=text, " +
+            "fields={keyword={type=keyword}}}}}}}";
+    public static final Set<String> VALID_AD_RESULT_MAPPINGS = ImmutableSet.of(AD_RESULT_INDEX_MAPPING_V4, AD_RESULT_INDEX_MAPPING_V5);
+    public static final String LATEST_AD_RESULT_INDEX_MAPPING = AD_RESULT_INDEX_MAPPING_V5;
 }

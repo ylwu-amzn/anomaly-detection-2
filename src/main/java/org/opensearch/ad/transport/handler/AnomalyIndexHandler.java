@@ -12,6 +12,8 @@
 package org.opensearch.ad.transport.handler;
 
 import static org.opensearch.ad.constant.CommonName.AD_RESULT_INDEX_MAPPING_V4;
+import static org.opensearch.ad.constant.CommonName.AD_RESULT_INDEX_MAPPING_V5;
+import static org.opensearch.ad.constant.CommonName.LATEST_AD_RESULT_INDEX_MAPPING;
 import static org.opensearch.common.xcontent.XContentFactory.jsonBuilder;
 
 import java.util.Iterator;
@@ -198,7 +200,7 @@ public class AnomalyIndexHandler<T extends ToXContentObject> {
 //        LOG.info("yyyyyyyyyy2 indexMetadata.mapping() : " + stringObjectMap);
 //        LOG.info("yyyyyyyyyy3 indexMetadata.mapping() : " + stringObjectMap.toString());
 //        LOG.info("yyyyyyyyyy4 equals ad result index mapping : " + stringObjectMap.toString().equals(AD_RESULT_INDEX_MAPPING_V4));
-        if (!AD_RESULT_INDEX_MAPPING_V4.equals(stringObjectMap.toString())) {
+        if (!LATEST_AD_RESULT_INDEX_MAPPING.equals(stringObjectMap.toString())) {
             //throw new EndRunException(detectorId, "wrong index mapping of custom AD result index", true);
             indexName = this.indexName; // write AD result into default AD result index
         }
