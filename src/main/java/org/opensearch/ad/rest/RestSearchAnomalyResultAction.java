@@ -27,7 +27,7 @@ public class RestSearchAnomalyResultAction extends AbstractSearchAction<AnomalyR
 
     private static final String LEGACY_URL_PATH = AnomalyDetectorPlugin.LEGACY_OPENDISTRO_AD_BASE_URI + "/results/_search";
     private static final String URL_PATH = AnomalyDetectorPlugin.AD_BASE_DETECTORS_URI + "/results/_search";
-    private final String SEARCH_ANOMALY_DETECTOR_ACTION = "search_anomaly_result";
+    private final String SEARCH_ANOMALY_RESULT_ACTION = "search_anomaly_result";
 
     public RestSearchAnomalyResultAction() {
         super(
@@ -41,6 +41,6 @@ public class RestSearchAnomalyResultAction extends AbstractSearchAction<AnomalyR
 
     @Override
     public String getName() {
-        return SEARCH_ANOMALY_DETECTOR_ACTION;
+        return SEARCH_ANOMALY_RESULT_ACTION;
     }
 }

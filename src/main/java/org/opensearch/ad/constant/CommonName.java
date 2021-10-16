@@ -137,9 +137,9 @@ public class CommonName {
     // ======================================
     // Used for custom AD result index
     // ======================================
-    // TODO: check if result index schema matches AD result index schema before checking if has write permission.
     public static final String DUMMY_AD_RESULT_ID = "dummy_ad_result_id";
     public static final String DUMMY_DETECTOR_ID = "dummy_detector_id";
+    //TODO: change to check each filed
     public static final String AD_RESULT_INDEX_MAPPING_V4 = "{dynamic=false, _meta={schema_version=4}, properties={anomaly_grade={type=double}, " +
             "anomaly_score={type=double}, confidence={type=double}, data_end_time={type=date, format=strict_date_time||epoch_millis}, " +
             "data_start_time={type=date, format=strict_date_time||epoch_millis}, detector_id={type=keyword}, entity={type=nested, " +
