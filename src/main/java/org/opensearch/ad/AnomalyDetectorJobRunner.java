@@ -39,6 +39,7 @@ import org.opensearch.ad.common.exception.AnomalyDetectionException;
 import org.opensearch.ad.common.exception.EndRunException;
 import org.opensearch.ad.common.exception.InternalFailure;
 import org.opensearch.ad.common.exception.ResourceNotFoundException;
+import org.opensearch.ad.constant.CommonName;
 import org.opensearch.ad.indices.ADIndex;
 import org.opensearch.ad.indices.AnomalyDetectionIndices;
 import org.opensearch.ad.model.ADTaskState;
@@ -221,76 +222,98 @@ public class AnomalyDetectorJobRunner implements ScheduledJobRunner {
         indexUtil.update();
 
 
-        if (!indexUtil.isCustomResultIndexMappingCorrect(jobParameter.getResultIndex())) {
-            log.info("---------- yyyyyyyyyy5555 wrong result index mapping : " + jobParameter.getResultIndex());
-            Exception exception = new EndRunException(detectorId, "abc wrong custom AD result index mapping", true);
-            handleAdException(jobParameter, lockService, lock, detectionStartTime, executionStartTime, exception);
-            return;
-        };
-        try {
-            String resultIndex = jobParameter.getResultIndex();
-            indexUtil.upgradeCustomResultIndexMapping(resultIndex,
-                    ActionListener.wrap(putMappingResponse -> {
-                        if (putMappingResponse.isAcknowledged()) {
-                            log.info(new ParameterizedMessage("---------- yyyyyyyyyy6 Succeeded in updating [{}]'s mapping", resultIndex));
-                            /*
-                             * We need to handle 3 cases:
-                             * 1. Detectors created by older versions and never updated. These detectors wont have User details in the
-                             * detector object. `detector.user` will be null. Insert `all_access, AmazonES_all_access` role.
-                             * 2. Detectors are created when security plugin is disabled, these will have empty User object.
-                             * (`detector.user.name`, `detector.user.roles` are empty )
-                             * 3. Detectors are created when security plugin is enabled, these will have an User object.
-                             * This will inject user role and check if the user role has permissions to call the execute
-                             * Anomaly Result API.
-                             */
-                            String user;
-                            List<String> roles;
-                            if (jobParameter.getUser() == null) {
-                                user = "";
-                                roles = settings.getAsList("", ImmutableList.of("all_access", "AmazonES_all_access"));
+        String resultIndex = jobParameter.getResultIndex();
+        if (resultIndex != null) {// TODO: frontend , show warn message that user need to manage all of the old data by themselves.
+            Exception resultIndexException = null;
+            if (!indexUtil.doesIndexExist(resultIndex)) {
+                log.info("---------- yyyyyyyyyy5555 result index doesn't exist : " + resultIndex);
+                resultIndexException = new EndRunException(detectorId, "Can't find result index", true);
+            } else if (!indexUtil.isCustomResultIndexMappingCorrect(resultIndex)) {
+                log.info("---------- yyyyyyyyyy5555 wrong result index mapping : " + resultIndex);
+                resultIndexException = new EndRunException(detectorId, "Result index mapping is not correct", true);
+            }
+//            if (!indexUtil.doesIndexExist(resultIndex)) {
+//                log.info("---------- yyyyyyyyyy5555 result index doesn't exist : " + resultIndex);
+//                resultIndexException = new EndRunException(detectorId, "Can't find result index", true);
+//            } else if (!indexUtil.isCustomResultIndexMappingCorrect(resultIndex)) {
+//                log.info("---------- yyyyyyyyyy5555 wrong result index mapping : " + resultIndex);
+//                resultIndexException = new EndRunException(detectorId, "Result index mapping is not correct", true);
+//            }
+            if (resultIndexException != null) {
+                handleAdException(jobParameter, lockService, lock, detectionStartTime, executionStartTime, resultIndexException);
+                return;
+            }
+            try {
+                indexUtil.upgradeCustomResultIndexMapping(resultIndex,
+                        ActionListener.wrap(putMappingResponse -> {
+                            if (putMappingResponse.isAcknowledged()) {
+                                log.info(new ParameterizedMessage("---------- yyyyyyyyyy6 Succeeded in updating [{}]'s mapping", resultIndex));
+                                runAnomalyDetectionJob(jobParameter, lockService, lock, detectionStartTime, executionStartTime, detectorId);
                             } else {
-                                user = jobParameter.getUser().getName();
-                                roles = jobParameter.getUser().getRoles();
+                                log.error(new ParameterizedMessage("---------- yyyyyyyyyy6 Fail to update [{}]'s mapping", resultIndex));
+                                Exception exception = new EndRunException(detectorId, "Can't upgrade custom AD result index mapping", false);
+                                handleAdException(jobParameter, lockService, lock, detectionStartTime, executionStartTime, exception);
                             }
-
-                            try (InjectSecurity injectSecurity = new InjectSecurity(detectorId, settings, client.threadPool().getThreadContext())) {
-                                // Injecting user role to verify if the user has permissions for our API.
-                                injectSecurity.inject(user, roles);
-
-                                AnomalyResultRequest request = new AnomalyResultRequest(
-                                        detectorId,
-                                        detectionStartTime.toEpochMilli(),
-                                        executionStartTime.toEpochMilli()
-                                );
-                                client
-                                        .execute(
-                                                AnomalyResultAction.INSTANCE,
-                                                request,
-                                                ActionListener
-                                                        .wrap(
-                                                                response -> {
-                                                                    indexAnomalyResult(jobParameter, lockService, lock, detectionStartTime, executionStartTime, response);
-                                                                },
-                                                                exception -> {
-                                                                    handleAdException(jobParameter, lockService, lock, detectionStartTime, executionStartTime, exception);
-                                                                }
-                                                        )
-                                        );
-                            } catch (Exception e) {
-                                indexAnomalyResultException(jobParameter, lockService, lock, detectionStartTime, executionStartTime, e, true);
-                                log.error("Failed to execute AD job " + detectorId, e);
-                            }
-                        } else {
-                            log.error(new ParameterizedMessage("---------- yyyyyyyyyy6 Fail to update [{}]'s mapping", resultIndex));
-                            Exception exception = new EndRunException(detectorId, "Can't upgrade custom AD result index mapping", false);
+                        }, exception -> {
+                            log.error(new ParameterizedMessage("---------- yyyyyyyyyy6 Fail to update [{}]'s mapping due to [{}]", resultIndex, exception.getMessage()));
                             handleAdException(jobParameter, lockService, lock, detectionStartTime, executionStartTime, exception);
-                        }
-                    }, exception -> {
-                        log.error(new ParameterizedMessage("---------- yyyyyyyyyy6 Fail to update [{}]'s mapping due to [{}]", resultIndex, exception.getMessage()));
-                        handleAdException(jobParameter, lockService, lock, detectionStartTime, executionStartTime, exception);
-                    }));
+                        }));
+            } catch (Exception e) {
+                handleAdException(jobParameter, lockService, lock, detectionStartTime, executionStartTime, e);
+            }
+        } else {
+            log.info("------- 0000000000 Run job with no custom result index", resultIndex);
+            runAnomalyDetectionJob(jobParameter, lockService, lock, detectionStartTime, executionStartTime, detectorId);
+        }
+    }
+
+    /**
+     * We need to handle 3 cases:
+     * 1. Detectors created by older versions and never updated. These detectors wont have User details in the
+     * detector object. `detector.user` will be null. Insert `all_access, AmazonES_all_access` role.
+     * 2. Detectors are created when security plugin is disabled, these will have empty User object.
+     * (`detector.user.name`, `detector.user.roles` are empty )
+     * 3. Detectors are created when security plugin is enabled, these will have an User object.
+     * This will inject user role and check if the user role has permissions to call the execute
+     * Anomaly Result API.
+     */
+    private void runAnomalyDetectionJob(AnomalyDetectorJob jobParameter, LockService lockService, LockModel lock, Instant detectionStartTime, Instant executionStartTime, String detectorId) {
+        String user;
+        List<String> roles;
+        if (jobParameter.getUser() == null) {
+            user = "";
+            roles = settings.getAsList("", ImmutableList.of("all_access", "AmazonES_all_access"));
+        } else {
+            user = jobParameter.getUser().getName();
+            roles = jobParameter.getUser().getRoles();
+        }
+
+        try (InjectSecurity injectSecurity = new InjectSecurity(detectorId, settings, client.threadPool().getThreadContext())) {
+            // Injecting user role to verify if the user has permissions for our API.
+            injectSecurity.inject(user, roles);
+
+            AnomalyResultRequest request = new AnomalyResultRequest(
+                detectorId,
+                detectionStartTime.toEpochMilli(),
+                executionStartTime.toEpochMilli()
+            );
+            client
+                .execute(
+                    AnomalyResultAction.INSTANCE,
+                    request,
+                    ActionListener
+                        .wrap(
+                            response -> {
+                                indexAnomalyResult(jobParameter, lockService, lock, detectionStartTime, executionStartTime, response);
+                            },
+                            exception -> {
+                                handleAdException(jobParameter, lockService, lock, detectionStartTime, executionStartTime, exception);
+                            }
+                        )
+                );
         } catch (Exception e) {
-            handleAdException(jobParameter, lockService, lock, detectionStartTime, executionStartTime, e);
+            indexAnomalyResultException(jobParameter, lockService, lock, detectionStartTime, executionStartTime, e, true);
+            log.error("Failed to execute AD job " + detectorId, e);
         }
     }
 
@@ -526,8 +549,16 @@ public class AnomalyDetectorJobRunner implements ScheduledJobRunner {
                 user,
                 indexUtil.getSchemaVersion(ADIndex.RESULT)
             );
-            anomalyResultHandler.index(anomalyResult, detectorId, jobParameter.getResultIndex());
+            String resultIndex = jobParameter.getResultIndex();
+//            if (resultIndex != null && !indexUtil.doesIndexExist(resultIndex)) {
+//                Exception e = new EndRunException(detectorId, "Can't find index " + resultIndex, true);
+//                handleAdException(jobParameter, lockService, lock, detectionStartTime, executionStartTime, e);
+//                return;
+//            }
+            anomalyResultHandler.index(anomalyResult, detectorId, resultIndex);
             updateRealtimeTask(response, detectorId);
+        } catch (EndRunException e) {
+            handleAdException(jobParameter, lockService, lock, detectionStartTime, executionStartTime, e);
         } catch (Exception e) {
             log.error("Failed to index anomaly result for " + detectorId, e);
         } finally {
@@ -636,7 +667,16 @@ public class AnomalyDetectorJobRunner implements ScheduledJobRunner {
                 user,
                 indexUtil.getSchemaVersion(ADIndex.RESULT)
             );
-            anomalyResultHandler.index(anomalyResult, detectorId, jobParameter.getResultIndex());
+            String resultIndex = jobParameter.getResultIndex();
+            if (resultIndex != null && !indexUtil.doesIndexExist(resultIndex)) {
+                // If custom result index doesn't exist, write exception to default result index.
+                log.info("ylwudebug3: ++++++++++++++++++++++++++++++ result index doesn't exist {}", resultIndex);
+                anomalyResultHandler.index(anomalyResult, detectorId, null);
+            } else {
+                log.info("ylwudebug3: ++++++++++++++++++++++++++++++ result index exist {}", resultIndex);
+                anomalyResultHandler.index(anomalyResult, detectorId, resultIndex);
+            }
+
             updateLatestRealtimeTask(detectorId, taskState, null, null, errorMessage);
         } catch (Exception e) {
             log.error("Failed to index anomaly result for " + detectorId, e);

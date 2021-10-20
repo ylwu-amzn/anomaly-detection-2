@@ -223,15 +223,11 @@ public class AnomalyResult implements ToXContentObject, Writeable {
         XContentBuilder xContentBuilder = builder
             .startObject()
             .field(DETECTOR_ID_FIELD, detectorId)
-//            .field(DATA_START_TIME_FIELD, dataStartTime.toEpochMilli())
-//            .field(DATA_END_TIME_FIELD, dataEndTime.toEpochMilli())
             .field(CommonName.SCHEMA_VERSION_FIELD, schemaVersion);
         if (dataStartTime != null) {
-            // can be null during preview
             xContentBuilder.field(DATA_START_TIME_FIELD, dataStartTime.toEpochMilli());
         }
         if (dataEndTime != null) {
-            // can be null during preview
             xContentBuilder.field(DATA_END_TIME_FIELD, dataEndTime.toEpochMilli());
         }
         if (featureData != null) {

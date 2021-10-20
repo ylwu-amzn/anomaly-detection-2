@@ -86,6 +86,7 @@ public class AnomalyDetector implements Writeable, ToXContentObject {
     public static final String CATEGORY_FIELD = "category_field";
     public static final String USER_FIELD = "user";
     public static final String DETECTOR_TYPE_FIELD = "detector_type";
+    public static final String RESULT_INDEX_PREFIX = "anomaly-result-";
     @Deprecated
     public static final String DETECTION_DATE_RANGE_FIELD = "detection_date_range";
 
@@ -196,6 +197,9 @@ public class AnomalyDetector implements Writeable, ToXContentObject {
         this.user = user;
         this.detectorType = isMultientityDetector(categoryFields) ? MULTI_ENTITY.name() : SINGLE_ENTITY.name();
         this.resultIndex = Strings.trimToNull(resultIndex);
+        if (this.resultIndex != null && !this.resultIndex.startsWith(RESULT_INDEX_PREFIX)) {
+            throw new IllegalArgumentException("Result index must start with prefix " + RESULT_INDEX_PREFIX);
+        }
     }
 
     public AnomalyDetector(StreamInput input) throws IOException {

@@ -1117,7 +1117,7 @@ public class ADBatchTaskRunner {
 
         anomalyResultBulkIndexHandler
             .bulkIndexAnomalyResult(
-                    adTask.getDetector().getResultIndex(),
+                adTask.getDetector().getResultIndex(),
                 anomalyResults,
                 new ThreadedActionListener<>(logger, threadPool, AD_BATCH_TASK_THREAD_POOL_NAME, ActionListener.wrap(r -> {
                     try {

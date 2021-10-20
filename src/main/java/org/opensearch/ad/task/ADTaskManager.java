@@ -108,6 +108,7 @@ import org.opensearch.ad.cluster.HashRing;
 import org.opensearch.ad.common.exception.ADTaskCancelledException;
 import org.opensearch.ad.common.exception.AnomalyDetectionException;
 import org.opensearch.ad.common.exception.DuplicateTaskException;
+import org.opensearch.ad.common.exception.EndRunException;
 import org.opensearch.ad.common.exception.LimitExceededException;
 import org.opensearch.ad.common.exception.ResourceNotFoundException;
 import org.opensearch.ad.constant.CommonValue;
@@ -343,6 +344,7 @@ public class ADTaskManager {
         }, listener);
     }
 
+    // check index mapping
     private void checkWritePermissionAndStartDetector(DetectionDateRange detectionDateRange, IndexAnomalyDetectorJobActionHandler handler, User user, TransportService transportService, ActionListener<AnomalyDetectorJobResponse> listener, Optional<AnomalyDetector> detector, String resultIndex) {
         try {
             AnomalyResult anomalyResult = new AnomalyResult(DUMMY_DETECTOR_ID, Double.NaN, Double.NaN, Double.NaN, null, null, null, null, null, null, null, CommonValue.NO_SCHEMA_VERSION);
@@ -2302,7 +2304,8 @@ public class ADTaskManager {
             adTask.setError(getErrorMessage(exception));
             if (exception instanceof LimitExceededException && isRetryableError(exception.getMessage())) {
                 action = ADTaskAction.PUSH_BACK_ENTITY;
-            } else if (exception instanceof ADTaskCancelledException) {
+            } else if (exception instanceof ADTaskCancelledException || exception instanceof EndRunException) {
+                logger.info("ylwwwwwww ---- action is CANCEL");
                 action = ADTaskAction.CANCEL;
             }
         }

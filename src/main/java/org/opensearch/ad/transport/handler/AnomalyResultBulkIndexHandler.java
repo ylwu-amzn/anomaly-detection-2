@@ -28,7 +28,9 @@ import org.opensearch.action.admin.indices.create.CreateIndexResponse;
 import org.opensearch.action.bulk.BulkRequestBuilder;
 import org.opensearch.action.bulk.BulkResponse;
 import org.opensearch.action.index.IndexRequest;
+import org.opensearch.ad.common.exception.ADTaskCancelledException;
 import org.opensearch.ad.common.exception.AnomalyDetectionException;
+import org.opensearch.ad.common.exception.EndRunException;
 import org.opensearch.ad.common.exception.ResourceNotFoundException;
 import org.opensearch.ad.indices.AnomalyDetectionIndices;
 import org.opensearch.ad.model.AnomalyResult;
@@ -73,6 +75,7 @@ public class AnomalyResultBulkIndexHandler extends AnomalyIndexHandler<AnomalyRe
             listener.onResponse(null);
             return;
         }
+        String detectorId = anomalyResults.get(0).getDetectorId();
         try {
             if (Strings.isNotBlank(resultIndex)) {
                 if (!anomalyDetectionIndices.doesIndexExist(resultIndex)) {
@@ -80,7 +83,7 @@ public class AnomalyResultBulkIndexHandler extends AnomalyIndexHandler<AnomalyRe
                     // job and historical analysis later if it’s deleted. If user delete the custom AD result index, and AD plugin
                     // recreate it, that may bring confusion and may have security leak (for example Admin delete that index as
                     // permission removed from the creator, we should not recreate it again).
-                    listener.onFailure(new ResourceNotFoundException("Can't find index " + resultIndex));
+                    listener.onFailure(new EndRunException(detectorId, "Can't find index " + resultIndex, true));
 //                    anomalyDetectionIndices.initCustomAnomalyResultIndexDirectly(resultIndex, ActionListener.wrap(response -> {
 //                        if (response.isAcknowledged()) {
 //                            bulkSaveDetectorResult(resultIndex, anomalyResults, listener);

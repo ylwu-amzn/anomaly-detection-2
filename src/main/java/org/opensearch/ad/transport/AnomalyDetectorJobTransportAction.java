@@ -118,16 +118,16 @@ public class AnomalyDetectorJobTransportAction extends HandledTransportAction<An
     }
 
     private void executeDetector(
-            ActionListener<AnomalyDetectorJobResponse> listener,
-            String detectorId,
-            DetectionDateRange detectionDateRange,
-            boolean historical,
-            long seqNo,
-            long primaryTerm,
-            String rawPath,
-            TimeValue requestTimeout,
-            User user,
-            ThreadContext.StoredContext context) {
+        ActionListener<AnomalyDetectorJobResponse> listener,
+        String detectorId,
+        DetectionDateRange detectionDateRange,
+        boolean historical,
+        long seqNo,
+        long primaryTerm,
+        String rawPath,
+        TimeValue requestTimeout,
+        User user,
+        ThreadContext.StoredContext context) {
         IndexAnomalyDetectorJobActionHandler handler = new IndexAnomalyDetectorJobActionHandler(
             client,
             listener,

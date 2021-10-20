@@ -11,6 +11,7 @@
 
 package org.opensearch.ad.rest;
 
+import static org.opensearch.ad.util.RestHandlerUtils.RESULT_INDEX;
 import static org.opensearch.ad.util.RestHandlerUtils.getSourceContext;
 import static org.opensearch.common.xcontent.ToXContent.EMPTY_PARAMS;
 import static org.opensearch.common.xcontent.XContentFactory.jsonBuilder;
@@ -19,7 +20,6 @@ import static org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedT
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.logging.log4j.LogManager;
@@ -88,7 +88,7 @@ public abstract class AbstractSearchAction<T extends ToXContentObject> extends B
         searchSourceBuilder.fetchSource(getSourceContext(request));
         searchSourceBuilder.seqNoAndPrimaryTerm(true).version(true);
 
-        String resultIndex = request.param("resultIndex");
+        String resultIndex = request.param(RESULT_INDEX);
         logger.info("ylwudebug ++++++++++++++++++++ result index : {}", resultIndex);
 
         logger.info("ylwudebug ---------- searchSourceBuilder : {}", searchSourceBuilder);
@@ -108,9 +108,11 @@ public abstract class AbstractSearchAction<T extends ToXContentObject> extends B
         return channel -> {
             if (resultIndex == null) {
                 client.execute(actionType, searchRequest, search(channel));
+                return;
             }
             SearchSourceBuilder matchAll = new SearchSourceBuilder().query(new MatchAllQueryBuilder()).size(0);
-            SearchRequest searchCustomIndexRequest = new SearchRequest().source(matchAll).indices(resultIndex);
+            // If user specify result index, we also query default system index to get old AD result.
+            SearchRequest searchCustomIndexRequest = new SearchRequest().source(matchAll).indices(index, resultIndex);
             client.search(searchCustomIndexRequest, ActionListener.wrap(r -> {
                 logger.info("ylwudebug ---------- search result index {}", resultIndex);
                 searchRequest.indices(resultIndex);

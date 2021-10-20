@@ -11,12 +11,8 @@
 
 package org.opensearch.ad.transport;
 
-import static org.opensearch.ad.constant.CommonName.DETECTION_STATE_INDEX;
-import static org.opensearch.ad.model.ADTask.PARENT_TASK_ID_FIELD;
-import static org.opensearch.ad.model.ADTask.STATE_FIELD;
 import static org.opensearch.ad.settings.AnomalyDetectorSettings.INDEX_PRESSURE_HARD_LIMIT;
 import static org.opensearch.ad.settings.AnomalyDetectorSettings.INDEX_PRESSURE_SOFT_LIMIT;
-import static org.opensearch.ad.util.ParseUtils.isNullOrEmpty;
 import static org.opensearch.common.xcontent.XContentFactory.jsonBuilder;
 import static org.opensearch.index.IndexingPressure.MAX_INDEXING_BYTES;
 
@@ -32,17 +28,15 @@ import org.opensearch.ExceptionsHelper;
 import org.opensearch.ResourceAlreadyExistsException;
 import org.opensearch.action.ActionListener;
 import org.opensearch.action.bulk.BulkAction;
-import org.opensearch.action.bulk.BulkItemResponse;
 import org.opensearch.action.bulk.BulkRequest;
 import org.opensearch.action.bulk.BulkResponse;
 import org.opensearch.action.index.IndexRequest;
 import org.opensearch.action.support.ActionFilters;
 import org.opensearch.action.support.HandledTransportAction;
 import org.opensearch.ad.common.exception.EndRunException;
+import org.opensearch.ad.common.exception.ResourceNotFoundException;
 import org.opensearch.ad.constant.CommonName;
 import org.opensearch.ad.indices.AnomalyDetectionIndices;
-import org.opensearch.ad.model.ADTaskState;
-import org.opensearch.ad.model.AnomalyDetectorJob;
 import org.opensearch.ad.model.AnomalyResult;
 import org.opensearch.ad.task.ADTaskManager;
 import org.opensearch.ad.util.BulkUtil;
@@ -53,11 +47,6 @@ import org.opensearch.common.inject.Inject;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.xcontent.XContentBuilder;
 import org.opensearch.index.IndexingPressure;
-import org.opensearch.index.query.BoolQueryBuilder;
-import org.opensearch.index.query.TermQueryBuilder;
-import org.opensearch.index.reindex.UpdateByQueryAction;
-import org.opensearch.index.reindex.UpdateByQueryRequest;
-import org.opensearch.script.Script;
 import org.opensearch.tasks.Task;
 import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.TransportService;
@@ -147,7 +136,8 @@ public class ADResultBulkTransportAction extends HandledTransportAction<ADResult
 
         if (bulkRequest.numberOfActions() > 0) {
             if (!detectionIndices.doesIndexExist(resultIndex)) {
-                try {
+                listener.onFailure(new EndRunException(detectorId, "Can't find result index", true));
+                /*try {
                     String finalResultIndex1 = resultIndex;
                     detectionIndices.initCustomAnomalyResultIndexDirectly(resultIndex, ActionListener.wrap(r -> {
                         LOG.info("-------------------++++++++++---------- 0000000000 recreated result index: {}", finalResultIndex1);
@@ -176,7 +166,7 @@ public class ADResultBulkTransportAction extends HandledTransportAction<ADResult
                 } catch (Exception e) {
                     LOG.warn("-------------------00000000001111111115555555555777777 realtime task failed to stopped: " + detectorId, e);
                     listener.onFailure(e);
-                }
+                }*/
 
 
                 /*if (!adTaskManager.hasRealtimeTaskCache(detectorId)) {

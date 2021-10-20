@@ -12,6 +12,9 @@
 package org.opensearch.ad.rest;
 
 import static org.opensearch.ad.indices.AnomalyDetectionIndices.ALL_AD_RESULTS_INDEX_PATTERN;
+import static org.opensearch.ad.util.RestHandlerUtils.DETECTOR_ID;
+import static org.opensearch.ad.util.RestHandlerUtils.REALTIME_TASK;
+import static org.opensearch.ad.util.RestHandlerUtils.RESULT_INDEX;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.opensearch.ad.AnomalyDetectorPlugin;
@@ -19,6 +22,9 @@ import org.opensearch.ad.model.AnomalyResult;
 import org.opensearch.ad.transport.SearchAnomalyResultAction;
 
 import com.google.common.collect.ImmutableList;
+
+import java.net.URL;
+import java.util.Locale;
 
 /**
  * This class consists of the REST handler to search anomaly results.
@@ -31,7 +37,7 @@ public class RestSearchAnomalyResultAction extends AbstractSearchAction<AnomalyR
 
     public RestSearchAnomalyResultAction() {
         super(
-            ImmutableList.of(),
+            ImmutableList.of(String.format(Locale.ROOT, "%s/{%s}", URL_PATH, RESULT_INDEX)),
             ImmutableList.of(Pair.of(URL_PATH, LEGACY_URL_PATH)),
             ALL_AD_RESULTS_INDEX_PATTERN,
             AnomalyResult.class,

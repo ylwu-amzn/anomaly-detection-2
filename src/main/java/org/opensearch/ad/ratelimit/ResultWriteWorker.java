@@ -130,6 +130,7 @@ public class ResultWriteWorker extends BatchWorker<ResultWriteRequest, ADResultB
             enqueueRetryRequestIteration(adResultBulkResponse.getRetryRequests().get(), 0);
         }, exception -> {
             if (ExceptionUtil.isRetryAble(exception)) {
+                LOG.error("aaaaaaaaaabbbb ---- isRetryAble exception", exception);
                 // retry all of them
                 super.putAll(toProcess);
             } else if (ExceptionUtil.isOverloaded(exception)) {

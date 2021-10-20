@@ -11,8 +11,7 @@
 
 package org.opensearch.ad.transport.handler;
 
-import static org.opensearch.ad.constant.CommonName.AD_RESULT_INDEX_MAPPING_V4;
-import static org.opensearch.ad.constant.CommonName.AD_RESULT_INDEX_MAPPING_V5;
+import static org.opensearch.ad.constant.CommonName.ANOMALY_RESULT_INDEX_ALIAS;
 import static org.opensearch.ad.constant.CommonName.LATEST_AD_RESULT_INDEX_MAPPING;
 import static org.opensearch.common.xcontent.XContentFactory.jsonBuilder;
 
@@ -118,16 +117,21 @@ public class AnomalyIndexHandler<T extends ToXContentObject> {
 //        index(toSave, detectorId, null);
 //    }
 
+//    public void index(T toSave, String detectorId) {
+//        index(toSave, detectorId, null);
+//    }
+
     public void index(T toSave, String detectorId, String customIndexName) {
         if (indexUtils.checkIndicesBlocked(clusterService.state(), ClusterBlockLevel.WRITE, this.indexName)) {
             LOG.warn(String.format(Locale.ROOT, CANNOT_SAVE_ERR_MSG, detectorId));
             return;
         }
-        try {
-            if (customIndexName != null) {
-                LOG.info("ylwudebug3: save to custom index: ------------------------------ {}", customIndexName);
-                if (!anomalyDetectionIndices.doesIndexExist(customIndexName)) {
-                    LOG.info("ylwudebug3: create custom index: ------------------------------++++++++++ {}", customIndexName);
+        if (customIndexName != null) {
+            LOG.info("ylwudebug3: save to custom index: ------------------------------ {}", customIndexName);
+            if (!anomalyDetectionIndices.doesIndexExist(customIndexName)) {
+                LOG.info("ylwudebug3: can't find custom index: ------------------------------++++++++++ {}", customIndexName);
+                throw new EndRunException(detectorId, "Can't find index " + customIndexName, true);
+                    /*LOG.info("ylwudebug3: create custom index: ------------------------------++++++++++ {}", customIndexName);
                     anomalyDetectionIndices.initCustomAnomalyResultIndexDirectly(
                             customIndexName,
                             ActionListener.wrap(initResponse -> onCreateIndexResponse(initResponse, toSave, detectorId, customIndexName), exception -> {
@@ -142,29 +146,33 @@ public class AnomalyIndexHandler<T extends ToXContentObject> {
                                     );
                                 }
                             })
-                    );
-                } else {
-                    save(toSave, detectorId, customIndexName);
-                }
+                    );*/
             } else {
-                if (!anomalyDetectionIndices.doesAnomalyResultIndexExist()) {
-                    anomalyDetectionIndices.initAnomalyResultIndexDirectly(
-                            ActionListener.wrap(initResponse -> onCreateIndexResponse(initResponse, toSave, detectorId, indexName), exception -> {
-                                if (ExceptionsHelper.unwrapCause(exception) instanceof ResourceAlreadyExistsException) {
-                                    // It is possible the index has been created while we sending the create request
-                                    save(toSave, detectorId);
-                                } else {
-                                    throw new AnomalyDetectionException(
-                                            detectorId,
-                                            String.format(Locale.ROOT, "Unexpected error creating index %s", indexName),
-                                            exception
-                                    );
-                                }
-                            })
-                    );
-                } else {
-                    save(toSave, detectorId);
-                }
+                LOG.info("ylwudebug3: save to default system index: ------------------------------");
+                save(toSave, detectorId, customIndexName);
+            }
+            return;
+        }
+        try {
+            if (!anomalyDetectionIndices.doesAnomalyResultIndexExist()) {
+                LOG.info("ylwudebug3: init default system index: ------------------------------ {}", indexName);
+                anomalyDetectionIndices.initAnomalyResultIndexDirectly(
+                        ActionListener.wrap(initResponse -> onCreateIndexResponse(initResponse, toSave, detectorId, indexName), exception -> {
+                            if (ExceptionsHelper.unwrapCause(exception) instanceof ResourceAlreadyExistsException) {
+                                // It is possible the index has been created while we sending the create request
+                                save(toSave, detectorId);
+                            } else {
+                                throw new AnomalyDetectionException(
+                                        detectorId,
+                                        String.format(Locale.ROOT, "Unexpected error creating index %s", indexName),
+                                        exception
+                                );
+                            }
+                        })
+                );
+            } else {
+                LOG.info("ylwudebug3: save to default system index: ------------------------------ {}", indexName);
+                save(toSave, detectorId);
             }
         } catch (Exception e) {
             throw new AnomalyDetectionException(
@@ -194,16 +202,22 @@ public class AnomalyIndexHandler<T extends ToXContentObject> {
     protected void save(T toSave, String detectorId, String indexName) {
         //TODO: check if index mapping matches AD result mapping? Upgrade index mapping to latest version.
         // Check AnomalyDetectionIndices line 737
-        IndexMetadata indexMetadata = clusterService.state().metadata().index(indexName);
+        LOG.info("ylwudebug3: save to ===== index: ------------------------------ {}", indexName);
+        if (!ANOMALY_RESULT_INDEX_ALIAS.equals(indexName)) {
+            // don't check indexmapping,  will get NPE exception if clusterService.state().metadata().index(indexName);
+
+            IndexMetadata indexMetadata = clusterService.state().metadata().index(indexName);
 //        LOG.info("yyyyyyyyyy indexMetadata.mapping() : " + indexMetadata.mapping());
-        Map<String, Object> stringObjectMap = indexMetadata.mapping().sourceAsMap();
+            Map<String, Object> stringObjectMap = indexMetadata.mapping().sourceAsMap();
 //        LOG.info("yyyyyyyyyy2 indexMetadata.mapping() : " + stringObjectMap);
 //        LOG.info("yyyyyyyyyy3 indexMetadata.mapping() : " + stringObjectMap.toString());
 //        LOG.info("yyyyyyyyyy4 equals ad result index mapping : " + stringObjectMap.toString().equals(AD_RESULT_INDEX_MAPPING_V4));
-        if (!LATEST_AD_RESULT_INDEX_MAPPING.equals(stringObjectMap.toString())) {
-            //throw new EndRunException(detectorId, "wrong index mapping of custom AD result index", true);
-            indexName = this.indexName; // write AD result into default AD result index
+            if (!LATEST_AD_RESULT_INDEX_MAPPING.equals(stringObjectMap.toString())) {
+                //throw new EndRunException(detectorId, "wrong index mapping of custom AD result index", true);
+                indexName = this.indexName; // write AD result into default AD result index
+            }
         }
+
         try (XContentBuilder builder = jsonBuilder()) {
             IndexRequest indexRequest = new IndexRequest(indexName).source(toSave.toXContent(builder, RestHandlerUtils.XCONTENT_WITH_TYPE));
             if (fixedDoc) {
