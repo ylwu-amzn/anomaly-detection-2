@@ -24,6 +24,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang.StringUtils;
@@ -232,6 +233,11 @@ public class IndexAnomalyDetectorActionHandler {
             if (!listEqualsWithoutConsideringOrder(existingDetector.getCategoryField(), anomalyDetector.getCategoryField())) {
                 listener
                     .onFailure(new OpenSearchStatusException(CommonErrorMessages.CAN_NOT_CHANGE_CATEGORY_FIELD, RestStatus.BAD_REQUEST));
+                return;
+            }
+            if (!Objects.equals(existingDetector.getResultIndex(), anomalyDetector.getResultIndex())) {
+                listener
+                        .onFailure(new OpenSearchStatusException(CommonErrorMessages.CAN_NOT_CHANGE_RESULT_INDEX, RestStatus.BAD_REQUEST));
                 return;
             }
 

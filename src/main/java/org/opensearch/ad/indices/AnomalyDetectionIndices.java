@@ -11,10 +11,7 @@
 
 package org.opensearch.ad.indices;
 
-import static org.opensearch.ad.constant.CommonName.AD_RESULT_INDEX_MAPPING_V4;
-import static org.opensearch.ad.constant.CommonName.AD_RESULT_INDEX_MAPPING_V5;
-import static org.opensearch.ad.constant.CommonName.LATEST_AD_RESULT_INDEX_MAPPING;
-import static org.opensearch.ad.constant.CommonName.VALID_AD_RESULT_MAPPINGS;
+import static org.opensearch.ad.constant.CommonName.AD_RESULT_FIELD_CONFIGS;
 import static org.opensearch.ad.settings.AnomalyDetectorSettings.AD_RESULT_HISTORY_MAX_DOCS_PER_SHARD;
 import static org.opensearch.ad.settings.AnomalyDetectorSettings.AD_RESULT_HISTORY_RETENTION_PERIOD;
 import static org.opensearch.ad.settings.AnomalyDetectorSettings.AD_RESULT_HISTORY_ROLLOVER_PERIOD;
@@ -33,6 +30,7 @@ import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -432,17 +430,6 @@ public class AnomalyDetectionIndices implements LocalNodeMasterListener {
         adminClient.indices().create(request, markMappingUpToDate(ADIndex.RESULT, actionListener));
     }
 
-    public boolean isCustomResultIndexMappingCorrect(String resultIndex) {
-        IndexMetadata indexMetadata = clusterService.state().metadata().index(resultIndex);
-        logger.info("---------- yyyyyyyyyy indexMetadata.mapping() : " + indexMetadata.mapping());
-        Map<String, Object> stringObjectMap = indexMetadata.mapping().sourceAsMap();
-        logger.info("---------- yyyyyyyyyy2 indexMetadata.mapping() : " + stringObjectMap);
-        logger.info("---------- yyyyyyyyyy3 indexMetadata.mapping() : " + stringObjectMap.toString());
-        boolean valid = VALID_AD_RESULT_MAPPINGS.stream().filter(m -> StringUtils.equals(m, stringObjectMap.toString())).findAny().isPresent();
-        logger.info("---------- yyyyyyyyyy4 equals ad result index mapping : " + valid);
-        return valid;
-    }
-
     public int getADResultIndexSchemaVersion(String mapping) {
         String[] lines = mapping.split("\n");
         for (String line : lines) {
@@ -453,7 +440,12 @@ public class AnomalyDetectionIndices implements LocalNodeMasterListener {
         throw new IllegalArgumentException("Can't find AD result index schema version");
     }
 
-    public void upgradeCustomResultIndexMapping(String resultIndex, ActionListener<AcknowledgedResponse> listener) throws IOException {
+    //TODO: don't upgrade custom result index in case it will break user's logic
+    public void upgradeResultIndexMapping(String resultIndex, ActionListener<AcknowledgedResponse> listener) throws IOException {
+        if (CommonName.ANOMALY_RESULT_INDEX_ALIAS.equals(resultIndex)) {
+            listener.onResponse(new AcknowledgedResponse(true));
+            return;
+        }
         IndexMetadata indexMetadata = clusterService.state().metadata().index(resultIndex);
         Map<String, Object> meta = (Map<String, Object>) indexMetadata.mapping().sourceAsMap().get("_meta");
         int schemaVersion = (int) meta.get("schema_version");
@@ -1031,5 +1023,30 @@ public class AnomalyDetectionIndices implements LocalNodeMasterListener {
             }
         }
         return value;
+    }
+
+    /**
+     * Check if custom result index has correct index mapping.
+     * @param resultIndex result index
+     * @return true if result index mapping is valid
+     */
+    public boolean isValidResultIndex(String resultIndex) {
+        IndexMetadata indexMetadata = clusterService.state().metadata().index(resultIndex);
+        Map<String, Object> indexMapping = indexMetadata.mapping().sourceAsMap();
+        String propertyName = "properties";
+        if (!indexMapping.containsKey(propertyName)) {
+            return false;
+        }
+        LinkedHashMap<String, Object> mapping = (LinkedHashMap<String, Object>)indexMapping.get(propertyName);
+
+        boolean correctResultIndexMappig = true;
+        for (String fieldName : AD_RESULT_FIELD_CONFIGS.keySet()) {
+            String defaultSchema = AD_RESULT_FIELD_CONFIGS.get(fieldName);
+            if (!mapping.containsKey(fieldName) || !defaultSchema.equals(mapping.get(fieldName).toString())) {
+                correctResultIndexMappig = false;
+                break;
+            }
+        }
+        return correctResultIndexMappig;
     }
 }

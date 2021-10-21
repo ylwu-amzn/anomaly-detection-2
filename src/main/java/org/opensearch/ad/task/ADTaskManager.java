@@ -22,7 +22,6 @@ import static org.opensearch.ad.constant.CommonErrorMessages.HC_DETECTOR_TASK_IS
 import static org.opensearch.ad.constant.CommonErrorMessages.NO_ELIGIBLE_NODE_TO_RUN_DETECTOR;
 import static org.opensearch.ad.constant.CommonName.DETECTION_STATE_INDEX;
 import static org.opensearch.ad.constant.CommonName.DUMMY_AD_RESULT_ID;
-import static org.opensearch.ad.constant.CommonName.DUMMY_DETECTOR_ID;
 import static org.opensearch.ad.indices.AnomalyDetectionIndices.ALL_AD_RESULTS_INDEX_PATTERN;
 import static org.opensearch.ad.model.ADTask.COORDINATING_NODE_FIELD;
 import static org.opensearch.ad.model.ADTask.DETECTOR_ID_FIELD;
@@ -66,15 +65,7 @@ import static org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedT
 import java.io.IOException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Semaphore;
 import java.util.function.BiConsumer;
@@ -111,7 +102,6 @@ import org.opensearch.ad.common.exception.DuplicateTaskException;
 import org.opensearch.ad.common.exception.EndRunException;
 import org.opensearch.ad.common.exception.LimitExceededException;
 import org.opensearch.ad.common.exception.ResourceNotFoundException;
-import org.opensearch.ad.constant.CommonValue;
 import org.opensearch.ad.indices.AnomalyDetectionIndices;
 import org.opensearch.ad.model.ADEntityTaskProfile;
 import org.opensearch.ad.model.ADTask;
@@ -295,6 +285,7 @@ public class ADTaskManager {
         ThreadContext.StoredContext context,
         ActionListener<AnomalyDetectorJobResponse> listener
     ) {
+        detectionIndices.update();
         getDetector(detectorId, (detector) -> {
             if (!detector.isPresent()) {
                 listener.onFailure(new OpenSearchStatusException(FAIL_TO_FIND_DETECTOR_MSG + detectorId, RestStatus.NOT_FOUND));
@@ -306,7 +297,6 @@ public class ADTaskManager {
                     String resultIndex = detector.get().getResultIndex();
                     if (!detectionIndices.doesIndexExist(resultIndex)) {
                         try {
-                            //TODO: For realtime job, if the custom result index deleted/not found, we should stop realtime job, single-entity can stop now, need to support HC
                             detectionIndices.initCustomAnomalyResultIndexDirectly(resultIndex, ActionListener.wrap(r -> {
                                 if (r.isAcknowledged()) {
                                     checkWritePermissionAndStartDetector(detectionDateRange, handler, user, transportService, listener, detector, resultIndex);
@@ -316,7 +306,7 @@ public class ADTaskManager {
                                     listener.onFailure(new AnomalyDetectionException(error));
                                 }
                             }, e-> {
-                                logger.error("------------ ylwudebug1: Failed to create custom AD result index "+resultIndex, e);
+                                logger.error("Failed to create custom AD result index " + resultIndex, e);
                                 if (ExceptionsHelper.unwrapCause(e) instanceof ResourceAlreadyExistsException) {
                                     checkWritePermissionAndStartDetector(detectionDateRange, handler, user, transportService, listener, detector, resultIndex);
                                 } else {
@@ -333,28 +323,35 @@ public class ADTaskManager {
                 } else {
                     startRealtimeOrHistoricalDetection(detectionDateRange, handler, user, transportService, listener, detector);
                 }
-//                if (detectionDateRange == null) {
-//                    // start realtime job
-//                    handler.startAnomalyDetectorJob(detector.get());
-//                } else {
-//                    // start historical analysis task
-//                    forwardApplyForTaskSlotsRequestToLeadNode(detector.get(), detectionDateRange, user, transportService, listener);
-//                }
             }
         }, listener);
     }
 
-    // check index mapping
     private void checkWritePermissionAndStartDetector(DetectionDateRange detectionDateRange, IndexAnomalyDetectorJobActionHandler handler, User user, TransportService transportService, ActionListener<AnomalyDetectorJobResponse> listener, Optional<AnomalyDetector> detector, String resultIndex) {
         try {
-            AnomalyResult anomalyResult = new AnomalyResult(DUMMY_DETECTOR_ID, Double.NaN, Double.NaN, Double.NaN, null, null, null, null, null, null, null, CommonValue.NO_SCHEMA_VERSION);
-            IndexRequest indexRequest = new IndexRequest(resultIndex).id(DUMMY_AD_RESULT_ID).source(anomalyResult.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS));
-            client.index(indexRequest, ActionListener.wrap(response -> {
-                logger.info("ylwudebug2: write result status for start detector is : {}", response.getResult());
-                startRealtimeOrHistoricalDetection(detectionDateRange, handler, user, transportService, listener, detector);
-            }, exception -> {
-                logger.error("ylwudebug2: Failed to write custom AD result index when start detectorm " + resultIndex, exception);
-                listener.onFailure(exception);
+            if (!detectionIndices.isValidResultIndex(resultIndex)) {
+                listener.onFailure(new EndRunException("Result index schema can't match", true));
+                return;
+            }
+            detectionIndices.upgradeResultIndexMapping(resultIndex, ActionListener.wrap(r -> {
+                AnomalyResult dummyResult = AnomalyResult.getDummyResult();
+                IndexRequest indexRequest = new IndexRequest(resultIndex).id(DUMMY_AD_RESULT_ID).source(dummyResult.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS));
+                client.index(indexRequest, ActionListener.wrap(response -> {
+                    logger.info("ylwudebug2: write result status for start detector is : {}", response.getResult());
+                    client.delete(new DeleteRequest(resultIndex).id(DUMMY_AD_RESULT_ID), ActionListener.wrap(deleteResponse -> {
+                        startRealtimeOrHistoricalDetection(detectionDateRange, handler, user, transportService, listener, detector);
+                    }, ex -> {
+                        logger.error("Failed to delete dummy AD result when start detector", ex);
+                        listener.onFailure(ex);
+                    }));
+
+                }, exception -> {
+                    logger.error("ylwudebug2: Failed to write custom AD result index when start detectorm " + resultIndex, exception);
+                    listener.onFailure(exception);
+                }));
+            }, e->{
+                logger.error("Failed to upgrade custom result index");
+                listener.onFailure(e);
             }));
         } catch (IOException e) {
             logger.error("Failed to index result", e);
@@ -363,7 +360,7 @@ public class ADTaskManager {
     }
 
     private void startRealtimeOrHistoricalDetection(DetectionDateRange detectionDateRange, IndexAnomalyDetectorJobActionHandler handler, User user, TransportService transportService, ActionListener<AnomalyDetectorJobResponse> listener, Optional<AnomalyDetector> detector) {
-        try (ThreadContext.StoredContext threadContext = client.threadPool().getThreadContext().stashContext()) {
+        try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
             if (detectionDateRange == null) {
                 // start realtime job
                 handler.startAnomalyDetectorJob(detector.get());

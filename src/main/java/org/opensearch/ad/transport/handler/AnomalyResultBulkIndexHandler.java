@@ -11,6 +11,7 @@
 
 package org.opensearch.ad.transport.handler;
 
+import static org.opensearch.ad.constant.CommonErrorMessages.CAN_NOT_FIND_RESULT_INDEX;
 import static org.opensearch.ad.constant.CommonName.ANOMALY_RESULT_INDEX_ALIAS;
 import static org.opensearch.common.xcontent.XContentFactory.jsonBuilder;
 
@@ -83,7 +84,7 @@ public class AnomalyResultBulkIndexHandler extends AnomalyIndexHandler<AnomalyRe
                     // job and historical analysis later if it’s deleted. If user delete the custom AD result index, and AD plugin
                     // recreate it, that may bring confusion and may have security leak (for example Admin delete that index as
                     // permission removed from the creator, we should not recreate it again).
-                    listener.onFailure(new EndRunException(detectorId, "Can't find index " + resultIndex, true));
+                    listener.onFailure(new EndRunException(detectorId, CAN_NOT_FIND_RESULT_INDEX + resultIndex, true));
 //                    anomalyDetectionIndices.initCustomAnomalyResultIndexDirectly(resultIndex, ActionListener.wrap(response -> {
 //                        if (response.isAcknowledged()) {
 //                            bulkSaveDetectorResult(resultIndex, anomalyResults, listener);
@@ -139,7 +140,7 @@ public class AnomalyResultBulkIndexHandler extends AnomalyIndexHandler<AnomalyRe
     }
 
     private void bulkSaveDetectorResult(String resultIndex, List<AnomalyResult> anomalyResults, ActionListener<BulkResponse> listener) {
-        LOG.debug("Start to bulk save {} anomaly results", anomalyResults.size());
+        LOG.info("Start to bulk save {} anomaly results", anomalyResults.size());
         BulkRequestBuilder bulkRequestBuilder = client.prepareBulk();
         anomalyResults.forEach(anomalyResult -> {
             try (XContentBuilder builder = jsonBuilder()) {
@@ -153,7 +154,7 @@ public class AnomalyResultBulkIndexHandler extends AnomalyIndexHandler<AnomalyRe
             }
         });
         client.bulk(bulkRequestBuilder.request(), ActionListener.wrap(r -> {
-            LOG.debug("bulk index AD result successfully, took: {}", r.getTook().duration());
+            LOG.info("bulk index AD result successfully, took: {}", r.getTook().duration());
             listener.onResponse(r);
         }, e -> {
             LOG.error("bulk index ad result failed", e);

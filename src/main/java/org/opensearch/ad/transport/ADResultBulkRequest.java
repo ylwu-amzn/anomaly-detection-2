@@ -40,9 +40,7 @@ public class ADResultBulkRequest extends ActionRequest implements Writeable {
         for (int i = 0; i < size; i++) {
             anomalyResults.add(new AnomalyResult(in));
         }
-        if (in.available() > 0) {
-            this.resultIndex = in.readOptionalString();
-        }
+        this.resultIndex = in.readOptionalString();
     }
 
     @Override

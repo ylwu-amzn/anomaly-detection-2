@@ -11,6 +11,7 @@
 
 package org.opensearch.ad.model;
 
+import static org.opensearch.ad.constant.CommonName.DUMMY_DETECTOR_ID;
 import static org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken;
 
 import java.io.IOException;
@@ -50,12 +51,12 @@ public class AnomalyResult implements ToXContentObject, Writeable {
 
     public static final String DETECTOR_ID_FIELD = "detector_id";
     public static final String ANOMALY_SCORE_FIELD = "anomaly_score";
-    private static final String ANOMALY_GRADE_FIELD = "anomaly_grade";
-    private static final String CONFIDENCE_FIELD = "confidence";
-    private static final String FEATURE_DATA_FIELD = "feature_data";
-    private static final String DATA_START_TIME_FIELD = "data_start_time";
+    public static final String ANOMALY_GRADE_FIELD = "anomaly_grade";
+    public static final String CONFIDENCE_FIELD = "confidence";
+    public static final String FEATURE_DATA_FIELD = "feature_data";
+    public static final String DATA_START_TIME_FIELD = "data_start_time";
     public static final String DATA_END_TIME_FIELD = "data_end_time";
-    private static final String EXECUTION_START_TIME_FIELD = "execution_start_time";
+    public static final String EXECUTION_START_TIME_FIELD = "execution_start_time";
     public static final String EXECUTION_END_TIME_FIELD = "execution_end_time";
     public static final String ERROR_FIELD = "error";
     public static final String ENTITY_FIELD = "entity";
@@ -521,5 +522,9 @@ public class AnomalyResult implements ToXContentObject, Writeable {
         out.writeInt(schemaVersion);
         out.writeOptionalString(taskId);
         out.writeOptionalString(modelId);
+    }
+
+    public static AnomalyResult getDummyResult() {
+        return new AnomalyResult(DUMMY_DETECTOR_ID, Double.NaN, Double.NaN, Double.NaN, null, null, null, null, null, null, null, CommonValue.NO_SCHEMA_VERSION);
     }
 }

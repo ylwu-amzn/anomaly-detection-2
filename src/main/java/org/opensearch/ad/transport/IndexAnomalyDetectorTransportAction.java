@@ -187,13 +187,24 @@ public class IndexAnomalyDetectorTransportAction extends HandledTransportAction<
                             }
                         }));
                     } else {
+                        if (!anomalyDetectionIndices.isValidResultIndex(resultIndex)) {
+                            LOG.warn("Can't create detector with custom result index {} as its mapping is invalid", resultIndex);
+                            listener.onFailure(new IllegalArgumentException("Invalid result index: " + resultIndex));
+                            return;
+                        }
                         //TODO: check if user has write permission on the resultIndex
 //                        DeleteRequest deleteRequest = new DeleteRequest(resultIndex, testId);
-                        AnomalyResult anomalyResult = new AnomalyResult(DUMMY_DETECTOR_ID, Double.NaN, Double.NaN, Double.NaN, null, null, null, null, null, null, null, CommonValue.NO_SCHEMA_VERSION);
-                        IndexRequest indexRequest = new IndexRequest(resultIndex).id(DUMMY_AD_RESULT_ID).source(anomalyResult.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS));
+                        // AnomalyResult anomalyResult = new AnomalyResult(DUMMY_DETECTOR_ID, Double.NaN, Double.NaN, Double.NaN, null, null, null, null, null, null, null, CommonValue.NO_SCHEMA_VERSION);
+                        AnomalyResult dummyResult = AnomalyResult.getDummyResult();
+                        IndexRequest indexRequest = new IndexRequest(resultIndex).id(DUMMY_AD_RESULT_ID).source(dummyResult.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS));
                         client.index(indexRequest, ActionListener.wrap(response -> {
                             LOG.info("ylwudebug1: result status is : {}", response.getResult());
-                            indexDetector(user, currentDetector, listener, detectorId, seqNo, primaryTerm, refreshPolicy, detector, method, requestTimeout, maxSingleEntityAnomalyDetectors, maxMultiEntityAnomalyDetectors, maxAnomalyFeatures);
+                            client.delete(new DeleteRequest(resultIndex).id(DUMMY_AD_RESULT_ID), ActionListener.wrap(deleteResponse -> {
+                                indexDetector(user, currentDetector, listener, detectorId, seqNo, primaryTerm, refreshPolicy, detector, method, requestTimeout, maxSingleEntityAnomalyDetectors, maxMultiEntityAnomalyDetectors, maxAnomalyFeatures);
+                            }, ex -> {
+                                LOG.error("Failed to delete dummy AD result when create detector", ex);
+                                listener.onFailure(ex);
+                            }));
                         }, exception -> {
                             LOG.error("ylwudebug1: Failed to write custom AD result index " + resultIndex, exception);
                             listener.onFailure(exception);

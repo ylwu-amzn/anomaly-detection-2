@@ -11,10 +11,13 @@
 
 package org.opensearch.ad.constant;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import org.opensearch.ad.stats.StatNames;
 
 import java.util.Set;
+
+import static org.opensearch.ad.model.AnomalyResult.*;
 
 public class CommonName {
     // ======================================
@@ -140,26 +143,42 @@ public class CommonName {
     public static final String DUMMY_AD_RESULT_ID = "dummy_ad_result_id";
     public static final String DUMMY_DETECTOR_ID = "dummy_detector_id";
     //TODO: change to check each filed
-    public static final String AD_RESULT_INDEX_MAPPING_V4 = "{dynamic=false, _meta={schema_version=4}, properties={anomaly_grade={type=double}, " +
-            "anomaly_score={type=double}, confidence={type=double}, data_end_time={type=date, format=strict_date_time||epoch_millis}, " +
-            "data_start_time={type=date, format=strict_date_time||epoch_millis}, detector_id={type=keyword}, entity={type=nested, " +
-            "properties={name={type=keyword}, value={type=keyword}}}, error={type=text}, execution_end_time={type=date, " +
-            "format=strict_date_time||epoch_millis}, execution_start_time={type=date, format=strict_date_time||epoch_millis}, " +
-            "feature_data={type=nested, properties={data={type=double}, feature_id={type=keyword}}}, is_anomaly={type=boolean}, " +
-            "model_id={type=keyword}, schema_version={type=integer}, task_id={type=keyword}, user={type=nested, " +
-            "properties={backend_roles={type=text, fields={keyword={type=keyword}}}, custom_attribute_names={type=text, " +
-            "fields={keyword={type=keyword}}}, name={type=text, fields={keyword={type=keyword, ignore_above=256}}}, roles={type=text, " +
-            "fields={keyword={type=keyword}}}}}}}";
-    public static final String AD_RESULT_INDEX_MAPPING_V5 = "{dynamic=false, _meta={schema_version=5}, properties={anomaly_grade={type=double}, anomaly_grade22={type=double}, " +
-            "anomaly_score={type=double}, confidence={type=double}, data_end_time={type=date, format=strict_date_time||epoch_millis}, " +
-            "data_start_time={type=date, format=strict_date_time||epoch_millis}, detector_id={type=keyword}, entity={type=nested, " +
-            "properties={name={type=keyword}, value={type=keyword}}}, error={type=text}, execution_end_time={type=date, " +
-            "format=strict_date_time||epoch_millis}, execution_start_time={type=date, format=strict_date_time||epoch_millis}, " +
-            "feature_data={type=nested, properties={data={type=double}, feature_id={type=keyword}}}, is_anomaly={type=boolean}, " +
-            "model_id={type=keyword}, schema_version={type=integer}, task_id={type=keyword}, user={type=nested, " +
-            "properties={backend_roles={type=text, fields={keyword={type=keyword}}}, custom_attribute_names={type=text, " +
-            "fields={keyword={type=keyword}}}, name={type=text, fields={keyword={type=keyword, ignore_above=256}}}, roles={type=text, " +
-            "fields={keyword={type=keyword}}}}}}}";
-    public static final Set<String> VALID_AD_RESULT_MAPPINGS = ImmutableSet.of(AD_RESULT_INDEX_MAPPING_V4, AD_RESULT_INDEX_MAPPING_V5);
-    public static final String LATEST_AD_RESULT_INDEX_MAPPING = AD_RESULT_INDEX_MAPPING_V5;
+//    public static final String AD_RESULT_INDEX_MAPPING_V4 = "{dynamic=false, _meta={schema_version=4}, properties={anomaly_grade={type=double}, " +
+//            "anomaly_score={type=double}, confidence={type=double}, data_end_time={type=date, format=strict_date_time||epoch_millis}, " +
+//            "data_start_time={type=date, format=strict_date_time||epoch_millis}, detector_id={type=keyword}, entity={type=nested, " +
+//            "properties={name={type=keyword}, value={type=keyword}}}, error={type=text}, execution_end_time={type=date, " +
+//            "format=strict_date_time||epoch_millis}, execution_start_time={type=date, format=strict_date_time||epoch_millis}, " +
+//            "feature_data={type=nested, properties={data={type=double}, feature_id={type=keyword}}}, is_anomaly={type=boolean}, " +
+//            "model_id={type=keyword}, schema_version={type=integer}, task_id={type=keyword}, user={type=nested, " +
+//            "properties={backend_roles={type=text, fields={keyword={type=keyword}}}, custom_attribute_names={type=text, " +
+//            "fields={keyword={type=keyword}}}, name={type=text, fields={keyword={type=keyword, ignore_above=256}}}, roles={type=text, " +
+//            "fields={keyword={type=keyword}}}}}}}";
+//    public static final String AD_RESULT_INDEX_MAPPING_V5 = "{dynamic=false, _meta={schema_version=5}, properties={anomaly_grade={type=double}, anomaly_grade22={type=double}, " +
+//            "anomaly_score={type=double}, confidence={type=double}, data_end_time={type=date, format=strict_date_time||epoch_millis}, " +
+//            "data_start_time={type=date, format=strict_date_time||epoch_millis}, detector_id={type=keyword}, entity={type=nested, " +
+//            "properties={name={type=keyword}, value={type=keyword}}}, error={type=text}, execution_end_time={type=date, " +
+//            "format=strict_date_time||epoch_millis}, execution_start_time={type=date, format=strict_date_time||epoch_millis}, " +
+//            "feature_data={type=nested, properties={data={type=double}, feature_id={type=keyword}}}, is_anomaly={type=boolean}, " +
+//            "model_id={type=keyword}, schema_version={type=integer}, task_id={type=keyword}, user={type=nested, " +
+//            "properties={backend_roles={type=text, fields={keyword={type=keyword}}}, custom_attribute_names={type=text, " +
+//            "fields={keyword={type=keyword}}}, name={type=text, fields={keyword={type=keyword, ignore_above=256}}}, roles={type=text, " +
+//            "fields={keyword={type=keyword}}}}}}}";
+//    public static final Set<String> VALID_AD_RESULT_MAPPINGS = ImmutableSet.of(AD_RESULT_INDEX_MAPPING_V4, AD_RESULT_INDEX_MAPPING_V5);
+//    public static final String LATEST_AD_RESULT_INDEX_MAPPING = AD_RESULT_INDEX_MAPPING_V5;
+    public static final ImmutableMap<String, String> AD_RESULT_FIELD_CONFIGS = ImmutableMap
+            .<String, String>builder()
+            .put(ANOMALY_GRADE_FIELD, "{type=double}")
+            .put(ANOMALY_SCORE_FIELD, "{type=double}")
+            .put(CONFIDENCE_FIELD, "{type=double}")
+            .put(DATA_START_TIME_FIELD, "{type=date, format=strict_date_time||epoch_millis}")
+            .put(DATA_END_TIME_FIELD, "{type=date, format=strict_date_time||epoch_millis}")
+            .put(DETECTOR_ID_FIELD, "{type=keyword}")
+            .put(EXECUTION_START_TIME_FIELD, "{type=date, format=strict_date_time||epoch_millis}")
+            .put(FEATURE_DATA_FIELD, "{type=nested, properties={data={type=double}, feature_id={type=keyword}}}")
+            .put("is_anomaly", "{type=boolean}")
+            .put(MODEL_ID_FIELD, "{type=keyword}")
+            .put(SCHEMA_VERSION_FIELD, "{type=integer}")
+            .put(TASK_ID_FIELD, "{type=keyword}")
+            .put(USER_FIELD, "{type=nested, properties={backend_roles={type=text, fields={keyword={type=keyword}}}, custom_attribute_names={type=text, fields={keyword={type=keyword}}}, name={type=text, fields={keyword={type=keyword, ignore_above=256}}}, roles={type=text, fields={keyword={type=keyword}}}}}")
+            .build();
 }

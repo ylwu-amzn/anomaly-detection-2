@@ -15,6 +15,8 @@ import static org.opensearch.action.DocWriteResponse.Result.CREATED;
 import static org.opensearch.action.DocWriteResponse.Result.UPDATED;
 import static org.opensearch.ad.AnomalyDetectorPlugin.AD_THREAD_POOL_NAME;
 import static org.opensearch.ad.constant.CommonErrorMessages.CAN_NOT_FIND_LATEST_TASK;
+import static org.opensearch.ad.constant.CommonErrorMessages.CAN_NOT_FIND_RESULT_INDEX;
+import static org.opensearch.ad.constant.CommonName.DUMMY_AD_RESULT_ID;
 import static org.opensearch.ad.util.RestHandlerUtils.XCONTENT_WITH_TYPE;
 import static org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken;
 
@@ -31,6 +33,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.message.ParameterizedMessage;
 import org.opensearch.action.ActionListener;
+import org.opensearch.action.delete.DeleteRequest;
 import org.opensearch.action.get.GetRequest;
 import org.opensearch.action.get.GetResponse;
 import org.opensearch.action.index.IndexRequest;
@@ -39,7 +42,6 @@ import org.opensearch.ad.common.exception.AnomalyDetectionException;
 import org.opensearch.ad.common.exception.EndRunException;
 import org.opensearch.ad.common.exception.InternalFailure;
 import org.opensearch.ad.common.exception.ResourceNotFoundException;
-import org.opensearch.ad.constant.CommonName;
 import org.opensearch.ad.indices.ADIndex;
 import org.opensearch.ad.indices.AnomalyDetectionIndices;
 import org.opensearch.ad.model.ADTaskState;
@@ -64,6 +66,7 @@ import org.opensearch.cluster.node.DiscoveryNode;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.xcontent.LoggingDeprecationHandler;
 import org.opensearch.common.xcontent.NamedXContentRegistry;
+import org.opensearch.common.xcontent.ToXContent;
 import org.opensearch.common.xcontent.XContentBuilder;
 import org.opensearch.common.xcontent.XContentParser;
 import org.opensearch.common.xcontent.XContentType;
@@ -227,24 +230,18 @@ public class AnomalyDetectorJobRunner implements ScheduledJobRunner {
             Exception resultIndexException = null;
             if (!indexUtil.doesIndexExist(resultIndex)) {
                 log.info("---------- yyyyyyyyyy5555 result index doesn't exist : " + resultIndex);
-                resultIndexException = new EndRunException(detectorId, "Can't find result index", true);
-            } else if (!indexUtil.isCustomResultIndexMappingCorrect(resultIndex)) {
+                resultIndexException = new EndRunException(detectorId, CAN_NOT_FIND_RESULT_INDEX + resultIndex, true);
+            } else if (!indexUtil.isValidResultIndex(resultIndex)) {
                 log.info("---------- yyyyyyyyyy5555 wrong result index mapping : " + resultIndex);
                 resultIndexException = new EndRunException(detectorId, "Result index mapping is not correct", true);
             }
-//            if (!indexUtil.doesIndexExist(resultIndex)) {
-//                log.info("---------- yyyyyyyyyy5555 result index doesn't exist : " + resultIndex);
-//                resultIndexException = new EndRunException(detectorId, "Can't find result index", true);
-//            } else if (!indexUtil.isCustomResultIndexMappingCorrect(resultIndex)) {
-//                log.info("---------- yyyyyyyyyy5555 wrong result index mapping : " + resultIndex);
-//                resultIndexException = new EndRunException(detectorId, "Result index mapping is not correct", true);
-//            }
+
             if (resultIndexException != null) {
                 handleAdException(jobParameter, lockService, lock, detectionStartTime, executionStartTime, resultIndexException);
                 return;
             }
             try {
-                indexUtil.upgradeCustomResultIndexMapping(resultIndex,
+                indexUtil.upgradeResultIndexMapping(resultIndex,
                         ActionListener.wrap(putMappingResponse -> {
                             if (putMappingResponse.isAcknowledged()) {
                                 log.info(new ParameterizedMessage("---------- yyyyyyyyyy6 Succeeded in updating [{}]'s mapping", resultIndex));
@@ -292,25 +289,44 @@ public class AnomalyDetectorJobRunner implements ScheduledJobRunner {
             // Injecting user role to verify if the user has permissions for our API.
             injectSecurity.inject(user, roles);
 
-            AnomalyResultRequest request = new AnomalyResultRequest(
-                detectorId,
-                detectionStartTime.toEpochMilli(),
-                executionStartTime.toEpochMilli()
-            );
-            client
-                .execute(
-                    AnomalyResultAction.INSTANCE,
-                    request,
-                    ActionListener
-                        .wrap(
-                            response -> {
-                                indexAnomalyResult(jobParameter, lockService, lock, detectionStartTime, executionStartTime, response);
-                            },
-                            exception -> {
-                                handleAdException(jobParameter, lockService, lock, detectionStartTime, executionStartTime, exception);
-                            }
-                        )
-                );
+            String resultIndex = jobParameter.getResultIndex();
+            AnomalyResult dummyResult = AnomalyResult.getDummyResult();
+            IndexRequest indexRequest = new IndexRequest(resultIndex).id(DUMMY_AD_RESULT_ID).source(dummyResult.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS));
+
+            //TODO: abstract common function to reuse in task runner
+            client.index(indexRequest, ActionListener.wrap(indexResponse -> {
+                log.info("ylwudebug2: write result status for start detector is : {}", indexResponse.getResult());
+                client.delete(new DeleteRequest(resultIndex).id(DUMMY_AD_RESULT_ID), ActionListener.wrap(deleteResponse -> {
+                    AnomalyResultRequest request = new AnomalyResultRequest(
+                            detectorId,
+                            detectionStartTime.toEpochMilli(),
+                            executionStartTime.toEpochMilli()
+                    );
+                    client
+                            .execute(
+                                    AnomalyResultAction.INSTANCE,
+                                    request,
+                                    ActionListener
+                                            .wrap(
+                                                    response -> {
+                                                        indexAnomalyResult(jobParameter, lockService, lock, detectionStartTime, executionStartTime, response);
+                                                    },
+                                                    exception -> {
+                                                        handleAdException(jobParameter, lockService, lock, detectionStartTime, executionStartTime, exception);
+                                                    }
+                                            )
+                            );
+                }, ex -> {
+                    log.error("Failed to delete dummy AD result when start detector", ex);
+                    handleAdException(jobParameter, lockService, lock, detectionStartTime, executionStartTime, ex);
+                }));
+            }, exception -> {
+                log.error("ylwudebug2: Failed to write custom AD result index when start detectorm " + resultIndex, exception);
+                //TODO: only stop job if it's caused by security exception
+                handleAdException(jobParameter, lockService, lock, detectionStartTime, executionStartTime, exception);
+            }));
+
+
         } catch (Exception e) {
             indexAnomalyResultException(jobParameter, lockService, lock, detectionStartTime, executionStartTime, e, true);
             log.error("Failed to execute AD job " + detectorId, e);
@@ -551,7 +567,7 @@ public class AnomalyDetectorJobRunner implements ScheduledJobRunner {
             );
             String resultIndex = jobParameter.getResultIndex();
 //            if (resultIndex != null && !indexUtil.doesIndexExist(resultIndex)) {
-//                Exception e = new EndRunException(detectorId, "Can't find index " + resultIndex, true);
+//                Exception e = new EndRunException(detectorId, CAN_NOT_FIND_RESULT_INDEX + resultIndex, true);
 //                handleAdException(jobParameter, lockService, lock, detectionStartTime, executionStartTime, e);
 //                return;
 //            }

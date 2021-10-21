@@ -11,6 +11,7 @@
 
 package org.opensearch.ad.rest;
 
+import static org.opensearch.ad.rest.RestSearchAnomalyResultAction.SEARCH_ANOMALY_RESULT_ACTION;
 import static org.opensearch.ad.util.RestHandlerUtils.RESULT_INDEX;
 import static org.opensearch.ad.util.RestHandlerUtils.getSourceContext;
 import static org.opensearch.common.xcontent.ToXContent.EMPTY_PARAMS;
@@ -87,34 +88,20 @@ public abstract class AbstractSearchAction<T extends ToXContentObject> extends B
         searchSourceBuilder.parseXContent(request.contentOrSourceParamParser());
         searchSourceBuilder.fetchSource(getSourceContext(request));
         searchSourceBuilder.seqNoAndPrimaryTerm(true).version(true);
-
-        String resultIndex = request.param(RESULT_INDEX);
-        logger.info("ylwudebug ++++++++++++++++++++ result index : {}", resultIndex);
-
-        logger.info("ylwudebug ---------- searchSourceBuilder : {}", searchSourceBuilder);
-        QueryBuilder query = searchSourceBuilder.query();
-
-        if (query != null && query instanceof BoolQueryBuilder) {
-            logger.info("ylwudebug ----------++++++++++ BoolQuery : {}, query class: {}", query, query.getClass());
-        }
-        if (query != null) {
-            logger.info("ylwudebug ---------- query : {}, query class: {}", query, query.getClass());
-        } else {
-            logger.info("ylwudebug ---------- query is null");
-        }
-
         SearchRequest searchRequest = new SearchRequest().source(searchSourceBuilder).indices(this.index);
 
+        String resultIndex = SEARCH_ANOMALY_RESULT_ACTION.equals(getName())? request.param(RESULT_INDEX) : null;
         return channel -> {
+            logger.info("+++++++++++++++++++++++++++++ result index: {}", resultIndex);
             if (resultIndex == null) {
                 client.execute(actionType, searchRequest, search(channel));
                 return;
             }
             SearchSourceBuilder matchAll = new SearchSourceBuilder().query(new MatchAllQueryBuilder()).size(0);
             // If user specify result index, we also query default system index to get old AD result.
-            SearchRequest searchCustomIndexRequest = new SearchRequest().source(matchAll).indices(index, resultIndex);
+            SearchRequest searchCustomIndexRequest = new SearchRequest().source(matchAll).indices(resultIndex);
             client.search(searchCustomIndexRequest, ActionListener.wrap(r -> {
-                logger.info("ylwudebug ---------- search result index {}", resultIndex);
+                // searchRequest.indices(resultIndex, index);
                 searchRequest.indices(resultIndex);
                 client.execute(actionType, searchRequest, search(channel));
             }, e-> {

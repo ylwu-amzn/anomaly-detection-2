@@ -28,6 +28,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.core.util.Throwables;
 import org.apache.logging.log4j.message.ParameterizedMessage;
+import org.apache.logging.log4j.util.Strings;
 import org.opensearch.OpenSearchStatusException;
 import org.opensearch.action.ActionListener;
 import org.opensearch.action.get.GetRequest;
@@ -479,7 +480,7 @@ public class AnomalyDetectorProfileRunner extends AbstractProfileRunner {
         long totalUpdates,
         MultiResponsesDelegateActionListener<DetectorProfile> listener
     ) {
-        SearchRequest searchLatestResult = createInittedEverRequest(detector.getDetectorId(), enabledTime);
+        SearchRequest searchLatestResult = createInittedEverRequest(detector.getDetectorId(), enabledTime, detector.getResultIndex());
         client.search(searchLatestResult, onInittedEver(enabledTime, profile, profilesToCollect, detector, totalUpdates, listener));
     }
 
@@ -610,7 +611,7 @@ public class AnomalyDetectorProfileRunner extends AbstractProfileRunner {
      * @param enabledTime the time when AD job is enabled in milliseconds
      * @return the search request
      */
-    private SearchRequest createInittedEverRequest(String detectorId, long enabledTime) {
+    private SearchRequest createInittedEverRequest(String detectorId, long enabledTime, String resultIndex) {
         BoolQueryBuilder filterQuery = new BoolQueryBuilder();
         filterQuery.filter(QueryBuilders.termQuery(AnomalyResult.DETECTOR_ID_FIELD, detectorId));
         filterQuery.filter(QueryBuilders.rangeQuery(AnomalyResult.EXECUTION_END_TIME_FIELD).gte(enabledTime));
@@ -620,6 +621,9 @@ public class AnomalyDetectorProfileRunner extends AbstractProfileRunner {
 
         SearchRequest request = new SearchRequest(CommonName.ANOMALY_RESULT_INDEX_ALIAS);
         request.source(source);
+        if (Strings.isNotBlank(resultIndex)) {
+            request.indices(resultIndex);
+        }
         return request;
     }
 }

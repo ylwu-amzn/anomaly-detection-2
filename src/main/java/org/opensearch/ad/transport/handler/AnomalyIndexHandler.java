@@ -11,13 +11,12 @@
 
 package org.opensearch.ad.transport.handler;
 
+import static org.opensearch.ad.constant.CommonErrorMessages.CAN_NOT_FIND_RESULT_INDEX;
 import static org.opensearch.ad.constant.CommonName.ANOMALY_RESULT_INDEX_ALIAS;
-import static org.opensearch.ad.constant.CommonName.LATEST_AD_RESULT_INDEX_MAPPING;
 import static org.opensearch.common.xcontent.XContentFactory.jsonBuilder;
 
 import java.util.Iterator;
 import java.util.Locale;
-import java.util.Map;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -130,7 +129,7 @@ public class AnomalyIndexHandler<T extends ToXContentObject> {
             LOG.info("ylwudebug3: save to custom index: ------------------------------ {}", customIndexName);
             if (!anomalyDetectionIndices.doesIndexExist(customIndexName)) {
                 LOG.info("ylwudebug3: can't find custom index: ------------------------------++++++++++ {}", customIndexName);
-                throw new EndRunException(detectorId, "Can't find index " + customIndexName, true);
+                throw new EndRunException(detectorId, CAN_NOT_FIND_RESULT_INDEX + customIndexName, true);
                     /*LOG.info("ylwudebug3: create custom index: ------------------------------++++++++++ {}", customIndexName);
                     anomalyDetectionIndices.initCustomAnomalyResultIndexDirectly(
                             customIndexName,
@@ -205,16 +204,9 @@ public class AnomalyIndexHandler<T extends ToXContentObject> {
         LOG.info("ylwudebug3: save to ===== index: ------------------------------ {}", indexName);
         if (!ANOMALY_RESULT_INDEX_ALIAS.equals(indexName)) {
             // don't check indexmapping,  will get NPE exception if clusterService.state().metadata().index(indexName);
-
-            IndexMetadata indexMetadata = clusterService.state().metadata().index(indexName);
-//        LOG.info("yyyyyyyyyy indexMetadata.mapping() : " + indexMetadata.mapping());
-            Map<String, Object> stringObjectMap = indexMetadata.mapping().sourceAsMap();
-//        LOG.info("yyyyyyyyyy2 indexMetadata.mapping() : " + stringObjectMap);
-//        LOG.info("yyyyyyyyyy3 indexMetadata.mapping() : " + stringObjectMap.toString());
-//        LOG.info("yyyyyyyyyy4 equals ad result index mapping : " + stringObjectMap.toString().equals(AD_RESULT_INDEX_MAPPING_V4));
-            if (!LATEST_AD_RESULT_INDEX_MAPPING.equals(stringObjectMap.toString())) {
-                //throw new EndRunException(detectorId, "wrong index mapping of custom AD result index", true);
-                indexName = this.indexName; // write AD result into default AD result index
+            if (!anomalyDetectionIndices.isValidResultIndex(indexName)) {
+                throw new EndRunException(detectorId, "wrong index mapping of custom AD result index", true);
+                //indexName = this.indexName; // write AD result into default AD result index
             }
         }
 
