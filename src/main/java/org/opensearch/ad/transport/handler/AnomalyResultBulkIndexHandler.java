@@ -15,7 +15,9 @@ import static org.opensearch.ad.constant.CommonErrorMessages.CAN_NOT_FIND_RESULT
 import static org.opensearch.ad.constant.CommonName.ANOMALY_RESULT_INDEX_ALIAS;
 import static org.opensearch.common.xcontent.XContentFactory.jsonBuilder;
 
+import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 
@@ -23,9 +25,11 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.util.Strings;
 import org.opensearch.ExceptionsHelper;
+import org.opensearch.OpenSearchSecurityException;
 import org.opensearch.ResourceAlreadyExistsException;
 import org.opensearch.action.ActionListener;
 import org.opensearch.action.admin.indices.create.CreateIndexResponse;
+import org.opensearch.action.bulk.BulkItemResponse;
 import org.opensearch.action.bulk.BulkRequestBuilder;
 import org.opensearch.action.bulk.BulkResponse;
 import org.opensearch.action.index.IndexRequest;
@@ -140,7 +144,7 @@ public class AnomalyResultBulkIndexHandler extends AnomalyIndexHandler<AnomalyRe
     }
 
     private void bulkSaveDetectorResult(String resultIndex, List<AnomalyResult> anomalyResults, ActionListener<BulkResponse> listener) {
-        LOG.info("Start to bulk save {} anomaly results", anomalyResults.size());
+        LOG.info("Start to bulk save {} anomaly results to index", anomalyResults.size(), resultIndex);
         BulkRequestBuilder bulkRequestBuilder = client.prepareBulk();
         anomalyResults.forEach(anomalyResult -> {
             try (XContentBuilder builder = jsonBuilder()) {
@@ -154,6 +158,18 @@ public class AnomalyResultBulkIndexHandler extends AnomalyIndexHandler<AnomalyRe
             }
         });
         client.bulk(bulkRequestBuilder.request(), ActionListener.wrap(r -> {
+
+            if (r.hasFailures()) {
+                Optional<BulkItemResponse> exception = Arrays.stream(r.getItems()).filter(item -> item.getFailure().getCause() instanceof OpenSearchSecurityException).findFirst();
+//                Arrays.stream(r.getItems()).forEach(item -> {
+//                    Exception e = item.getFailure().getCause();
+//                    LOG.info("--------------------- exception: {}, {}", e.getClass(), e.getMessage());
+//                });
+                if (exception.isPresent()) {
+                    listener.onFailure(exception.get().getFailure().getCause());
+                    return;
+                }
+            }
             LOG.info("bulk index AD result successfully, took: {}", r.getTook().duration());
             listener.onResponse(r);
         }, e -> {

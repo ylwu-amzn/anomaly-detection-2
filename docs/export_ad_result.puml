@@ -1,0 +1,15 @@
+@startuml
+'https://plantuml.com/sequence-diagram
+
+autonumber
+User -> "AD Backend": specify date range and call export API
+"AD Backend" -> "AD Backend": create export task
+"AD Backend" -> User: return task id
+
+loop
+   "AD Backend" -> "AD Backend": split whole date range into small pieces
+   "AD Backend" -> "AD Backend": export old results piece by piece
+end
+User -> "AD Backend": get profile of export task
+
+@enduml

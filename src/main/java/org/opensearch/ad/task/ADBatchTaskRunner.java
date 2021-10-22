@@ -48,6 +48,7 @@ import java.util.stream.Collectors;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.util.Strings;
 import org.opensearch.action.ActionListener;
 import org.opensearch.action.ActionListenerResponseHandler;
 import org.opensearch.action.delete.DeleteRequest;
@@ -1138,16 +1139,42 @@ public class ADBatchTaskRunner {
             user = adTask.getUser().getName();
             roles = adTask.getUser().getRoles();
         }
-        String resultIndex = adTask.getDetector().getResultIndex();
-        AnomalyResult dummyResult = AnomalyResult.getDummyResult();
+        String resultIndex = adTask.getDetector().getResultIndex(); // if result index is null, we should index directly
 
-        try (InjectSecurity injectSecurity = new InjectSecurity(adTask.getTaskId(), settings, client.threadPool().getThreadContext())) {
-            // Injecting user role to verify if the user has permissions for our API.
-            injectSecurity.inject(user, roles);
-            logger.info(" --------+++++++++ inject roles for index dummy result");
-
+        if (Strings.isNotBlank(resultIndex)) {
+            try (InjectSecurity injectSecurity = new InjectSecurity(adTask.getTaskId(), settings, client.threadPool().getThreadContext())) {
+                // Injecting user role to verify if the user has permissions for our API.
+                injectSecurity.inject(user, roles);
+                logger.info(" --------+++++++++ inject roles for index dummy result");
+                anomalyResultBulkIndexHandler
+                        .bulkIndexAnomalyResult(
+                                resultIndex,
+                                anomalyResults,
+                                new ThreadedActionListener<>(logger, threadPool, AD_BATCH_TASK_THREAD_POOL_NAME, ActionListener.wrap(r -> {
+                                    injectSecurity.close();
+                                    logger.info("yyyyyyyyyyyyyyyyyyyyy ------- closed injectSecurity");
+                                    logger.info("aaaaaaaaaa ------------ 111111 aaaaaaaaaa run next piece");
+                                    try {
+                                    /*try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
+                                        // Current piece end time is the next piece's start time
+                                        logger.info("aaaaaaaaaa ------------ 111111 aaaaaaaaaa run next piece");
+                                        runNextPiece(adTask, pieceEndTime, dataStartTime, dataEndTime, interval, internalListener);
+                                    } catch (Exception e) {
+                                        logger.error("aaaaaaaaaa ------------ 111111 aaaaaaaaaa", e);
+                                        internalListener.onFailure(e);
+                                    }*/
+                                        runNextPiece(adTask, pieceEndTime, dataStartTime, dataEndTime, interval, internalListener);
+                                    } catch (Exception e) {
+                                        internalListener.onFailure(e);
+                                    }
+                                }, e -> {
+                                    injectSecurity.close();
+                                    logger.error("Fail to bulk index anomaly result", e);
+                                    internalListener.onFailure(e);
+                                }), false)
+                        );
+            /*AnomalyResult dummyResult = AnomalyResult.getDummyResult();
             IndexRequest indexRequest = new IndexRequest(resultIndex).id(DUMMY_AD_RESULT_ID).source(dummyResult.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS));
-
             client.index(indexRequest, ActionListener.wrap(indexResponse -> {
                 logger.info("ylwudebug2: write result status for start detector is : {}", indexResponse.getResult());
 //                try (InjectSecurity injectSecurity2 = new InjectSecurity(adTask.getTaskId(), settings, client.threadPool().getThreadContext())) {
@@ -1222,12 +1249,38 @@ public class ADBatchTaskRunner {
                 //TODO: only stop job if it's caused by security exception
                 injectSecurity.close();
                 internalListener.onFailure(exception);
-            }));
-        } catch (Exception exception) {
-            logger.error("111111111122222222223333333333, failed llll ", exception);
-            internalListener.onFailure(exception);
+            }));*/
+            } catch (Exception exception) {
+                logger.error("111111111122222222223333333333, failed llll ", exception);
+                internalListener.onFailure(exception);
+            }
+            return;
         }
-
+        anomalyResultBulkIndexHandler
+                .bulkIndexAnomalyResult(
+                        resultIndex,
+                        anomalyResults,
+                        new ThreadedActionListener<>(logger, threadPool, AD_BATCH_TASK_THREAD_POOL_NAME, ActionListener.wrap(r -> {
+                            logger.info("yyyyyyyyyyyyyyyyyyyyy ------- closed injectSecurity");
+                            logger.info("aaaaaaaaaa ------------ 111111 aaaaaaaaaa run next piece");
+                            try {
+                                    /*try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
+                                        // Current piece end time is the next piece's start time
+                                        logger.info("aaaaaaaaaa ------------ 111111 aaaaaaaaaa run next piece");
+                                        runNextPiece(adTask, pieceEndTime, dataStartTime, dataEndTime, interval, internalListener);
+                                    } catch (Exception e) {
+                                        logger.error("aaaaaaaaaa ------------ 111111 aaaaaaaaaa", e);
+                                        internalListener.onFailure(e);
+                                    }*/
+                                runNextPiece(adTask, pieceEndTime, dataStartTime, dataEndTime, interval, internalListener);
+                            } catch (Exception e) {
+                                internalListener.onFailure(e);
+                            }
+                        }, e -> {
+                            logger.error("Fail to bulk index anomaly result", e);
+                            internalListener.onFailure(e);
+                        }), false)
+                );
     }
 
     private void runNextPiece(

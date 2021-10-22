@@ -1,0 +1,120 @@
+@startuml
+'https://plantuml.com/sequence-diagram
+
+autonumber
+== Create detector ==
+User -> "AD Frontend": specify result index
+"AD Frontend" -> "AD Backend": create detector
+alt Result index doesn't exist
+    "AD Backend" -> "AD Backend": create result index if not exist
+else
+    alt result index has valid mapping
+        "AD Backend" -> "AD Backend": check if user has write permission to result index
+        "AD Backend" -> "AD Backend": upgrade AD result index mapping to latest version
+    else
+        "AD Backend" -> "AD Backend": throw exception
+    end
+end
+
+"AD Backend" -> "AD Backend": create detector
+
+== Start realtime job ==
+User -> "AD Frontend": start realtime job
+"AD Frontend" -> "AD Backend": start realtime job
+alt Result index doesn't exist
+    "AD Backend" -> "AD Backend": create result index if not exist
+else
+    alt result index has valid mapping
+        "AD Backend" -> "AD Backend": check if user has write permission to result index
+        "AD Backend" -> "AD Backend": upgrade AD result index mapping to latest version
+    else
+        "AD Backend" -> "AD Backend": throw exception
+    end
+end
+"AD Backend" -> "AD Backend": create realtime job
+
+loop
+  "AD Backend" -> "AD Backend": run realtime job
+  alt Result index doesn't exist
+      "AD Backend" -> "AD Backend": create result index if not exist
+  else
+    alt result index has valid mapping
+        "AD Backend" -> "AD Backend": check if user has write permission to result index
+        "AD Backend" -> "AD Backend": upgrade AD result index mapping to latest version
+    else
+        "AD Backend" -> "AD Backend": throw end run exception and stop job
+    end
+  end
+  "AD Backend" -> "AD Backend": run job and store result in custom result index
+end
+
+== Start historical analysis ==
+User -> "AD Frontend": start historical analysis
+"AD Frontend" -> "AD Backend": start historical analysis
+alt Result index doesn't exist
+    "AD Backend" -> "AD Backend": create result index if not exist
+else
+    alt result index has valid mapping
+        "AD Backend" -> "AD Backend": check if user has write permission to result index
+        "AD Backend" -> "AD Backend": upgrade AD result index mapping to latest version
+    else
+        "AD Backend" -> "AD Backend": throw exception
+    end
+end
+"AD Backend" -> "AD Backend": create historical analysis task
+
+loop detect historical data piece by piece
+    "AD Backend" -> "AD Backend": run historical task piece by piece
+    alt Result index doesn't exist
+        "AD Backend" -> "AD Backend": create result index if not exist
+    else
+        alt result index has valid mapping
+            "AD Backend" -> "AD Backend": check if user has write permission to result index
+            "AD Backend" -> "AD Backend": upgrade AD result index mapping to latest version
+        else
+            "AD Backend" -> "AD Backend": stop historical analysis
+        end
+    end
+    "AD Backend" -> "AD Backend": store result in custom result index
+end
+
+== Delete detector ==
+User -> "AD Frontend": delete detector
+"AD Frontend" -> User: message: should delete custom result index?
+"AD Frontend" -> "AD Backend": delete detector
+"AD Frontend" -> "AD Backend": delete custom result index if user choose yes
+
+== Migrate old AD result ==
+User -> "AD Backend": call migrate API by passing in dateRange & detectorId
+alt Result index doesn't exist
+        "AD Backend" -> "AD Backend": create result index if not exist
+else
+   alt result index has valid mapping
+      "AD Backend" -> "AD Backend": check if user has write permission to result index
+      "AD Backend" -> "AD Backend": upgrade AD result index mapping to latest version
+   else
+       "AD Backend" -> "AD Backend": throw exception
+   end
+end
+"AD Backend" -> "AD Backend": create migration task
+"AD Backend" -> User: return task id
+
+loop migrate historical results piece by piece
+   "AD Backend" -> "AD Backend": split whole date range into small pieces
+
+    alt Result index doesn't exist
+        "AD Backend" -> "AD Backend": create result index if not exist
+    else
+        alt result index has valid mapping
+            "AD Backend" -> "AD Backend": check if user has write permission to result index
+            "AD Backend" -> "AD Backend": upgrade AD result index mapping to latest version
+        else
+            "AD Backend" -> "AD Backend": stop migration task
+        end
+    end
+
+   "AD Backend" -> "AD Backend": migrate old results piece by piece
+end
+User -> "AD Backend": get profile of migration task
+
+@enduml

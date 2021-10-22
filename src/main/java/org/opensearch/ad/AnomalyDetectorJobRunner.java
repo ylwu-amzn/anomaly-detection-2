@@ -296,6 +296,9 @@ public class AnomalyDetectorJobRunner implements ScheduledJobRunner {
             //TODO: abstract common function to reuse in task runner
             client.index(indexRequest, ActionListener.wrap(indexResponse -> {
                 log.info("ylwudebug2: write result status for start detector is : {}", indexResponse.getResult());
+                try (InjectSecurity injectSecurity2 = new InjectSecurity(detectorId, settings, client.threadPool().getThreadContext())) {
+
+                }
                 client.delete(new DeleteRequest(resultIndex).id(DUMMY_AD_RESULT_ID), ActionListener.wrap(deleteResponse -> {
                     AnomalyResultRequest request = new AnomalyResultRequest(
                             detectorId,

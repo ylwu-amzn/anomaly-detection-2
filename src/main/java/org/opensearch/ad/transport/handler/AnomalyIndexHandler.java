@@ -120,6 +120,7 @@ public class AnomalyIndexHandler<T extends ToXContentObject> {
 //        index(toSave, detectorId, null);
 //    }
 
+    // TODO: check if user has permission to index.
     public void index(T toSave, String detectorId, String customIndexName) {
         if (indexUtils.checkIndicesBlocked(clusterService.state(), ClusterBlockLevel.WRITE, this.indexName)) {
             LOG.warn(String.format(Locale.ROOT, CANNOT_SAVE_ERR_MSG, detectorId));
