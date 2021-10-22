@@ -376,24 +376,24 @@ public class AnomalyDetectorJobTransportActionTests extends HistoricalAnalysisIn
 
     public void testRealtimeDetectorWithoutFeature() throws IOException {
         AnomalyDetector detector = TestHelpers.randomDetector(ImmutableList.of(), testIndex, detectionIntervalInMinutes, timeField);
-        testInvalidDetector(detector, "Can't start detector job as no features configured");
+        testInvalidDetector(detector, "Can't validateCustomRestulIndexAndCreateDetector detector job as no features configured");
     }
 
     public void testHistoricalDetectorWithoutFeature() throws IOException {
         AnomalyDetector detector = TestHelpers.randomDetector(ImmutableList.of(), testIndex, detectionIntervalInMinutes, timeField);
-        testInvalidDetector(detector, "Can't start detector job as no features configured");
+        testInvalidDetector(detector, "Can't validateCustomRestulIndexAndCreateDetector detector job as no features configured");
     }
 
     public void testRealtimeDetectorWithoutEnabledFeature() throws IOException {
         AnomalyDetector detector = TestHelpers
             .randomDetector(ImmutableList.of(TestHelpers.randomFeature(false)), testIndex, detectionIntervalInMinutes, timeField);
-        testInvalidDetector(detector, "Can't start detector job as no enabled features configured");
+        testInvalidDetector(detector, "Can't validateCustomRestulIndexAndCreateDetector detector job as no enabled features configured");
     }
 
     public void testHistoricalDetectorWithoutEnabledFeature() throws IOException {
         AnomalyDetector detector = TestHelpers
             .randomDetector(ImmutableList.of(TestHelpers.randomFeature(false)), testIndex, detectionIntervalInMinutes, timeField);
-        testInvalidDetector(detector, "Can't start detector job as no enabled features configured");
+        testInvalidDetector(detector, "Can't validateCustomRestulIndexAndCreateDetector detector job as no enabled features configured");
     }
 
     private void testInvalidDetector(AnomalyDetector detector, String error) throws IOException {

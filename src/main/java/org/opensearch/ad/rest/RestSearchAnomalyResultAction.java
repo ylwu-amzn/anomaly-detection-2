@@ -12,8 +12,6 @@
 package org.opensearch.ad.rest;
 
 import static org.opensearch.ad.indices.AnomalyDetectionIndices.ALL_AD_RESULTS_INDEX_PATTERN;
-import static org.opensearch.ad.util.RestHandlerUtils.DETECTOR_ID;
-import static org.opensearch.ad.util.RestHandlerUtils.REALTIME_TASK;
 import static org.opensearch.ad.util.RestHandlerUtils.RESULT_INDEX;
 
 import org.apache.commons.lang3.tuple.Pair;
@@ -23,7 +21,6 @@ import org.opensearch.ad.transport.SearchAnomalyResultAction;
 
 import com.google.common.collect.ImmutableList;
 
-import java.net.URL;
 import java.util.Locale;
 
 /**

@@ -35,7 +35,6 @@ import org.opensearch.ad.model.AnomalyResult;
 import org.opensearch.ad.util.ClientUtil;
 import org.opensearch.ad.util.IndexUtils;
 import org.opensearch.ad.util.Throttler;
-import org.opensearch.ad.util.ThrowingConsumerWrapper;
 import org.opensearch.client.Client;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.settings.Settings;
@@ -68,9 +67,7 @@ public class AnomalyResultBulkIndexHandlerTests extends ADUnitTestCase {
             client,
             settings,
             threadPool,
-            ThrowingConsumerWrapper.throwingConsumerWrapper(anomalyDetectionIndices::initDetectionStateIndex),
-            anomalyDetectionIndices::doesDetectorStateIndexExist,
-            clientUtil,
+                clientUtil,
             indexUtils,
             clusterService,
             anomalyDetectionIndices
@@ -104,7 +101,7 @@ public class AnomalyResultBulkIndexHandlerTests extends ADUnitTestCase {
     public void testWrongAnomalyResult() {
         BulkRequestBuilder bulkRequestBuilder = mock(BulkRequestBuilder.class);
         doReturn(bulkRequestBuilder).when(client).prepareBulk();
-        doReturn(true).when(anomalyDetectionIndices).doesAnomalyResultIndexExist();
+        doReturn(true).when(anomalyDetectionIndices).doesDefaultAnomalyResultIndexExist();
         bulkIndexHandler.bulkIndexAnomalyResult(ImmutableList.of(wrongAnomalyResult(), TestHelpers.randomAnomalyDetectResult()), listener);
         verify(listener, times(1)).onFailure(exceptionCaptor.capture());
         assertEquals("Failed to prepare request to bulk index anomaly results", exceptionCaptor.getValue().getMessage());
@@ -113,7 +110,7 @@ public class AnomalyResultBulkIndexHandlerTests extends ADUnitTestCase {
     public void testBulkSaveException() {
         BulkRequestBuilder bulkRequestBuilder = mock(BulkRequestBuilder.class);
         doReturn(bulkRequestBuilder).when(client).prepareBulk();
-        doReturn(true).when(anomalyDetectionIndices).doesAnomalyResultIndexExist();
+        doReturn(true).when(anomalyDetectionIndices).doesDefaultAnomalyResultIndexExist();
 
         String testError = randomAlphaOfLength(5);
         doAnswer(invocation -> {

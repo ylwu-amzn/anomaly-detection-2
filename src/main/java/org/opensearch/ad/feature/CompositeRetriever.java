@@ -150,7 +150,6 @@ public class CompositeRetriever extends AbstractRetriever {
             .aggregation(composite)
             .trackTotalHits(false);
 
-        //LOG.info("----------------- query : {}", searchSourceBuilder);
         return new PageIterator(searchSourceBuilder);
     }
 

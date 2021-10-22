@@ -109,9 +109,12 @@ public class ResultWriteWorker extends BatchWorker<ResultWriteRequest, ADResultB
     @Override
     protected ADResultBulkRequest toBatchRequest(List<ResultWriteRequest> toProcess) {
         // toProcess won't be null or empty, check BatchWorker, line 108
-        final ADResultBulkRequest bulkRequest = new ADResultBulkRequest(toProcess.get(0).getResultIndex());
+        // It's possible that the result index in "toProcess" is default AD result index or user's custom result
+        // index, could be multiple custom result indexes. As we have checked the index permission when job start,
+        // won't recheck the custom result index permission here.
+        final ADResultBulkRequest bulkRequest = new ADResultBulkRequest();
         for (ResultWriteRequest request : toProcess) {
-            bulkRequest.add(request.getResult());
+            bulkRequest.add(request);
         }
         return bulkRequest;
     }

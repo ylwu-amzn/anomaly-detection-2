@@ -39,9 +39,7 @@ import org.opensearch.common.xcontent.ToXContentObject;
 import org.opensearch.common.xcontent.XContentBuilder;
 import org.opensearch.common.xcontent.XContentParser;
 import org.opensearch.common.xcontent.XContentType;
-import org.opensearch.index.query.BoolQueryBuilder;
 import org.opensearch.index.query.MatchAllQueryBuilder;
-import org.opensearch.index.query.QueryBuilder;
 import org.opensearch.rest.BaseRestHandler;
 import org.opensearch.rest.BytesRestResponse;
 import org.opensearch.rest.RestChannel;
@@ -92,25 +90,16 @@ public abstract class AbstractSearchAction<T extends ToXContentObject> extends B
 
         String resultIndex = SEARCH_ANOMALY_RESULT_ACTION.equals(getName())? request.param(RESULT_INDEX) : null;
         return channel -> {
-            logger.info("+++++++++++++++++++++++++++++ result index: {}", resultIndex);
+            logger.info("+++++++++++++++++++++++++++++ search result index: {}", resultIndex);
             if (resultIndex == null) {
                 client.execute(actionType, searchRequest, search(channel));
                 return;
             }
-            SearchSourceBuilder matchAll = new SearchSourceBuilder().query(new MatchAllQueryBuilder()).size(0);
-            // If user specify result index, we also query default system index to get old AD result.
-            SearchRequest searchCustomIndexRequest = new SearchRequest().source(matchAll).indices(resultIndex);
-            client.search(searchCustomIndexRequest, ActionListener.wrap(r -> {
-                // searchRequest.indices(resultIndex, index);
-                searchRequest.indices(resultIndex);
-                client.execute(actionType, searchRequest, search(channel));
-            }, e-> {
-                try {
-                    channel.sendResponse(new BytesRestResponse(channel, e));
-                } catch (IOException exception) {
-                    logger.error("Failed to send back search exception result for " + actionType, exception);
-                }
-            }));
+//            SearchSourceBuilder matchAll = new SearchSourceBuilder().query(new MatchAllQueryBuilder()).size(0);
+            // If user specify result index, we just query that index to get old AD result.
+//            SearchRequest searchCustomIndexRequest = new SearchRequest().source(matchAll).indices(resultIndex);
+            searchRequest.indices(resultIndex);
+            client.search(searchRequest, search(channel));
         };
 
 

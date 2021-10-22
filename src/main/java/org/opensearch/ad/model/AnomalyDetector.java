@@ -75,7 +75,6 @@ public class AnomalyDetector implements Writeable, ToXContentObject {
     private static final String DESCRIPTION_FIELD = "description";
     private static final String TIMEFIELD_FIELD = "time_field";
     private static final String INDICES_FIELD = "indices";
-    private static final String RESULT_INDEX_FIELD = "result_index";
     private static final String FILTER_QUERY_FIELD = "filter_query";
     private static final String FEATURE_ATTRIBUTES_FIELD = "feature_attributes";
     private static final String DETECTION_INTERVAL_FIELD = "detection_interval";
@@ -86,6 +85,7 @@ public class AnomalyDetector implements Writeable, ToXContentObject {
     public static final String CATEGORY_FIELD = "category_field";
     public static final String USER_FIELD = "user";
     public static final String DETECTOR_TYPE_FIELD = "detector_type";
+    private static final String RESULT_INDEX_FIELD = "result_index";
     public static final String RESULT_INDEX_PREFIX = "anomaly-result-";
     @Deprecated
     public static final String DETECTION_DATE_RANGE_FIELD = "detection_date_range";
@@ -198,7 +198,7 @@ public class AnomalyDetector implements Writeable, ToXContentObject {
         this.detectorType = isMultientityDetector(categoryFields) ? MULTI_ENTITY.name() : SINGLE_ENTITY.name();
         this.resultIndex = Strings.trimToNull(resultIndex);
         if (this.resultIndex != null && !this.resultIndex.startsWith(RESULT_INDEX_PREFIX)) {
-            throw new IllegalArgumentException("Result index must start with prefix " + RESULT_INDEX_PREFIX);
+            throw new IllegalArgumentException("Result index must validateCustomRestulIndexAndCreateDetector with prefix " + RESULT_INDEX_PREFIX);
         }
     }
 
@@ -652,10 +652,6 @@ public class AnomalyDetector implements Writeable, ToXContentObject {
 
     public String getResultIndex() {
         return resultIndex;
-    }
-
-    public boolean useCustomResultIndex() {
-        return Strings.isNotBlank(getResultIndex());
     }
 
     public boolean isMultientityDetector() {

@@ -12,7 +12,6 @@
 package org.opensearch.ad.transport.handler;
 
 import static org.opensearch.ad.constant.CommonErrorMessages.CAN_NOT_FIND_RESULT_INDEX;
-import static org.opensearch.ad.constant.CommonName.ANOMALY_RESULT_INDEX_ALIAS;
 import static org.opensearch.common.xcontent.XContentFactory.jsonBuilder;
 
 import java.util.Iterator;
@@ -37,7 +36,6 @@ import org.opensearch.ad.util.IndexUtils;
 import org.opensearch.ad.util.RestHandlerUtils;
 import org.opensearch.client.Client;
 import org.opensearch.cluster.block.ClusterBlockLevel;
-import org.opensearch.cluster.metadata.IndexMetadata;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.unit.TimeValue;
@@ -102,62 +100,35 @@ public class AnomalyIndexHandler<T extends ToXContentObject> {
         this.clusterService = clusterService;
     }
 
-    /**
-     * Since the constructor needs to provide injected value and Guice does not allow Boolean to be there
-     * (claiming it does not know how to instantiate it), caller needs to manually set it to true if
-     * it want to save to a specific doc.
-     * @param fixedDoc whether to save to a specific doc Id
-     */
-    public void setFixedDoc(boolean fixedDoc) {
-        this.fixedDoc = fixedDoc;
-    }
-
-//    public void index(T toSave, String detectorId) {
-//        index(toSave, detectorId, null);
-//    }
-
-//    public void index(T toSave, String detectorId) {
-//        index(toSave, detectorId, null);
-//    }
-
     // TODO: check if user has permission to index.
     public void index(T toSave, String detectorId, String customIndexName) {
         if (indexUtils.checkIndicesBlocked(clusterService.state(), ClusterBlockLevel.WRITE, this.indexName)) {
             LOG.warn(String.format(Locale.ROOT, CANNOT_SAVE_ERR_MSG, detectorId));
             return;
         }
-        if (customIndexName != null) {
-            LOG.info("ylwudebug3: save to custom index: ------------------------------ {}", customIndexName);
-            if (!anomalyDetectionIndices.doesIndexExist(customIndexName)) {
-                LOG.info("ylwudebug3: can't find custom index: ------------------------------++++++++++ {}", customIndexName);
-                throw new EndRunException(detectorId, CAN_NOT_FIND_RESULT_INDEX + customIndexName, true);
-                    /*LOG.info("ylwudebug3: create custom index: ------------------------------++++++++++ {}", customIndexName);
-                    anomalyDetectionIndices.initCustomAnomalyResultIndexDirectly(
-                            customIndexName,
-                            ActionListener.wrap(initResponse -> onCreateIndexResponse(initResponse, toSave, detectorId, customIndexName), exception -> {
-                                if (ExceptionsHelper.unwrapCause(exception) instanceof ResourceAlreadyExistsException) {
-                                    // It is possible the index has been created while we sending the create request
-                                    save(toSave, detectorId, customIndexName);
-                                } else {
-                                    throw new AnomalyDetectionException(
-                                            detectorId,
-                                            String.format(Locale.ROOT, "Unexpected error creating index %s", indexName),
-                                            exception
-                                    );
-                                }
-                            })
-                    );*/
-            } else {
+
+        try {
+            if (customIndexName != null) {
+                LOG.info("ylwudebug3: save to custom index: ------------------------------ {}", customIndexName);
+                // Only create custom AD result index when create detector, won’t recreate custom AD result index in realtime
+                // job and historical analysis later if it’s deleted. If user delete the custom AD result index, and AD plugin
+                // recreate it, that may bring confusion and may have security leak (for example Admin delete that index as
+                // permission removed from the creator, we should not recreate it again).
+                if (!anomalyDetectionIndices.doesIndexExist(customIndexName)) {
+                    LOG.info("ylwudebug3: can't find custom index: ------------------------------++++++++++ {}", customIndexName);
+                    throw new EndRunException(detectorId, CAN_NOT_FIND_RESULT_INDEX + customIndexName, true);
+                }
+                if (!anomalyDetectionIndices.isValidResultIndex(customIndexName)) {
+                    throw new EndRunException(detectorId, "wrong index mapping of custom AD result index", true);
+                }
                 LOG.info("ylwudebug3: save to default system index: ------------------------------");
                 save(toSave, detectorId, customIndexName);
+                return;
             }
-            return;
-        }
-        try {
-            if (!anomalyDetectionIndices.doesAnomalyResultIndexExist()) {
+            if (!anomalyDetectionIndices.doesDefaultAnomalyResultIndexExist()) {
                 LOG.info("ylwudebug3: init default system index: ------------------------------ {}", indexName);
                 anomalyDetectionIndices.initAnomalyResultIndexDirectly(
-                        ActionListener.wrap(initResponse -> onCreateIndexResponse(initResponse, toSave, detectorId, indexName), exception -> {
+                        ActionListener.wrap(initResponse -> onCreateIndexResponse(initResponse, toSave, detectorId), exception -> {
                             if (ExceptionsHelper.unwrapCause(exception) instanceof ResourceAlreadyExistsException) {
                                 // It is possible the index has been created while we sending the create request
                                 save(toSave, detectorId);
@@ -183,10 +154,10 @@ public class AnomalyIndexHandler<T extends ToXContentObject> {
         }
     }
 
-    private void onCreateIndexResponse(CreateIndexResponse response, T toSave, String detectorId, String resultIndex) {
+    private void onCreateIndexResponse(CreateIndexResponse response, T toSave, String detectorId) {
         if (response.isAcknowledged()) {
-            LOG.info("ylwudebug3: store result into index: ------------------------------++++++++++ {}", resultIndex);
-            save(toSave, detectorId, resultIndex);
+            LOG.info("ylwudebug3: store result into index: ------------------------------++++++++++ {}", indexName);
+            save(toSave, detectorId);
         } else {
             throw new AnomalyDetectionException(
                 detectorId,
@@ -199,18 +170,8 @@ public class AnomalyIndexHandler<T extends ToXContentObject> {
         save(toSave, detectorId, indexName);
     }
 
+    //TODO: Upgrade custom result index mapping to latest version.
     protected void save(T toSave, String detectorId, String indexName) {
-        //TODO: check if index mapping matches AD result mapping? Upgrade index mapping to latest version.
-        // Check AnomalyDetectionIndices line 737
-        LOG.info("ylwudebug3: save to ===== index: ------------------------------ {}", indexName);
-        if (!ANOMALY_RESULT_INDEX_ALIAS.equals(indexName)) {
-            // don't check indexmapping,  will get NPE exception if clusterService.state().metadata().index(indexName);
-            if (!anomalyDetectionIndices.isValidResultIndex(indexName)) {
-                throw new EndRunException(detectorId, "wrong index mapping of custom AD result index", true);
-                //indexName = this.indexName; // write AD result into default AD result index
-            }
-        }
-
         try (XContentBuilder builder = jsonBuilder()) {
             IndexRequest indexRequest = new IndexRequest(indexName).source(toSave.toXContent(builder, RestHandlerUtils.XCONTENT_WITH_TYPE));
             if (fixedDoc) {

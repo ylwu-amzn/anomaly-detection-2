@@ -28,7 +28,6 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.core.util.Throwables;
 import org.apache.logging.log4j.message.ParameterizedMessage;
-import org.apache.logging.log4j.util.Strings;
 import org.opensearch.OpenSearchStatusException;
 import org.opensearch.action.ActionListener;
 import org.opensearch.action.get.GetRequest;
@@ -621,7 +620,7 @@ public class AnomalyDetectorProfileRunner extends AbstractProfileRunner {
 
         SearchRequest request = new SearchRequest(CommonName.ANOMALY_RESULT_INDEX_ALIAS);
         request.source(source);
-        if (Strings.isNotBlank(resultIndex)) {
+        if (resultIndex != null) {
             request.indices(resultIndex);
         }
         return request;

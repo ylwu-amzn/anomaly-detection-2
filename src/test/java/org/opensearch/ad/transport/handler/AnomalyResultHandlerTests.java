@@ -84,7 +84,7 @@ public class AnomalyResultHandlerTests extends AbstractIndexHandlerTest {
             threadPool,
             CommonName.ANOMALY_RESULT_INDEX_ALIAS,
             ThrowingConsumerWrapper.throwingConsumerWrapper(anomalyDetectionIndices::initAnomalyResultIndexDirectly),
-            anomalyDetectionIndices::doesAnomalyResultIndexExist,
+            anomalyDetectionIndices::doesDefaultAnomalyResultIndexExist,
             clientUtil,
             indexUtil,
             clusterService
@@ -121,7 +121,7 @@ public class AnomalyResultHandlerTests extends AbstractIndexHandlerTest {
             threadPool,
             CommonName.ANOMALY_RESULT_INDEX_ALIAS,
             ThrowingConsumerWrapper.throwingConsumerWrapper(anomalyDetectionIndices::initAnomalyResultIndexDirectly),
-            anomalyDetectionIndices::doesAnomalyResultIndexExist,
+            anomalyDetectionIndices::doesDefaultAnomalyResultIndexExist,
             clientUtil,
             indexUtil,
             clusterService
@@ -140,7 +140,7 @@ public class AnomalyResultHandlerTests extends AbstractIndexHandlerTest {
             threadPool,
             CommonName.ANOMALY_RESULT_INDEX_ALIAS,
             ThrowingConsumerWrapper.throwingConsumerWrapper(anomalyDetectionIndices::initAnomalyResultIndexDirectly),
-            anomalyDetectionIndices::doesAnomalyResultIndexExist,
+            anomalyDetectionIndices::doesDefaultAnomalyResultIndexExist,
             clientUtil,
             indexUtil,
             clusterService
@@ -161,7 +161,7 @@ public class AnomalyResultHandlerTests extends AbstractIndexHandlerTest {
             threadPool,
             CommonName.ANOMALY_RESULT_INDEX_ALIAS,
             ThrowingConsumerWrapper.throwingConsumerWrapper(anomalyDetectionIndices::initAnomalyResultIndexDirectly),
-            anomalyDetectionIndices::doesAnomalyResultIndexExist,
+            anomalyDetectionIndices::doesDefaultAnomalyResultIndexExist,
             clientUtil,
             indexUtil,
             clusterService
@@ -217,7 +217,7 @@ public class AnomalyResultHandlerTests extends AbstractIndexHandlerTest {
             threadPool,
             CommonName.ANOMALY_RESULT_INDEX_ALIAS,
             ThrowingConsumerWrapper.throwingConsumerWrapper(anomalyDetectionIndices::initAnomalyResultIndexDirectly),
-            anomalyDetectionIndices::doesAnomalyResultIndexExist,
+            anomalyDetectionIndices::doesDefaultAnomalyResultIndexExist,
             clientUtil,
             indexUtil,
             clusterService

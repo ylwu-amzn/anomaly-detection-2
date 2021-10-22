@@ -22,7 +22,6 @@ import java.util.Set;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.apache.logging.log4j.util.Strings;
 import org.apache.lucene.search.join.ScoreMode;
 import org.opensearch.action.ActionListener;
 import org.opensearch.action.get.GetRequest;
@@ -448,10 +447,9 @@ public class EntityProfileRunner extends AbstractProfileRunner {
             .trackTotalHits(false)
             .size(0);
 
-        //TODO: support AD result index
         SearchRequest request = new SearchRequest(CommonName.ANOMALY_RESULT_INDEX_ALIAS);
         request.source(source);
-        if (Strings.isNotBlank(resultIndex)) {
+        if (resultIndex != null) {
             request.indices(resultIndex);
         }
         return request;

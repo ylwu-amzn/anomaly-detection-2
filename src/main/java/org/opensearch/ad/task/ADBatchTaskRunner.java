@@ -16,7 +16,6 @@ import static org.opensearch.ad.breaker.MemoryCircuitBreaker.DEFAULT_JVM_HEAP_US
 import static org.opensearch.ad.constant.CommonErrorMessages.NO_ELIGIBLE_NODE_TO_RUN_DETECTOR;
 import static org.opensearch.ad.constant.CommonName.AGG_NAME_MAX_TIME;
 import static org.opensearch.ad.constant.CommonName.AGG_NAME_MIN_TIME;
-import static org.opensearch.ad.constant.CommonName.DUMMY_AD_RESULT_ID;
 import static org.opensearch.ad.model.ADTask.CURRENT_PIECE_FIELD;
 import static org.opensearch.ad.model.ADTask.EXECUTION_END_TIME_FIELD;
 import static org.opensearch.ad.model.ADTask.INIT_PROGRESS_FIELD;
@@ -48,11 +47,8 @@ import java.util.stream.Collectors;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.apache.logging.log4j.util.Strings;
 import org.opensearch.action.ActionListener;
 import org.opensearch.action.ActionListenerResponseHandler;
-import org.opensearch.action.delete.DeleteRequest;
-import org.opensearch.action.index.IndexRequest;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.support.ThreadedActionListener;
 import org.opensearch.ad.breaker.ADCircuitBreakerService;
@@ -89,8 +85,6 @@ import org.opensearch.ad.transport.ADBatchTaskRemoteExecutionAction;
 import org.opensearch.ad.transport.ADStatsNodeResponse;
 import org.opensearch.ad.transport.ADStatsNodesAction;
 import org.opensearch.ad.transport.ADStatsRequest;
-import org.opensearch.ad.transport.AnomalyResultAction;
-import org.opensearch.ad.transport.AnomalyResultRequest;
 import org.opensearch.ad.transport.handler.AnomalyResultBulkIndexHandler;
 import org.opensearch.ad.util.ExceptionUtil;
 import org.opensearch.ad.util.ParseUtils;
@@ -99,10 +93,6 @@ import org.opensearch.cluster.node.DiscoveryNode;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.unit.TimeValue;
-import org.opensearch.common.util.concurrent.ThreadContext;
-import org.opensearch.common.xcontent.ToXContent;
-import org.opensearch.common.xcontent.XContentBuilder;
-import org.opensearch.common.xcontent.XContentType;
 import org.opensearch.commons.InjectSecurity;
 import org.opensearch.index.query.BoolQueryBuilder;
 import org.opensearch.index.query.RangeQueryBuilder;
@@ -639,7 +629,7 @@ public class ADBatchTaskRunner {
                 // Entity task done on worker node. Send entity task done message to coordinating node to poll next entity.
                 adTaskManager.entityTaskDone(adTask, e, transportService);
                 if (adTaskCacheManager.getAvailableNewEntityTaskLanes(adTask.getDetectorId()) > 0) {
-                    // When reach this line, it means entity task failed to start on worker node
+                    // When reach this line, it means entity task failed to validateCustomRestulIndexAndCreateDetector on worker node
                     // Sleep some time before starting new task lane.
                     threadPool
                         .schedule(
@@ -834,8 +824,6 @@ public class ADBatchTaskRunner {
         } else if (ExceptionUtil.countInStats(e)) {
             adStats.getStat(StatNames.AD_BATCH_TASK_FAILURE_COUNT.getName()).increment();
         }
-        //TODO: clean cache?
-
         // Handle AD task exception
         adTaskManager.handleADTaskException(adTask, e);
     }
@@ -1139,123 +1127,26 @@ public class ADBatchTaskRunner {
             user = adTask.getUser().getName();
             roles = adTask.getUser().getRoles();
         }
-        String resultIndex = adTask.getDetector().getResultIndex(); // if result index is null, we should index directly
+        String resultIndex = adTask.getDetector().getResultIndex();
 
-        if (Strings.isNotBlank(resultIndex)) {
-            try (InjectSecurity injectSecurity = new InjectSecurity(adTask.getTaskId(), settings, client.threadPool().getThreadContext())) {
-                // Injecting user role to verify if the user has permissions for our API.
-                injectSecurity.inject(user, roles);
-                logger.info(" --------+++++++++ inject roles for index dummy result");
-                anomalyResultBulkIndexHandler
-                        .bulkIndexAnomalyResult(
-                                resultIndex,
-                                anomalyResults,
-                                new ThreadedActionListener<>(logger, threadPool, AD_BATCH_TASK_THREAD_POOL_NAME, ActionListener.wrap(r -> {
-                                    injectSecurity.close();
-                                    logger.info("yyyyyyyyyyyyyyyyyyyyy ------- closed injectSecurity");
-                                    logger.info("aaaaaaaaaa ------------ 111111 aaaaaaaaaa run next piece");
-                                    try {
-                                    /*try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
-                                        // Current piece end time is the next piece's start time
-                                        logger.info("aaaaaaaaaa ------------ 111111 aaaaaaaaaa run next piece");
-                                        runNextPiece(adTask, pieceEndTime, dataStartTime, dataEndTime, interval, internalListener);
-                                    } catch (Exception e) {
-                                        logger.error("aaaaaaaaaa ------------ 111111 aaaaaaaaaa", e);
-                                        internalListener.onFailure(e);
-                                    }*/
-                                        runNextPiece(adTask, pieceEndTime, dataStartTime, dataEndTime, interval, internalListener);
-                                    } catch (Exception e) {
-                                        internalListener.onFailure(e);
-                                    }
-                                }, e -> {
-                                    injectSecurity.close();
-                                    logger.error("Fail to bulk index anomaly result", e);
-                                    internalListener.onFailure(e);
-                                }), false)
-                        );
-            /*AnomalyResult dummyResult = AnomalyResult.getDummyResult();
-            IndexRequest indexRequest = new IndexRequest(resultIndex).id(DUMMY_AD_RESULT_ID).source(dummyResult.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS));
-            client.index(indexRequest, ActionListener.wrap(indexResponse -> {
-                logger.info("ylwudebug2: write result status for start detector is : {}", indexResponse.getResult());
-//                try (InjectSecurity injectSecurity2 = new InjectSecurity(adTask.getTaskId(), settings, client.threadPool().getThreadContext())) {
-//                    injectSecurity2.inject(user, roles);
-//                    logger.info(" --------+++++++++ inject roles for delete dummy result");
-//                    client.delete(new DeleteRequest(resultIndex).id(DUMMY_AD_RESULT_ID), ActionListener.wrap(deleteResponse -> {
-//                        logger.error("000000000000000000000000000000 user has access to write index {}", resultIndex);
-//                        logger.info(" --------+++++++++ ---- close roles for delete dummy result");
-//                        anomalyResultBulkIndexHandler
-//                                .bulkIndexAnomalyResult(
-//                                        resultIndex,
-//                                        anomalyResults,
-//                                        new ThreadedActionListener<>(logger, threadPool, AD_BATCH_TASK_THREAD_POOL_NAME, ActionListener.wrap(r -> {
-//                                            try {
-//                                                try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
-//                                                    // Current piece end time is the next piece's start time
-//                                                    runNextPiece(adTask, pieceEndTime, dataStartTime, dataEndTime, interval, internalListener);
-//                                                } catch (Exception e) {
-//                                                    logger.error("aaaaaaaaaa ------------ aaaaaaaaaa", e);
-//                                                    handleException(adTask, e);
-//                                                }
-//                                            } catch (Exception e) {
-//                                                internalListener.onFailure(e);
-//                                            }
-//                                        }, e -> {
-//                                            logger.error("Fail to bulk index anomaly result", e);
-//                                            internalListener.onFailure(e);
-//                                        }), false)
-//                                );
-//                    }, ex -> {
-//                        logger.error("000000000000000000000000000000 Failed to delete dummy AD result when start detector", ex);
-//                        handleException(adTask, ex);
-//                    }));
-//                } catch (Exception e) {
-//                    logger.error("00000011111111111122222222223333333333, failed llll ", e);
-//                    handleException(adTask, e);
-//                }
-                client.delete(new DeleteRequest(resultIndex).id(DUMMY_AD_RESULT_ID), ActionListener.wrap(deleteResponse -> {
-                    logger.error("000000000000000000000000000000 user has access to write index {}", resultIndex);
-                    anomalyResultBulkIndexHandler
-                            .bulkIndexAnomalyResult(
-                                    resultIndex,
-                                    anomalyResults,
-                                    new ThreadedActionListener<>(logger, threadPool, AD_BATCH_TASK_THREAD_POOL_NAME, ActionListener.wrap(r -> {
-                                        try {
-                                            try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
-                                                // Current piece end time is the next piece's start time
-                                                logger.info("aaaaaaaaaa ------------ 111111 aaaaaaaaaa run next piece");
-                                                runNextPiece(adTask, pieceEndTime, dataStartTime, dataEndTime, interval, internalListener);
-                                            } catch (Exception e) {
-                                                logger.error("aaaaaaaaaa ------------ 111111 aaaaaaaaaa", e);
-                                                internalListener.onFailure(e);
-                                            }
-
-
-                                        } catch (Exception e) {
-                                            internalListener.onFailure(e);
-                                        }
-                                    }, e -> {
-                                        logger.error("Fail to bulk index anomaly result", e);
-                                        internalListener.onFailure(e);
-                                    }), false)
-                            );
-                }, ex -> {
-                    logger.error("000000000000000000000000000000 Failed to delete dummy AD result when start detector", ex);
-                    injectSecurity.close();
-                    logger.info("yyyyyyyyyyyyyyyyyyyyy ------- closed injectSecurity");
-                    internalListener.onFailure(ex);
-                }));
-            }, exception -> {
-                logger.error("ylwudebug2: Failed to write custom AD result index when start detectorm " + resultIndex, exception);
-                //TODO: only stop job if it's caused by security exception
-                injectSecurity.close();
-                internalListener.onFailure(exception);
-            }));*/
-            } catch (Exception exception) {
-                logger.error("111111111122222222223333333333, failed llll ", exception);
-                internalListener.onFailure(exception);
-            }
+        if (resultIndex == null) {
+            // if result index is null, store anomaly result directly
+            storeAnomalyResultAndRunNextPiece(adTask, pieceEndTime, dataStartTime, dataEndTime, interval, internalListener, anomalyResults, resultIndex, null);
             return;
         }
+
+        try (InjectSecurity injectSecurity = new InjectSecurity(adTask.getTaskId(), settings, client.threadPool().getThreadContext())) {
+            // Injecting user role to verify if the user has permissions to write result to result index.
+            injectSecurity.inject(user, roles);
+            logger.info(" --------+++++++++ inject roles for index dummy result");
+            storeAnomalyResultAndRunNextPiece(adTask, pieceEndTime, dataStartTime, dataEndTime, interval, internalListener, anomalyResults, resultIndex, injectSecurity);
+        } catch (Exception exception) {
+            logger.error("111111111122222222223333333333, failed llll ", exception);
+            internalListener.onFailure(exception);
+        }
+    }
+
+    private void storeAnomalyResultAndRunNextPiece(ADTask adTask, long pieceEndTime, long dataStartTime, long dataEndTime, long interval, ActionListener<String> internalListener, List<AnomalyResult> anomalyResults, String resultIndex, InjectSecurity injectSecurity) {
         anomalyResultBulkIndexHandler
                 .bulkIndexAnomalyResult(
                         resultIndex,
@@ -1264,19 +1155,17 @@ public class ADBatchTaskRunner {
                             logger.info("yyyyyyyyyyyyyyyyyyyyy ------- closed injectSecurity");
                             logger.info("aaaaaaaaaa ------------ 111111 aaaaaaaaaa run next piece");
                             try {
-                                    /*try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
-                                        // Current piece end time is the next piece's start time
-                                        logger.info("aaaaaaaaaa ------------ 111111 aaaaaaaaaa run next piece");
-                                        runNextPiece(adTask, pieceEndTime, dataStartTime, dataEndTime, interval, internalListener);
-                                    } catch (Exception e) {
-                                        logger.error("aaaaaaaaaa ------------ 111111 aaaaaaaaaa", e);
-                                        internalListener.onFailure(e);
-                                    }*/
+                                if (injectSecurity != null) {
+                                    injectSecurity.close();
+                                }
                                 runNextPiece(adTask, pieceEndTime, dataStartTime, dataEndTime, interval, internalListener);
                             } catch (Exception e) {
                                 internalListener.onFailure(e);
                             }
                         }, e -> {
+                            if (injectSecurity != null) {
+                                injectSecurity.close();
+                            }
                             logger.error("Fail to bulk index anomaly result", e);
                             internalListener.onFailure(e);
                         }), false)

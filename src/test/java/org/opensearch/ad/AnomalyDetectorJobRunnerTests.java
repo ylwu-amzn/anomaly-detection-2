@@ -156,7 +156,7 @@ public class AnomalyDetectorJobRunnerTests extends AbstractADTest {
         IndexUtils indexUtils = new IndexUtils(client, clientUtil, clusterService, indexNameResolver);
         NodeStateManager stateManager = mock(NodeStateManager.class);
 
-        runner.setIndexUtil(indexUtil);
+        runner.setAnomalyDetectionIndices(indexUtil);
 
         lockService = new LockService(client, clusterService);
         doReturn(lockService).when(context).getLockService();

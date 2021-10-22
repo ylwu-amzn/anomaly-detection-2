@@ -140,7 +140,7 @@ public class ResultWriteWorkerTests extends AbstractRateLimitingTest {
             return null;
         }).when(resultHandler).flush(any(), any());
 
-        resultWriteQueue.put(new ResultWriteRequest(Long.MAX_VALUE, detectorId, RequestPriority.MEDIUM, detectResult));
+        resultWriteQueue.put(new ResultWriteRequest(Long.MAX_VALUE, detectorId, RequestPriority.MEDIUM, detectResult, null));
 
         // the request results one flush
         verify(resultHandler, times(1)).flush(any(), any());
@@ -171,7 +171,7 @@ public class ResultWriteWorkerTests extends AbstractRateLimitingTest {
             return null;
         }).when(resultHandler).flush(any(), any());
 
-        resultWriteQueue.put(new ResultWriteRequest(Long.MAX_VALUE, detectorId, RequestPriority.MEDIUM, detectResult));
+        resultWriteQueue.put(new ResultWriteRequest(Long.MAX_VALUE, detectorId, RequestPriority.MEDIUM, detectResult, null));
 
         // one flush from the original request; and one due to retry
         verify(resultHandler, times(2)).flush(any(), any());
@@ -191,7 +191,7 @@ public class ResultWriteWorkerTests extends AbstractRateLimitingTest {
             return null;
         }).when(resultHandler).flush(any(), any());
 
-        resultWriteQueue.put(new ResultWriteRequest(Long.MAX_VALUE, detectorId, RequestPriority.MEDIUM, detectResult));
+        resultWriteQueue.put(new ResultWriteRequest(Long.MAX_VALUE, detectorId, RequestPriority.MEDIUM, detectResult, null));
         // one flush from the original request; and one due to retry
         verify(resultHandler, times(2)).flush(any(), any());
         verify(nodeStateManager, times(1)).setException(eq(detectorId), any(OpenSearchStatusException.class));
@@ -205,7 +205,7 @@ public class ResultWriteWorkerTests extends AbstractRateLimitingTest {
             return null;
         }).when(resultHandler).flush(any(), any());
 
-        resultWriteQueue.put(new ResultWriteRequest(Long.MAX_VALUE, detectorId, RequestPriority.MEDIUM, detectResult));
+        resultWriteQueue.put(new ResultWriteRequest(Long.MAX_VALUE, detectorId, RequestPriority.MEDIUM, detectResult, null));
         // one flush from the original request; and one due to retry
         verify(resultHandler, times(1)).flush(any(), any());
         verify(nodeStateManager, times(1)).setException(eq(detectorId), any(OpenSearchRejectedExecutionException.class));

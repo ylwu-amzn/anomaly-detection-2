@@ -11,7 +11,6 @@
 
 package org.opensearch.ad.transport;
 
-import static org.opensearch.ad.constant.CommonErrorMessages.CAN_NOT_FIND_RESULT_INDEX;
 import static org.opensearch.ad.settings.AnomalyDetectorSettings.INDEX_PRESSURE_HARD_LIMIT;
 import static org.opensearch.ad.settings.AnomalyDetectorSettings.INDEX_PRESSURE_SOFT_LIMIT;
 import static org.opensearch.common.xcontent.XContentFactory.jsonBuilder;
@@ -24,19 +23,15 @@ import java.util.Random;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.apache.logging.log4j.util.Strings;
 import org.opensearch.action.ActionListener;
 import org.opensearch.action.bulk.BulkAction;
 import org.opensearch.action.bulk.BulkRequest;
-import org.opensearch.action.bulk.BulkResponse;
 import org.opensearch.action.index.IndexRequest;
 import org.opensearch.action.support.ActionFilters;
 import org.opensearch.action.support.HandledTransportAction;
-import org.opensearch.ad.common.exception.EndRunException;
 import org.opensearch.ad.constant.CommonName;
-import org.opensearch.ad.indices.AnomalyDetectionIndices;
 import org.opensearch.ad.model.AnomalyResult;
-import org.opensearch.ad.task.ADTaskManager;
+import org.opensearch.ad.ratelimit.ResultWriteRequest;
 import org.opensearch.ad.util.BulkUtil;
 import org.opensearch.ad.util.RestHandlerUtils;
 import org.opensearch.client.Client;
@@ -59,7 +54,6 @@ public class ADResultBulkTransportAction extends HandledTransportAction<ADResult
     private String indexName;
     private Client client;
     private Random random;
-    private final AnomalyDetectionIndices detectionIndices;
 
     @Inject
     public ADResultBulkTransportAction(
@@ -68,8 +62,7 @@ public class ADResultBulkTransportAction extends HandledTransportAction<ADResult
         IndexingPressure indexingPressure,
         Settings settings,
         ClusterService clusterService,
-        Client client,
-        AnomalyDetectionIndices detectionIndices
+        Client client
     ) {
         super(ADResultBulkAction.NAME, transportService, actionFilters, ADResultBulkRequest::new, ThreadPool.Names.SAME);
         this.indexingPressure = indexingPressure;
@@ -82,7 +75,6 @@ public class ADResultBulkTransportAction extends HandledTransportAction<ADResult
         clusterService.getClusterSettings().addSettingsUpdateConsumer(INDEX_PRESSURE_HARD_LIMIT, it -> hardLimit = it);
         // random seed is 42. Can be any number
         this.random = new Random(42);
-        this.detectionIndices = detectionIndices;
     }
 
     @Override
@@ -93,53 +85,45 @@ public class ADResultBulkTransportAction extends HandledTransportAction<ADResult
         // all non-zero anomaly grade index requests and index zero anomaly grade index requests with probability (1 - index pressure).
         long totalBytes = indexingPressure.getCurrentCombinedCoordinatingAndPrimaryBytes() + indexingPressure.getCurrentReplicaBytes();
         float indexingPressurePercent = (float) totalBytes / primaryAndCoordinatingLimits;
-        List<AnomalyResult> results = request.getAnomalyResults();
-        String resultIndex = request.getResultIndex();
-        resultIndex = Strings.isNotBlank(resultIndex) ? resultIndex : indexName;
+        List<ResultWriteRequest> results = request.getAnomalyResults();
 
         if (results == null || results.size() < 1) {
             listener.onResponse(new ADResultBulkResponse());
         }
 
-        String detectorId = results.get(0).getDetectorId();
-
         BulkRequest bulkRequest = new BulkRequest();
 
         if (indexingPressurePercent <= softLimit) {
-            for (AnomalyResult result : results) {
-                addResult(bulkRequest, result, resultIndex);
+            for (ResultWriteRequest resultWriteRequest : results) {
+                addResult(bulkRequest, resultWriteRequest.getResult(), resultWriteRequest.getResultIndex());
             }
         } else if (indexingPressurePercent <= hardLimit) {
             // exceed soft limit (60%) but smaller than hard limit (90%)
             float acceptProbability = 1 - indexingPressurePercent;
-            for (AnomalyResult result : results) {
+            for (ResultWriteRequest resultWriteRequest : results) {
+                AnomalyResult result = resultWriteRequest.getResult();
                 if (result.isHighPriority() || random.nextFloat() < acceptProbability) {
-                    addResult(bulkRequest, result, resultIndex);
+                    addResult(bulkRequest, result, resultWriteRequest.getResultIndex());
                 }
             }
         } else {
             // if exceeding hard limit, only index non-zero grade or error result
-            for (AnomalyResult result : results) {
+            for (ResultWriteRequest resultWriteRequest : results) {
+                AnomalyResult result = resultWriteRequest.getResult();
                 if (result.isHighPriority()) {
-                    addResult(bulkRequest, result, resultIndex);
+                    addResult(bulkRequest, result, resultWriteRequest.getResultIndex());
                 }
             }
         }
 
         if (bulkRequest.numberOfActions() > 0) {
-            if (!detectionIndices.doesIndexExist(resultIndex)) {
-                LOG.info("-------------------0000000000 result index doesn't exist: {}", resultIndex);
-                listener.onFailure(new EndRunException(detectorId, CAN_NOT_FIND_RESULT_INDEX + resultIndex, true));
-            } else {
-                LOG.info("-------------------0000000000 result index exists: {}", resultIndex);
-                client.execute(BulkAction.INSTANCE, bulkRequest, ActionListener.wrap(bulkResponse -> {
-                    List<IndexRequest> failedRequests = BulkUtil.getFailedIndexRequest(bulkRequest, bulkResponse);
-                    listener.onResponse(new ADResultBulkResponse(failedRequests));
-                }, e -> {
-                    LOG.error("Failed to bulk index AD result", e);
-                    listener.onFailure(e);
-                }));
-            }
+            client.execute(BulkAction.INSTANCE, bulkRequest, ActionListener.wrap(bulkResponse -> {
+                List<IndexRequest> failedRequests = BulkUtil.getFailedIndexRequest(bulkRequest, bulkResponse);
+                listener.onResponse(new ADResultBulkResponse(failedRequests));
+            }, e -> {
+                LOG.error("Failed to bulk index AD result", e);
+                listener.onFailure(e);
+            }));
         } else {
             listener.onResponse(new ADResultBulkResponse());
         }
@@ -147,7 +131,9 @@ public class ADResultBulkTransportAction extends HandledTransportAction<ADResult
 
     private void addResult(BulkRequest bulkRequest, AnomalyResult result, String resultIndex) {
         try (XContentBuilder builder = jsonBuilder()) {
-            IndexRequest indexRequest = new IndexRequest(resultIndex).source(result.toXContent(builder, RestHandlerUtils.XCONTENT_WITH_TYPE));
+            String index = resultIndex == null? indexName : resultIndex;
+            LOG.info("++++++++++---------- writgbulkreulat into index {}", index);
+            IndexRequest indexRequest = new IndexRequest(index).source(result.toXContent(builder, RestHandlerUtils.XCONTENT_WITH_TYPE));
             bulkRequest.add(indexRequest);
         } catch (IOException e) {
             LOG.error(String.format(Locale.ROOT, "Failed to prepare bulk %s", resultIndex), e);

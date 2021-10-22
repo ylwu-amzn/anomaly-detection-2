@@ -57,6 +57,7 @@ import org.opensearch.ad.util.RestHandlerUtils;
 import org.opensearch.client.Client;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.unit.TimeValue;
+import org.opensearch.common.util.concurrent.ThreadContext;
 import org.opensearch.common.xcontent.NamedXContentRegistry;
 import org.opensearch.common.xcontent.XContentFactory;
 import org.opensearch.common.xcontent.XContentParser;
@@ -165,22 +166,41 @@ public class IndexAnomalyDetectorActionHandler {
         this.adTaskManager = adTaskManager;
     }
 
+    public void start() {
+        String resultIndex = anomalyDetector.getResultIndex();
+        try {
+            // use default detector result index which is system index
+            if (resultIndex == null) {
+                createOrUpdateDetector();
+                return;
+            }
+
+            // user specified detector result index
+            anomalyDetectionIndices.initCustomResultIndexAndExecute(resultIndex, () -> createOrUpdateDetector(), listener);
+        } catch (Exception e) {
+            logger.error("Failed to create index " + resultIndex, e);
+            listener.onFailure(e);
+        }
+    }
+
     /**
      * Start function to process create/update anomaly detector request.
      * Check if anomaly detector index exist first, if not, will create first.
-     *
-     * @throws IOException IOException from {@link AnomalyDetectionIndices#initAnomalyDetectorIndexIfAbsent(ActionListener)}
      */
-    public void start() throws IOException {
-        if (!anomalyDetectionIndices.doesAnomalyDetectorIndexExist()) {
-            logger.info("AnomalyDetector Indices do not exist");
-            anomalyDetectionIndices
-                .initAnomalyDetectorIndex(
-                    ActionListener.wrap(response -> onCreateMappingsResponse(response), exception -> listener.onFailure(exception))
-                );
-        } else {
-            logger.info("AnomalyDetector Indices do exist, calling prepareAnomalyDetectorIndexing");
-            prepareAnomalyDetectorIndexing();
+    private void createOrUpdateDetector() {
+        try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
+            if (!anomalyDetectionIndices.doesAnomalyDetectorIndexExist()) {
+                logger.info("AnomalyDetector Indices do not exist");
+                anomalyDetectionIndices
+                        .initAnomalyDetectorIndex(
+                                ActionListener.wrap(response -> onCreateMappingsResponse(response), exception -> listener.onFailure(exception))
+                        );
+            } else {
+                logger.info("AnomalyDetector Indices do exist, calling prepareAnomalyDetectorIndexing");
+                prepareAnomalyDetectorIndexing();
+            }
+        } catch (Exception e) {
+            listener.onFailure(e);
         }
     }
 

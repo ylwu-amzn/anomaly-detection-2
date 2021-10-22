@@ -21,7 +21,6 @@ import static org.opensearch.ad.constant.CommonErrorMessages.FAIL_TO_FIND_DETECT
 import static org.opensearch.ad.constant.CommonErrorMessages.HC_DETECTOR_TASK_IS_UPDATING;
 import static org.opensearch.ad.constant.CommonErrorMessages.NO_ELIGIBLE_NODE_TO_RUN_DETECTOR;
 import static org.opensearch.ad.constant.CommonName.DETECTION_STATE_INDEX;
-import static org.opensearch.ad.constant.CommonName.DUMMY_AD_RESULT_ID;
 import static org.opensearch.ad.indices.AnomalyDetectionIndices.ALL_AD_RESULTS_INDEX_PATTERN;
 import static org.opensearch.ad.model.ADTask.COORDINATING_NODE_FIELD;
 import static org.opensearch.ad.model.ADTask.DETECTOR_ID_FIELD;
@@ -65,7 +64,15 @@ import static org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedT
 import java.io.IOException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Semaphore;
 import java.util.function.BiConsumer;
@@ -111,7 +118,6 @@ import org.opensearch.ad.model.ADTaskState;
 import org.opensearch.ad.model.ADTaskType;
 import org.opensearch.ad.model.AnomalyDetector;
 import org.opensearch.ad.model.AnomalyDetectorJob;
-import org.opensearch.ad.model.AnomalyResult;
 import org.opensearch.ad.model.DetectionDateRange;
 import org.opensearch.ad.model.DetectorProfile;
 import org.opensearch.ad.model.Entity;
@@ -285,78 +291,27 @@ public class ADTaskManager {
         ThreadContext.StoredContext context,
         ActionListener<AnomalyDetectorJobResponse> listener
     ) {
+        // upgrade index mapping of AD default indices
         detectionIndices.update();
+
         getDetector(detectorId, (detector) -> {
             if (!detector.isPresent()) {
                 listener.onFailure(new OpenSearchStatusException(FAIL_TO_FIND_DETECTOR_MSG + detectorId, RestStatus.NOT_FOUND));
                 return;
             }
             if (validateDetector(detector.get(), listener)) { // validate if detector is ready to start
-                if (detector.get().useCustomResultIndex()) {
-                    context.restore();
-                    String resultIndex = detector.get().getResultIndex();
-                    if (!detectionIndices.doesIndexExist(resultIndex)) {
-                        try {
-                            detectionIndices.initCustomAnomalyResultIndexDirectly(resultIndex, ActionListener.wrap(r -> {
-                                if (r.isAcknowledged()) {
-                                    checkWritePermissionAndStartDetector(detectionDateRange, handler, user, transportService, listener, detector, resultIndex);
-                                } else {
-                                    String error = "Creating custom anomaly result index with mappings call not acknowledged: " + resultIndex;
-                                    logger.error(error);
-                                    listener.onFailure(new AnomalyDetectionException(error));
-                                }
-                            }, e-> {
-                                logger.error("Failed to create custom AD result index " + resultIndex, e);
-                                if (ExceptionsHelper.unwrapCause(e) instanceof ResourceAlreadyExistsException) {
-                                    checkWritePermissionAndStartDetector(detectionDateRange, handler, user, transportService, listener, detector, resultIndex);
-                                } else {
-                                    listener.onFailure(e);
-                                }
-                            }));
-                        } catch (IOException e) {
-                            logger.error("Failed to init custom AD result index "+resultIndex, e);
-                            listener.onFailure(e);
-                        }
-                    } else {
-                        checkWritePermissionAndStartDetector(detectionDateRange, handler, user, transportService, listener, detector, resultIndex);
-                    }
-                } else {
+                String resultIndex = detector.get().getResultIndex();
+                if (resultIndex == null) {
                     startRealtimeOrHistoricalDetection(detectionDateRange, handler, user, transportService, listener, detector);
+                    return;
                 }
+                context.restore();
+                detectionIndices.initCustomResultIndexAndExecute(
+                        resultIndex,
+                        () -> startRealtimeOrHistoricalDetection(detectionDateRange, handler, user, transportService, listener, detector),
+                        listener);
             }
         }, listener);
-    }
-
-    private void checkWritePermissionAndStartDetector(DetectionDateRange detectionDateRange, IndexAnomalyDetectorJobActionHandler handler, User user, TransportService transportService, ActionListener<AnomalyDetectorJobResponse> listener, Optional<AnomalyDetector> detector, String resultIndex) {
-        try {
-            if (!detectionIndices.isValidResultIndex(resultIndex)) {
-                listener.onFailure(new EndRunException("Result index schema can't match", true));
-                return;
-            }
-            detectionIndices.upgradeResultIndexMapping(resultIndex, ActionListener.wrap(r -> {
-                AnomalyResult dummyResult = AnomalyResult.getDummyResult();
-                IndexRequest indexRequest = new IndexRequest(resultIndex).id(DUMMY_AD_RESULT_ID).source(dummyResult.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS));
-                client.index(indexRequest, ActionListener.wrap(response -> {
-                    logger.info("ylwudebug2: write result status for start detector is : {}", response.getResult());
-                    client.delete(new DeleteRequest(resultIndex).id(DUMMY_AD_RESULT_ID), ActionListener.wrap(deleteResponse -> {
-                        startRealtimeOrHistoricalDetection(detectionDateRange, handler, user, transportService, listener, detector);
-                    }, ex -> {
-                        logger.error("Failed to delete dummy AD result when start detector", ex);
-                        listener.onFailure(ex);
-                    }));
-
-                }, exception -> {
-                    logger.error("ylwudebug2: Failed to write custom AD result index when start detectorm " + resultIndex, exception);
-                    listener.onFailure(exception);
-                }));
-            }, e->{
-                logger.error("Failed to upgrade custom result index");
-                listener.onFailure(e);
-            }));
-        } catch (IOException e) {
-            logger.error("Failed to index result", e);
-            listener.onFailure(e);
-        }
     }
 
     private void startRealtimeOrHistoricalDetection(DetectionDateRange detectionDateRange, IndexAnomalyDetectorJobActionHandler handler, User user, TransportService transportService, ActionListener<AnomalyDetectorJobResponse> listener, Optional<AnomalyDetector> detector) {
@@ -2235,10 +2190,6 @@ public class ADTaskManager {
 
     public void removeRealtimeTaskCache(String detectorId) {
         adTaskCacheManager.removeRealtimeTaskCache(detectorId);
-    }
-
-    public boolean hasRealtimeTaskCache(String detectorId) {
-        return adTaskCacheManager.getRealtimeTaskCache(detectorId) != null;
     }
 
     /**
