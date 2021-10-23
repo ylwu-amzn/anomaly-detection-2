@@ -25,15 +25,17 @@ import java.util.List;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.opensearch.action.ActionListener;
+import org.apache.logging.log4j.util.Strings;
 import org.opensearch.action.ActionType;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.ad.constant.CommonErrorMessages;
 import org.opensearch.ad.model.AnomalyDetector;
+import org.opensearch.ad.rest.handler.AnomalyDetectorFunction;
 import org.opensearch.ad.settings.EnabledSetting;
 import org.opensearch.client.node.NodeClient;
 import org.opensearch.common.bytes.BytesReference;
+import org.opensearch.common.util.concurrent.ThreadContext;
 import org.opensearch.common.xcontent.LoggingDeprecationHandler;
 import org.opensearch.common.xcontent.ToXContentObject;
 import org.opensearch.common.xcontent.XContentBuilder;
@@ -46,6 +48,7 @@ import org.opensearch.rest.RestChannel;
 import org.opensearch.rest.RestRequest;
 import org.opensearch.rest.RestResponse;
 import org.opensearch.rest.RestStatus;
+import org.opensearch.rest.action.RestActionListener;
 import org.opensearch.rest.action.RestResponseListener;
 import org.opensearch.search.SearchHit;
 import org.opensearch.search.builder.SearchSourceBuilder;
@@ -88,7 +91,7 @@ public abstract class AbstractSearchAction<T extends ToXContentObject> extends B
         searchSourceBuilder.seqNoAndPrimaryTerm(true).version(true);
         SearchRequest searchRequest = new SearchRequest().source(searchSourceBuilder).indices(this.index);
 
-        String resultIndex = SEARCH_ANOMALY_RESULT_ACTION.equals(getName())? request.param(RESULT_INDEX) : null;
+        String resultIndex = SEARCH_ANOMALY_RESULT_ACTION.equals(getName())? Strings.trimToNull(request.param(RESULT_INDEX)) : null;
         return channel -> {
             logger.info("+++++++++++++++++++++++++++++ search result index: {}", resultIndex);
             if (resultIndex == null) {
@@ -98,11 +101,38 @@ public abstract class AbstractSearchAction<T extends ToXContentObject> extends B
 //            SearchSourceBuilder matchAll = new SearchSourceBuilder().query(new MatchAllQueryBuilder()).size(0);
             // If user specify result index, we just query that index to get old AD result.
 //            SearchRequest searchCustomIndexRequest = new SearchRequest().source(matchAll).indices(resultIndex);
-            searchRequest.indices(resultIndex);
-            client.search(searchRequest, search(channel));
+
+            ;
+            SearchRequest searchResultIndexRequest = new SearchRequest()
+                    .indices(resultIndex)
+                    .source(new SearchSourceBuilder().query(new MatchAllQueryBuilder()).size(0));
+            searchRequest.indices(resultIndex, this.index);
+
+
+            AnomalyDetectorFunction function = () -> {
+                try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
+                    searchRequest.indices(resultIndex, this.index);
+                    client.search(searchRequest, search(channel));
+                } catch (Exception e) {
+                    logger.error(e);
+                    try {
+                        channel.sendResponse(new BytesRestResponse(channel, e));
+                    } catch (Exception exception) {
+                        logger.error("Failed to send back failure response for search AD result", exception);
+                    }
+                }
+            };
+            client.search(searchResultIndexRequest, searchResultIndex(function, channel));
         };
+    }
 
-
+    private RestActionListener<SearchResponse> searchResultIndex(AnomalyDetectorFunction function, RestChannel channel) {
+        return new RestActionListener<SearchResponse>(channel) {
+            @Override
+            protected void processResponse(SearchResponse searchResponse) throws Exception {
+                function.execute();
+            }
+        };
     }
 
     private RestResponseListener<SearchResponse> search(RestChannel channel) {
