@@ -14,14 +14,14 @@ package org.opensearch.ad.rest;
 import static org.opensearch.ad.indices.AnomalyDetectionIndices.ALL_AD_RESULTS_INDEX_PATTERN;
 import static org.opensearch.ad.util.RestHandlerUtils.RESULT_INDEX;
 
+import java.util.Locale;
+
 import org.apache.commons.lang3.tuple.Pair;
 import org.opensearch.ad.AnomalyDetectorPlugin;
 import org.opensearch.ad.model.AnomalyResult;
 import org.opensearch.ad.transport.SearchAnomalyResultAction;
 
 import com.google.common.collect.ImmutableList;
-
-import java.util.Locale;
 
 /**
  * This class consists of the REST handler to search anomaly results.

@@ -103,15 +103,11 @@ public class ResultWriteWorker extends BatchWorker<ResultWriteRequest, ADResultB
             listener.onResponse(null);
             return;
         }
-        resultHandler.flush(request, listener); //TODO: write result to custom AD result index
+        resultHandler.flush(request, listener);
     }
 
     @Override
     protected ADResultBulkRequest toBatchRequest(List<ResultWriteRequest> toProcess) {
-        // toProcess won't be null or empty, check BatchWorker, line 108
-        // It's possible that the result index in "toProcess" is default AD result index or user's custom result
-        // index, could be multiple custom result indexes. As we have checked the index permission when job start,
-        // won't recheck the custom result index permission here.
         final ADResultBulkRequest bulkRequest = new ADResultBulkRequest();
         for (ResultWriteRequest request : toProcess) {
             bulkRequest.add(request);
@@ -133,7 +129,6 @@ public class ResultWriteWorker extends BatchWorker<ResultWriteRequest, ADResultB
             enqueueRetryRequestIteration(adResultBulkResponse.getRetryRequests().get(), 0);
         }, exception -> {
             if (ExceptionUtil.isRetryAble(exception)) {
-                LOG.error("aaaaaaaaaabbbb ---- isRetryAble exception", exception);
                 // retry all of them
                 super.putAll(toProcess);
             } else if (ExceptionUtil.isOverloaded(exception)) {

@@ -131,8 +131,7 @@ public class ADResultBulkTransportAction extends HandledTransportAction<ADResult
 
     private void addResult(BulkRequest bulkRequest, AnomalyResult result, String resultIndex) {
         try (XContentBuilder builder = jsonBuilder()) {
-            String index = resultIndex == null? indexName : resultIndex;
-            LOG.info("++++++++++---------- writgbulkreulat into index {}", index);
+            String index = resultIndex == null ? indexName : resultIndex;
             IndexRequest indexRequest = new IndexRequest(index).source(result.toXContent(builder, RestHandlerUtils.XCONTENT_WITH_TYPE));
             bulkRequest.add(indexRequest);
         } catch (IOException e) {

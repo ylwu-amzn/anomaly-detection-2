@@ -114,7 +114,8 @@ public class AnomalyDetectorRestApiIT extends AnomalyDetectorRestTestCase {
             randomInt(),
             null,
             null,
-            TestHelpers.randomUser()
+            TestHelpers.randomUser(),
+            null
         );
 
         TestHelpers
@@ -190,7 +191,8 @@ public class AnomalyDetectorRestApiIT extends AnomalyDetectorRestTestCase {
             detector.getSchemaVersion(),
             detector.getLastUpdateTime(),
             ImmutableList.of(randomAlphaOfLength(5)),
-            detector.getUser()
+            detector.getUser(),
+            null
         );
         Exception ex = expectThrows(
             ResponseException.class,
@@ -247,7 +249,8 @@ public class AnomalyDetectorRestApiIT extends AnomalyDetectorRestTestCase {
             detector.getSchemaVersion(),
             detector.getLastUpdateTime(),
             null,
-            detector.getUser()
+            detector.getUser(),
+            null
         );
 
         updateClusterSettings(EnabledSetting.AD_PLUGIN_ENABLED, false);
@@ -310,7 +313,8 @@ public class AnomalyDetectorRestApiIT extends AnomalyDetectorRestTestCase {
             detector1.getSchemaVersion(),
             detector1.getLastUpdateTime(),
             null,
-            detector1.getUser()
+            detector1.getUser(),
+            null
         );
 
         TestHelpers
@@ -348,7 +352,8 @@ public class AnomalyDetectorRestApiIT extends AnomalyDetectorRestTestCase {
             detector.getSchemaVersion(),
             Instant.now(),
             null,
-            detector.getUser()
+            detector.getUser(),
+            null
         );
 
         Thread.sleep(2000); // sleep some time before updating to avoid flaky test
@@ -393,7 +398,8 @@ public class AnomalyDetectorRestApiIT extends AnomalyDetectorRestTestCase {
             detector.getSchemaVersion(),
             detector.getLastUpdateTime(),
             null,
-            detector.getUser()
+            detector.getUser(),
+            null
         );
 
         deleteIndexWithAdminClient(AnomalyDetector.ANOMALY_DETECTORS_INDEX);
@@ -728,7 +734,7 @@ public class AnomalyDetectorRestApiIT extends AnomalyDetectorRestTestCase {
                 null
             );
 
-        assertEquals("Fail to validateCustomRestulIndexAndCreateDetector AD job", RestStatus.OK, TestHelpers.restStatus(startAdJobResponse));
+        assertEquals("Fail to start AD job", RestStatus.OK, TestHelpers.restStatus(startAdJobResponse));
 
         TestHelpers
             .assertFailWith(
@@ -759,7 +765,7 @@ public class AnomalyDetectorRestApiIT extends AnomalyDetectorRestTestCase {
                 null
             );
 
-        assertEquals("Fail to validateCustomRestulIndexAndCreateDetector AD job", RestStatus.OK, TestHelpers.restStatus(startAdJobResponse));
+        assertEquals("Fail to start AD job", RestStatus.OK, TestHelpers.restStatus(startAdJobResponse));
 
         String newDescription = randomAlphaOfLength(5);
 
@@ -779,7 +785,8 @@ public class AnomalyDetectorRestApiIT extends AnomalyDetectorRestTestCase {
             detector.getSchemaVersion(),
             detector.getLastUpdateTime(),
             null,
-            detector.getUser()
+            detector.getUser(),
+            null
         );
 
         TestHelpers
@@ -811,7 +818,7 @@ public class AnomalyDetectorRestApiIT extends AnomalyDetectorRestTestCase {
                 null
             );
 
-        assertEquals("Fail to validateCustomRestulIndexAndCreateDetector AD job", RestStatus.OK, TestHelpers.restStatus(startAdJobResponse));
+        assertEquals("Fail to start AD job", RestStatus.OK, TestHelpers.restStatus(startAdJobResponse));
 
         ToXContentObject[] results = getAnomalyDetector(detector.getDetectorId(), true, client());
         assertEquals("Incorrect Location header", detector, results[0]);
@@ -854,7 +861,7 @@ public class AnomalyDetectorRestApiIT extends AnomalyDetectorRestTestCase {
                 null
             );
 
-        assertEquals("Fail to validateCustomRestulIndexAndCreateDetector AD job", RestStatus.OK, TestHelpers.restStatus(startAdJobResponse));
+        assertEquals("Fail to start AD job", RestStatus.OK, TestHelpers.restStatus(startAdJobResponse));
 
         startAdJobResponse = TestHelpers
             .makeRequest(
@@ -866,7 +873,7 @@ public class AnomalyDetectorRestApiIT extends AnomalyDetectorRestTestCase {
                 null
             );
 
-        assertEquals("Fail to validateCustomRestulIndexAndCreateDetector AD job", RestStatus.OK, TestHelpers.restStatus(startAdJobResponse));
+        assertEquals("Fail to start AD job", RestStatus.OK, TestHelpers.restStatus(startAdJobResponse));
     }
 
     public void testStartAdJobWithNonexistingDetectorIndex() throws Exception {
@@ -916,7 +923,7 @@ public class AnomalyDetectorRestApiIT extends AnomalyDetectorRestTestCase {
                 "",
                 null
             );
-        assertEquals("Fail to validateCustomRestulIndexAndCreateDetector AD job", RestStatus.OK, TestHelpers.restStatus(startAdJobResponse));
+        assertEquals("Fail to start AD job", RestStatus.OK, TestHelpers.restStatus(startAdJobResponse));
 
         updateClusterSettings(EnabledSetting.AD_PLUGIN_ENABLED, false);
 
@@ -979,7 +986,7 @@ public class AnomalyDetectorRestApiIT extends AnomalyDetectorRestTestCase {
 
     public void testStopNonExistingAdJob() throws Exception {
         AnomalyDetector detector = createRandomAnomalyDetector(true, false, client());
-        // sometimes it fails to validateCustomRestulIndexAndCreateDetector detector as not able to find detector, sleep 2 seconds
+        // sometimes it fails to start detector as not able to find detector, sleep 2 seconds
         Thread.sleep(2000);
         Response startAdJobResponse = TestHelpers
             .makeRequest(
@@ -990,7 +997,7 @@ public class AnomalyDetectorRestApiIT extends AnomalyDetectorRestTestCase {
                 "",
                 null
             );
-        assertEquals("Fail to validateCustomRestulIndexAndCreateDetector AD job", RestStatus.OK, TestHelpers.restStatus(startAdJobResponse));
+        assertEquals("Fail to start AD job", RestStatus.OK, TestHelpers.restStatus(startAdJobResponse));
 
         TestHelpers
             .assertFailWith(
@@ -1019,7 +1026,7 @@ public class AnomalyDetectorRestApiIT extends AnomalyDetectorRestTestCase {
                 "",
                 null
             );
-        assertEquals("Fail to validateCustomRestulIndexAndCreateDetector AD job", RestStatus.OK, TestHelpers.restStatus(startAdJobResponse));
+        assertEquals("Fail to start AD job", RestStatus.OK, TestHelpers.restStatus(startAdJobResponse));
 
         Response stopAdJobResponse = TestHelpers
             .makeRequest(
@@ -1042,7 +1049,7 @@ public class AnomalyDetectorRestApiIT extends AnomalyDetectorRestTestCase {
                 null
             );
 
-        assertEquals("Fail to validateCustomRestulIndexAndCreateDetector AD job", RestStatus.OK, TestHelpers.restStatus(startAdJobResponse));
+        assertEquals("Fail to start AD job", RestStatus.OK, TestHelpers.restStatus(startAdJobResponse));
     }
 
     public void testStartAdjobWithNullFeatures() throws Exception {
@@ -1053,7 +1060,7 @@ public class AnomalyDetectorRestApiIT extends AnomalyDetectorRestTestCase {
         TestHelpers
             .assertFailWith(
                 ResponseException.class,
-                "Can't validateCustomRestulIndexAndCreateDetector detector job as no features configured",
+                "Can't start detector job as no features configured",
                 () -> TestHelpers
                     .makeRequest(
                         client(),
@@ -1074,7 +1081,7 @@ public class AnomalyDetectorRestApiIT extends AnomalyDetectorRestTestCase {
         TestHelpers
             .assertFailWith(
                 ResponseException.class,
-                "Can't validateCustomRestulIndexAndCreateDetector detector job as no features configured",
+                "Can't start detector job as no features configured",
                 () -> TestHelpers
                     .makeRequest(
                         client(),
@@ -1161,7 +1168,7 @@ public class AnomalyDetectorRestApiIT extends AnomalyDetectorRestTestCase {
             ResponseException.class,
             () -> startAnomalyDetector(detector.getDetectorId(), new DetectionDateRange(now.minus(10, ChronoUnit.DAYS), now), client())
         );
-        assertTrue(e.getMessage().contains("Can't validateCustomRestulIndexAndCreateDetector detector job as no enabled features configured"));
+        assertTrue(e.getMessage().contains("Can't start detector job as no enabled features configured"));
     }
 
     public void testDeleteAnomalyDetectorWhileRunning() throws Exception {

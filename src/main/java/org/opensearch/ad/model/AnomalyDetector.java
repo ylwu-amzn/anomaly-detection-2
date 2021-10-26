@@ -11,6 +11,8 @@
 
 package org.opensearch.ad.model;
 
+import static org.opensearch.ad.constant.CommonErrorMessages.INVALID_RESULT_INDEX_PREFIX;
+import static org.opensearch.ad.constant.CommonName.CUSTOM_RESULT_INDEX_PREFIX;
 import static org.opensearch.ad.model.AnomalyDetectorType.MULTI_ENTITY;
 import static org.opensearch.ad.model.AnomalyDetectorType.SINGLE_ENTITY;
 import static org.opensearch.ad.settings.AnomalyDetectorSettings.DEFAULT_SHINGLE_SIZE;
@@ -86,7 +88,6 @@ public class AnomalyDetector implements Writeable, ToXContentObject {
     public static final String USER_FIELD = "user";
     public static final String DETECTOR_TYPE_FIELD = "detector_type";
     private static final String RESULT_INDEX_FIELD = "result_index";
-    public static final String RESULT_INDEX_PREFIX = "anomaly-result-";
     @Deprecated
     public static final String DETECTION_DATE_RANGE_FIELD = "detection_date_range";
 
@@ -132,6 +133,7 @@ public class AnomalyDetector implements Writeable, ToXContentObject {
      * @param lastUpdateTime    detector's last update time
      * @param categoryFields    a list of partition fields
      * @param user              user to which detector is associated
+     * @param resultIndex       result index
      */
     public AnomalyDetector(
         String detectorId,
@@ -197,8 +199,8 @@ public class AnomalyDetector implements Writeable, ToXContentObject {
         this.user = user;
         this.detectorType = isMultientityDetector(categoryFields) ? MULTI_ENTITY.name() : SINGLE_ENTITY.name();
         this.resultIndex = Strings.trimToNull(resultIndex);
-        if (this.resultIndex != null && !this.resultIndex.startsWith(RESULT_INDEX_PREFIX)) {
-            throw new IllegalArgumentException("Result index must validateCustomRestulIndexAndCreateDetector with prefix " + RESULT_INDEX_PREFIX);
+        if (this.resultIndex != null && !this.resultIndex.startsWith(CUSTOM_RESULT_INDEX_PREFIX)) {
+            throw new IllegalArgumentException(INVALID_RESULT_INDEX_PREFIX);
         }
     }
 

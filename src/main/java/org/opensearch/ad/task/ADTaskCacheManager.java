@@ -838,7 +838,7 @@ public class ADTaskCacheManager {
         if (count != null && adTaskSlotLimit != null) {
             Integer detectorTaskSlots = adTaskSlotLimit.getDetectorTaskSlots();
             if (detectorTaskSlots != null && detectorTaskSlots > count) {
-                logger.info("ssssssssssssssssssssssssssssss Scale down task slots from {} to the same as top entity count {}", detectorTaskSlots, count);
+                logger.debug("Scale down task slots from {} to the same as top entity count {}", detectorTaskSlots, count);
                 adTaskSlotLimit.setDetectorTaskSlots(count);
             }
         }

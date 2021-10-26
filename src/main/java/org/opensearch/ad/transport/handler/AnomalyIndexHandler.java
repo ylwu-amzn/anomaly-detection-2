@@ -109,54 +109,48 @@ public class AnomalyIndexHandler<T extends ToXContentObject> {
 
         try {
             if (customIndexName != null) {
-                LOG.info("ylwudebug3: save to custom index: ------------------------------ {}", customIndexName);
                 // Only create custom AD result index when create detector, won’t recreate custom AD result index in realtime
                 // job and historical analysis later if it’s deleted. If user delete the custom AD result index, and AD plugin
-                // recreate it, that may bring confusion and may have security leak (for example Admin delete that index as
-                // permission removed from the creator, we should not recreate it again).
+                // recreate it, that may bring confusion.
                 if (!anomalyDetectionIndices.doesIndexExist(customIndexName)) {
-                    LOG.info("ylwudebug3: can't find custom index: ------------------------------++++++++++ {}", customIndexName);
                     throw new EndRunException(detectorId, CAN_NOT_FIND_RESULT_INDEX + customIndexName, true);
                 }
                 if (!anomalyDetectionIndices.isValidResultIndex(customIndexName)) {
                     throw new EndRunException(detectorId, "wrong index mapping of custom AD result index", true);
                 }
-                LOG.info("ylwudebug3: save to default system index: ------------------------------");
                 save(toSave, detectorId, customIndexName);
                 return;
             }
             if (!anomalyDetectionIndices.doesDefaultAnomalyResultIndexExist()) {
-                LOG.info("ylwudebug3: init default system index: ------------------------------ {}", indexName);
-                anomalyDetectionIndices.initAnomalyResultIndexDirectly(
+                anomalyDetectionIndices
+                    .initDefaultAnomalyResultIndexDirectly(
                         ActionListener.wrap(initResponse -> onCreateIndexResponse(initResponse, toSave, detectorId), exception -> {
                             if (ExceptionsHelper.unwrapCause(exception) instanceof ResourceAlreadyExistsException) {
                                 // It is possible the index has been created while we sending the create request
                                 save(toSave, detectorId);
                             } else {
                                 throw new AnomalyDetectionException(
-                                        detectorId,
-                                        String.format(Locale.ROOT, "Unexpected error creating index %s", indexName),
-                                        exception
+                                    detectorId,
+                                    String.format(Locale.ROOT, "Unexpected error creating index %s", indexName),
+                                    exception
                                 );
                             }
                         })
-                );
+                    );
             } else {
-                LOG.info("ylwudebug3: save to default system index: ------------------------------ {}", indexName);
                 save(toSave, detectorId);
             }
         } catch (Exception e) {
             throw new AnomalyDetectionException(
-                    detectorId,
-                    String.format(Locale.ROOT, "Error in saving %s for detector %s", indexName, detectorId),
-                    e
+                detectorId,
+                String.format(Locale.ROOT, "Error in saving %s for detector %s", indexName, detectorId),
+                e
             );
         }
     }
 
     private void onCreateIndexResponse(CreateIndexResponse response, T toSave, String detectorId) {
         if (response.isAcknowledged()) {
-            LOG.info("ylwudebug3: store result into index: ------------------------------++++++++++ {}", indexName);
             save(toSave, detectorId);
         } else {
             throw new AnomalyDetectionException(
@@ -170,7 +164,7 @@ public class AnomalyIndexHandler<T extends ToXContentObject> {
         save(toSave, detectorId, indexName);
     }
 
-    //TODO: Upgrade custom result index mapping to latest version.
+    // TODO: Upgrade custom result index mapping to latest version.
     protected void save(T toSave, String detectorId, String indexName) {
         try (XContentBuilder builder = jsonBuilder()) {
             IndexRequest indexRequest = new IndexRequest(indexName).source(toSave.toXContent(builder, RestHandlerUtils.XCONTENT_WITH_TYPE));

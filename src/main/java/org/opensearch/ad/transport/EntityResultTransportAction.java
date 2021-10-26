@@ -203,7 +203,7 @@ public class EntityResultTransportAction extends HandledTransportAction<EntityRe
                 // So many OpenSearchRejectedExecutionException if we write no matter what
                 if (result.getRcfScore() > 0) {
                     resultWriteQueue
-                        .put( // TODO: write AD result to custom result index.
+                        .put(
                             new ResultWriteRequest(
                                 System.currentTimeMillis() + detector.getDetectorIntervalInMilliseconds(),
                                 detectorId,

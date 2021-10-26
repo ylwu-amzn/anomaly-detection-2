@@ -18,7 +18,6 @@ import java.util.List;
 import org.opensearch.action.ActionRequest;
 import org.opensearch.action.ActionRequestValidationException;
 import org.opensearch.action.ValidateActions;
-import org.opensearch.ad.model.AnomalyResult;
 import org.opensearch.ad.ratelimit.ResultWriteRequest;
 import org.opensearch.common.io.stream.StreamInput;
 import org.opensearch.common.io.stream.StreamOutput;

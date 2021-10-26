@@ -11,13 +11,7 @@
 
 package org.opensearch.ad.constant;
 
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
 import org.opensearch.ad.stats.StatNames;
-
-import java.util.Set;
-
-import static org.opensearch.ad.model.AnomalyResult.*;
 
 public class CommonName {
     // ======================================
@@ -142,20 +136,5 @@ public class CommonName {
     // ======================================
     public static final String DUMMY_AD_RESULT_ID = "dummy_ad_result_id";
     public static final String DUMMY_DETECTOR_ID = "dummy_detector_id";
-    public static final ImmutableMap<String, String> AD_RESULT_FIELD_CONFIGS = ImmutableMap
-            .<String, String>builder()
-            .put(ANOMALY_GRADE_FIELD, "{type=double}")
-            .put(ANOMALY_SCORE_FIELD, "{type=double}")
-            .put(CONFIDENCE_FIELD, "{type=double}")
-            .put(DATA_START_TIME_FIELD, "{type=date, format=strict_date_time||epoch_millis}")
-            .put(DATA_END_TIME_FIELD, "{type=date, format=strict_date_time||epoch_millis}")
-            .put(DETECTOR_ID_FIELD, "{type=keyword}")
-            .put(EXECUTION_START_TIME_FIELD, "{type=date, format=strict_date_time||epoch_millis}")
-            .put(FEATURE_DATA_FIELD, "{type=nested, properties={data={type=double}, feature_id={type=keyword}}}")
-            //.put("is_anomaly", "{type=boolean}")
-            .put(MODEL_ID_FIELD, "{type=keyword}")
-            .put(SCHEMA_VERSION_FIELD, "{type=integer}")
-            .put(TASK_ID_FIELD, "{type=keyword}")
-            .put(USER_FIELD, "{type=nested, properties={backend_roles={type=text, fields={keyword={type=keyword}}}, custom_attribute_names={type=text, fields={keyword={type=keyword}}}, name={type=text, fields={keyword={type=keyword, ignore_above=256}}}, roles={type=text, fields={keyword={type=keyword}}}}}")
-            .build();
+    public static final String CUSTOM_RESULT_INDEX_PREFIX = "opensearch-ad-plugin-results-";
 }

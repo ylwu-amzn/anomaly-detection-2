@@ -11,19 +11,25 @@
 
 package org.opensearch.ad.ratelimit;
 
+import java.io.IOException;
+
 import org.opensearch.ad.model.AnomalyResult;
 import org.opensearch.common.io.stream.StreamInput;
 import org.opensearch.common.io.stream.StreamOutput;
 import org.opensearch.common.io.stream.Writeable;
-
-import java.io.IOException;
 
 public class ResultWriteRequest extends QueuedRequest implements Writeable {
     private final AnomalyResult result;
     // If resultIndex is null, result will be stored in default result index.
     private final String resultIndex;
 
-    public ResultWriteRequest(long expirationEpochMs, String detectorId, RequestPriority priority, AnomalyResult result, String resultIndex) {
+    public ResultWriteRequest(
+        long expirationEpochMs,
+        String detectorId,
+        RequestPriority priority,
+        AnomalyResult result,
+        String resultIndex
+    ) {
         super(expirationEpochMs, detectorId, priority);
         this.result = result;
         this.resultIndex = resultIndex;

@@ -35,7 +35,6 @@ import org.opensearch.ad.constant.CommonErrorMessages;
 import org.opensearch.ad.model.AnomalyDetector;
 import org.opensearch.ad.rest.handler.AnomalyDetectorFunction;
 import org.opensearch.ad.settings.EnabledSetting;
-import org.opensearch.client.OpenSearchClient;
 import org.opensearch.client.node.NodeClient;
 import org.opensearch.common.bytes.BytesReference;
 import org.opensearch.common.util.concurrent.ThreadContext;
@@ -51,7 +50,6 @@ import org.opensearch.rest.RestChannel;
 import org.opensearch.rest.RestRequest;
 import org.opensearch.rest.RestResponse;
 import org.opensearch.rest.RestStatus;
-import org.opensearch.rest.action.RestActionListener;
 import org.opensearch.rest.action.RestResponseListener;
 import org.opensearch.search.SearchHit;
 import org.opensearch.search.builder.SearchSourceBuilder;
@@ -94,37 +92,15 @@ public abstract class AbstractSearchAction<T extends ToXContentObject> extends B
         searchSourceBuilder.seqNoAndPrimaryTerm(true).version(true);
         SearchRequest searchRequest = new SearchRequest().source(searchSourceBuilder).indices(this.index);
 
-        String resultIndex = SEARCH_ANOMALY_RESULT_ACTION.equals(getName())? Strings.trimToNull(request.param(RESULT_INDEX)) : null;
+        String resultIndex = SEARCH_ANOMALY_RESULT_ACTION.equals(getName()) ? Strings.trimToNull(request.param(RESULT_INDEX)) : null;
         return channel -> {
-            logger.info("+++++++++++++++++++++++++++++ search result index: {}", resultIndex);
             if (resultIndex == null) {
                 client.execute(actionType, searchRequest, search(channel));
                 return;
             }
-//            SearchSourceBuilder matchAll = new SearchSourceBuilder().query(new MatchAllQueryBuilder()).size(0);
-            // If user specify result index, we just query that index to get old AD result.
-//            SearchRequest searchCustomIndexRequest = new SearchRequest().source(matchAll).indices(resultIndex);
-
-            ;
             SearchRequest searchResultIndexRequest = new SearchRequest()
-                    .indices(resultIndex)
-                    .source(new SearchSourceBuilder().query(new MatchAllQueryBuilder()).size(0));
-
-
-
-//            AnomalyDetectorFunction function = () -> {
-//                try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
-//                    searchRequest.indices(resultIndex, this.index);
-//                    client.search(searchRequest, search(channel));
-//                } catch (Exception e) {
-//                    logger.error(e);
-//                    try {
-//                        channel.sendResponse(new BytesRestResponse(channel, e));
-//                    } catch (Exception exception) {
-//                        logger.error("Failed to send back failure response for search AD result", exception);
-//                    }
-//                }
-//            };
+                .indices(resultIndex)
+                .source(new SearchSourceBuilder().query(new MatchAllQueryBuilder()).size(0));
             client.search(searchResultIndexRequest, ActionListener.wrap(r -> {
                 executeWithAdmin(client, () -> {
                     searchRequest.indices(resultIndex, this.index);
@@ -133,9 +109,7 @@ public abstract class AbstractSearchAction<T extends ToXContentObject> extends B
             }, e -> {
                 if (e instanceof OpenSearchSecurityException) {
                     logger.warn("No permission to search AD result index [{}], will query default AD result index only", resultIndex);
-                    executeWithAdmin(client, () -> {
-                        client.search(searchRequest, search(channel));
-                    }, channel);
+                    executeWithAdmin(client, () -> { client.search(searchRequest, search(channel)); }, channel);
                 } else {
                     logger.error(e);
                     try {
@@ -159,15 +133,6 @@ public abstract class AbstractSearchAction<T extends ToXContentObject> extends B
                 logger.error("Failed to send back failure response for search AD result", exception);
             }
         }
-    }
-
-    private RestActionListener<SearchResponse> searchResultIndex(AnomalyDetectorFunction function, RestChannel channel) {
-        return new RestActionListener<SearchResponse>(channel) {
-            @Override
-            protected void processResponse(SearchResponse searchResponse) throws Exception {
-                function.execute();
-            }
-        };
     }
 
     private RestResponseListener<SearchResponse> search(RestChannel channel) {

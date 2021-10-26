@@ -81,6 +81,8 @@ import org.opensearch.ad.model.Feature;
 import org.opensearch.ad.model.FeatureData;
 import org.opensearch.ad.model.IntervalTimeConfiguration;
 import org.opensearch.ad.model.TimeConfiguration;
+import org.opensearch.ad.ratelimit.RequestPriority;
+import org.opensearch.ad.ratelimit.ResultWriteRequest;
 import org.opensearch.ad.settings.AnomalyDetectorSettings;
 import org.opensearch.client.AdminClient;
 import org.opensearch.client.Client;
@@ -305,7 +307,8 @@ public class TestHelpers {
             randomInt(),
             lastUpdateTime,
             categoryFields,
-            user
+            user,
+            null
         );
     }
 
@@ -337,6 +340,7 @@ public class TestHelpers {
             randomInt(),
             Instant.now(),
             categoryFields,
+            null,
             null
         );
     }
@@ -366,7 +370,8 @@ public class TestHelpers {
             randomInt(),
             Instant.now(),
             categoryFields,
-            randomUser()
+            randomUser(),
+            null
         );
     }
 
@@ -387,7 +392,8 @@ public class TestHelpers {
             randomInt(),
             Instant.now(),
             null,
-            randomUser()
+            randomUser(),
+            null
         );
     }
 
@@ -408,7 +414,8 @@ public class TestHelpers {
             randomInt(),
             Instant.now().truncatedTo(ChronoUnit.SECONDS),
             null,
-            randomUser()
+            randomUser(),
+            null
         );
     }
 
@@ -434,7 +441,8 @@ public class TestHelpers {
             randomInt(),
             Instant.now().truncatedTo(ChronoUnit.SECONDS),
             categoryField,
-            randomUser()
+            randomUser(),
+            null
         );
     }
 
@@ -457,7 +465,8 @@ public class TestHelpers {
             randomInt(),
             Instant.now().truncatedTo(ChronoUnit.SECONDS),
             categoryField,
-            randomUser()
+            randomUser(),
+            null
         );
     }
 
@@ -648,6 +657,17 @@ public class TestHelpers {
 
     public static AnomalyResult randomHCADAnomalyDetectResult(double score, double grade) {
         return randomHCADAnomalyDetectResult(score, grade, null);
+    }
+
+    public static ResultWriteRequest randomResultWriteRequest(String detectorId, double score, double grade) {
+        ResultWriteRequest resultWriteRequest = new ResultWriteRequest(
+            Instant.now().plus(10, ChronoUnit.MINUTES).toEpochMilli(),
+            detectorId,
+            RequestPriority.MEDIUM,
+            randomHCADAnomalyDetectResult(score, grade),
+            null
+        );
+        return resultWriteRequest;
     }
 
     public static AnomalyResult randomHCADAnomalyDetectResult(double score, double grade, String error) {

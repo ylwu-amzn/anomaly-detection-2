@@ -678,7 +678,7 @@ public class AnomalyDetectorPlugin extends Plugin implements ActionPlugin, Scrip
             client,
             settings,
             threadPool,
-                this.clientUtil,
+            this.clientUtil,
             this.indexUtils,
             clusterService,
             anomalyDetectionIndices

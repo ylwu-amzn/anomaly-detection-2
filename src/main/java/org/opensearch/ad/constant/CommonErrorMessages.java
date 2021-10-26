@@ -11,6 +11,8 @@
 
 package org.opensearch.ad.constant;
 
+import static org.opensearch.ad.constant.CommonName.CUSTOM_RESULT_INDEX_PREFIX;
+
 import java.util.Locale;
 
 public class CommonErrorMessages {
@@ -81,4 +83,5 @@ public class CommonErrorMessages {
     public static String FAIL_TO_SEARCH = "Fail to search";
 
     public static String CAN_NOT_FIND_RESULT_INDEX = "Can't find result index ";
+    public static String INVALID_RESULT_INDEX_PREFIX = "Result index must start with " + CUSTOM_RESULT_INDEX_PREFIX;
 }

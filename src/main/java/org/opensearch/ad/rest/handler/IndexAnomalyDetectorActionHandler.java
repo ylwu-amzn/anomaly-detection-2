@@ -175,7 +175,7 @@ public class IndexAnomalyDetectorActionHandler {
                 return;
             }
 
-            // user specified detector result index
+            // user custom result index
             anomalyDetectionIndices.initCustomResultIndexAndExecute(resultIndex, () -> createOrUpdateDetector(), listener);
         } catch (Exception e) {
             logger.error("Failed to create index " + resultIndex, e);
@@ -192,9 +192,9 @@ public class IndexAnomalyDetectorActionHandler {
             if (!anomalyDetectionIndices.doesAnomalyDetectorIndexExist()) {
                 logger.info("AnomalyDetector Indices do not exist");
                 anomalyDetectionIndices
-                        .initAnomalyDetectorIndex(
-                                ActionListener.wrap(response -> onCreateMappingsResponse(response), exception -> listener.onFailure(exception))
-                        );
+                    .initAnomalyDetectorIndex(
+                        ActionListener.wrap(response -> onCreateMappingsResponse(response), exception -> listener.onFailure(exception))
+                    );
             } else {
                 logger.info("AnomalyDetector Indices do exist, calling prepareAnomalyDetectorIndexing");
                 prepareAnomalyDetectorIndexing();
@@ -256,8 +256,7 @@ public class IndexAnomalyDetectorActionHandler {
                 return;
             }
             if (!Objects.equals(existingDetector.getResultIndex(), anomalyDetector.getResultIndex())) {
-                listener
-                        .onFailure(new OpenSearchStatusException(CommonErrorMessages.CAN_NOT_CHANGE_RESULT_INDEX, RestStatus.BAD_REQUEST));
+                listener.onFailure(new OpenSearchStatusException(CommonErrorMessages.CAN_NOT_CHANGE_RESULT_INDEX, RestStatus.BAD_REQUEST));
                 return;
             }
 

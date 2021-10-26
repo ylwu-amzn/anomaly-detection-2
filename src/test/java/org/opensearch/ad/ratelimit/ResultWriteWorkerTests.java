@@ -132,7 +132,14 @@ public class ResultWriteWorkerTests extends AbstractRateLimitingTest {
         ADResultBulkResponse resp = new ADResultBulkResponse(retryRequests);
 
         ADResultBulkRequest request = new ADResultBulkRequest();
-        request.add(detectResult);
+        ResultWriteRequest resultWriteRequest = new ResultWriteRequest(
+            Instant.now().plus(10, ChronoUnit.MINUTES).toEpochMilli(),
+            detectorId,
+            RequestPriority.MEDIUM,
+            detectResult,
+            null
+        );
+        request.add(resultWriteRequest);
 
         doAnswer(invocation -> {
             ActionListener<ADResultBulkResponse> listener = invocation.getArgument(1);
@@ -157,7 +164,14 @@ public class ResultWriteWorkerTests extends AbstractRateLimitingTest {
         ADResultBulkResponse resp = new ADResultBulkResponse(retryRequests);
 
         ADResultBulkRequest request = new ADResultBulkRequest();
-        request.add(detectResult);
+        ResultWriteRequest resultWriteRequest = new ResultWriteRequest(
+            Instant.now().plus(10, ChronoUnit.MINUTES).toEpochMilli(),
+            detectorId,
+            RequestPriority.MEDIUM,
+            detectResult,
+            null
+        );
+        request.add(resultWriteRequest);
 
         final AtomicBoolean retried = new AtomicBoolean();
         doAnswer(invocation -> {

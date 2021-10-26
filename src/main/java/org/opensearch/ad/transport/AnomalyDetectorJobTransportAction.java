@@ -127,7 +127,8 @@ public class AnomalyDetectorJobTransportAction extends HandledTransportAction<An
         String rawPath,
         TimeValue requestTimeout,
         User user,
-        ThreadContext.StoredContext context) {
+        ThreadContext.StoredContext context
+    ) {
         IndexAnomalyDetectorJobActionHandler handler = new IndexAnomalyDetectorJobActionHandler(
             client,
             listener,

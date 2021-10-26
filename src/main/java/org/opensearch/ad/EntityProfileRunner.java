@@ -261,7 +261,12 @@ public class EntityProfileRunner extends AbstractProfileRunner {
 
                     if (profilesToCollect.contains(EntityProfileName.ENTITY_INFO)) {
                         long enabledTimeMs = job.getEnabledTime().toEpochMilli();
-                        SearchRequest lastSampleTimeRequest = createLastSampleTimeRequest(detectorId, enabledTimeMs, entityValue, detector.getResultIndex());
+                        SearchRequest lastSampleTimeRequest = createLastSampleTimeRequest(
+                            detectorId,
+                            enabledTimeMs,
+                            entityValue,
+                            detector.getResultIndex()
+                        );
 
                         EntityProfile.Builder builder = new EntityProfile.Builder();
 

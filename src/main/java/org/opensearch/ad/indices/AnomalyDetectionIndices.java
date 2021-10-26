@@ -12,8 +12,8 @@
 package org.opensearch.ad.indices;
 
 import static org.opensearch.ad.constant.CommonErrorMessages.CAN_NOT_FIND_RESULT_INDEX;
-import static org.opensearch.ad.constant.CommonName.AD_RESULT_FIELD_CONFIGS;
 import static org.opensearch.ad.constant.CommonName.DUMMY_AD_RESULT_ID;
+import static org.opensearch.ad.model.AnomalyResult.AD_RESULT_FIELD_CONFIGS;
 import static org.opensearch.ad.settings.AnomalyDetectorSettings.AD_RESULT_HISTORY_MAX_DOCS_PER_SHARD;
 import static org.opensearch.ad.settings.AnomalyDetectorSettings.AD_RESULT_HISTORY_RETENTION_PERIOD;
 import static org.opensearch.ad.settings.AnomalyDetectorSettings.AD_RESULT_HISTORY_ROLLOVER_PERIOD;
@@ -60,7 +60,6 @@ import org.opensearch.action.delete.DeleteRequest;
 import org.opensearch.action.index.IndexRequest;
 import org.opensearch.action.support.GroupedActionListener;
 import org.opensearch.action.support.IndicesOptions;
-import org.opensearch.action.support.master.AcknowledgedResponse;
 import org.opensearch.ad.common.exception.EndRunException;
 import org.opensearch.ad.constant.CommonName;
 import org.opensearch.ad.constant.CommonValue;
@@ -306,7 +305,6 @@ public class AnomalyDetectionIndices implements LocalNodeMasterListener {
     public <T> void initCustomResultIndexAndExecute(String resultIndex, AnomalyDetectorFunction function, ActionListener<T> listener) {
         try {
             if (!doesIndexExist(resultIndex)) {
-                logger.info("---------- result index doesn't exist: {}", resultIndex);
                 initCustomAnomalyResultIndexDirectly(resultIndex, ActionListener.wrap(response -> {
                     if (response.isAcknowledged()) {
                         logger.info("Successfully created anomaly detector result index {}", resultIndex);
@@ -326,7 +324,6 @@ public class AnomalyDetectionIndices implements LocalNodeMasterListener {
                     }
                 }));
             } else {
-                logger.info("----------------- result index exists: {}", resultIndex);
                 validateCustomResultIndexAndExecute(resultIndex, function, listener);
             }
         } catch (Exception e) {
@@ -344,8 +341,9 @@ public class AnomalyDetectionIndices implements LocalNodeMasterListener {
             }
 
             AnomalyResult dummyResult = AnomalyResult.getDummyResult();
-            IndexRequest indexRequest = new IndexRequest(resultIndex).id(DUMMY_AD_RESULT_ID)
-                    .source(dummyResult.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS));
+            IndexRequest indexRequest = new IndexRequest(resultIndex)
+                .id(DUMMY_AD_RESULT_ID)
+                .source(dummyResult.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS));
             client.index(indexRequest, ActionListener.wrap(response -> {
                 logger.debug("Successfully wrote dummy AD result to result index {}", resultIndex);
                 client.delete(new DeleteRequest(resultIndex).id(DUMMY_AD_RESULT_ID), ActionListener.wrap(deleteResponse -> {
@@ -365,26 +363,32 @@ public class AnomalyDetectionIndices implements LocalNodeMasterListener {
         }
     }
 
-    public <T> void validateCustomIndexForBackendJob(String resultIndex, String securityLogId, String user, List<String> roles, AnomalyDetectorFunction function, ActionListener<T> listener) {
-
+    public <T> void validateCustomIndexForBackendJob(
+        String resultIndex,
+        String securityLogId,
+        String user,
+        List<String> roles,
+        AnomalyDetectorFunction function,
+        ActionListener<T> listener
+    ) {
         if (!doesIndexExist(resultIndex)) {
-            logger.info("---------- yyyyyyyyyy5555 result index doesn't exist : " + resultIndex);
             listener.onFailure(new EndRunException(CAN_NOT_FIND_RESULT_INDEX + resultIndex, true));
             return;
         }
         if (!isValidResultIndex(resultIndex)) {
-            logger.info("---------- yyyyyyyyyy5555 wrong result index mapping : " + resultIndex);
             listener.onFailure(new EndRunException("Result index mapping is not correct", true));
             return;
         }
         try (InjectSecurity injectSecurity = new InjectSecurity(securityLogId, settings, client.threadPool().getThreadContext())) {
             injectSecurity.inject(user, roles);
-            ActionListener<T> wrappedListener = ActionListener.wrap(r -> {listener.onResponse(r);}, e -> {injectSecurity.close(); listener.onFailure(e);});
-            validateCustomResultIndexAndExecute(resultIndex,
-                    () -> {
+            ActionListener<T> wrappedListener = ActionListener.wrap(r -> { listener.onResponse(r); }, e -> {
+                injectSecurity.close();
+                listener.onFailure(e);
+            });
+            validateCustomResultIndexAndExecute(resultIndex, () -> {
                 injectSecurity.close(); // check what will happen if not close
                 function.execute();
-                }, wrappedListener);
+            }, wrappedListener);
         } catch (Exception e) {
             logger.error("Failed to validate custom index for backend job " + securityLogId, e);
             listener.onFailure(e);
@@ -403,7 +407,7 @@ public class AnomalyDetectionIndices implements LocalNodeMasterListener {
         if (!indexMapping.containsKey(propertyName)) {
             return false;
         }
-        LinkedHashMap<String, Object> mapping = (LinkedHashMap<String, Object>)indexMapping.get(propertyName);
+        LinkedHashMap<String, Object> mapping = (LinkedHashMap<String, Object>) indexMapping.get(propertyName);
 
         boolean correctResultIndexMappig = true;
         for (String fieldName : AD_RESULT_FIELD_CONFIGS.keySet()) {
@@ -500,7 +504,7 @@ public class AnomalyDetectionIndices implements LocalNodeMasterListener {
      */
     public void initDefaultAnomalyResultIndexIfAbsent(ActionListener<CreateIndexResponse> actionListener) throws IOException {
         if (!doesDefaultAnomalyResultIndexExist()) {
-            initAnomalyResultIndexDirectly(actionListener);
+            initDefaultAnomalyResultIndexDirectly(actionListener);
         }
     }
 
@@ -535,62 +539,33 @@ public class AnomalyDetectionIndices implements LocalNodeMasterListener {
      * @param actionListener action called after create index
      * @throws IOException IOException from {@link AnomalyDetectionIndices#getAnomalyResultMappings}
      */
-    public void initAnomalyResultIndexDirectly(ActionListener<CreateIndexResponse> actionListener) throws IOException {
-        String mapping = getAnomalyResultMappings();
-        CreateIndexRequest request = new CreateIndexRequest(AD_RESULT_HISTORY_INDEX_PATTERN)
-            .mapping(CommonName.MAPPING_TYPE, mapping, XContentType.JSON)
-            .alias(new Alias(CommonName.ANOMALY_RESULT_INDEX_ALIAS));
-        choosePrimaryShards(request);
-        adminClient.indices().create(request, markMappingUpToDate(ADIndex.RESULT, actionListener));
+    public void initDefaultAnomalyResultIndexDirectly(ActionListener<CreateIndexResponse> actionListener) throws IOException {
+        initAnomalyResultIndexDirectly(AD_RESULT_HISTORY_INDEX_PATTERN, CommonName.ANOMALY_RESULT_INDEX_ALIAS, true, actionListener);
     }
 
-    public void initCustomAnomalyResultIndexDirectly(String resultIndex, ActionListener<CreateIndexResponse> actionListener) throws IOException {
-        String mapping = getAnomalyResultMappings();
-        CreateIndexRequest request = new CreateIndexRequest(resultIndex)
-                .mapping(CommonName.MAPPING_TYPE, mapping, XContentType.JSON);
-        choosePrimaryShards(request, false);
-        //TODO: mark mapping up to date for each result index. Make new AD result schema BWC to old schema, upgrade AD result schema.
-        adminClient.indices().create(request, markMappingUpToDate(ADIndex.RESULT, actionListener));
+    public void initCustomAnomalyResultIndexDirectly(String resultIndex, ActionListener<CreateIndexResponse> actionListener)
+        throws IOException {
+        initAnomalyResultIndexDirectly(resultIndex, null, false, actionListener);
     }
 
-//    public int getADResultIndexSchemaVersion(String mapping) {
-//        String[] lines = mapping.split("\n");
-//        for (String line : lines) {
-//            if (line.contains("schema_version")) {
-//                return Integer.parseInt(line.replace("\"schema_version\":", "").trim());
-//            }
-//        }
-//        throw new IllegalArgumentException("Can't find AD result index schema version");
-//    }
-
-//    //TODO: don't upgrade custom result index in case it will break user's logic
-//    public void upgradeCustomResultIndexMapping(String resultIndex, ActionListener<AcknowledgedResponse> listener) throws IOException {
-//        if (CommonName.ANOMALY_RESULT_INDEX_ALIAS.equals(resultIndex)) {
-//            listener.onResponse(new AcknowledgedResponse(true));
-//            return;
-//        }
-//        IndexMetadata indexMetadata = clusterService.state().metadata().index(resultIndex);
-//        Map<String, Object> meta = (Map<String, Object>) indexMetadata.mapping().sourceAsMap().get("_meta");
-//        int schemaVersion = (int) meta.get("schema_version");
-//
-//        String mapping = getAnomalyResultMappings();
-//
-//        int adResultIndexSchemaVersion = getADResultIndexSchemaVersion(mapping);
-//        logger.info("---------- yyyyyyyyyy444 schemaVersion: {}, adResultIndexSchemaVersion: {}", schemaVersion, adResultIndexSchemaVersion);
-//        if (schemaVersion < adResultIndexSchemaVersion) {
-//            adminClient.indices().putMapping(
-//                    new PutMappingRequest()
-//                            .indices(resultIndex)
-//                            .type(CommonName.MAPPING_TYPE)
-////                            .source(adIndex.getMapping(), XContentType.JSON),
-//                            .source(mapping, XContentType.JSON),
-//                    listener
-//            );
-//        } else {
-//            logger.info("---------- yyyyyyyyyy6 no need to upgrade custom index mappig");
-//            listener.onResponse(new AcknowledgedResponse(true));
-//        }
-//    }
+    public void initAnomalyResultIndexDirectly(
+        String resultIndex,
+        String alias,
+        boolean hiddenIndex,
+        ActionListener<CreateIndexResponse> actionListener
+    ) throws IOException {
+        String mapping = getAnomalyResultMappings();
+        CreateIndexRequest request = new CreateIndexRequest(resultIndex).mapping(CommonName.MAPPING_TYPE, mapping, XContentType.JSON);
+        if (alias != null) {
+            request.alias(new Alias(CommonName.ANOMALY_RESULT_INDEX_ALIAS));
+        }
+        choosePrimaryShards(request, hiddenIndex);
+        if (AD_RESULT_HISTORY_INDEX_PATTERN.equals(resultIndex)) {
+            adminClient.indices().create(request, markMappingUpToDate(ADIndex.RESULT, actionListener));
+        } else {
+            adminClient.indices().create(request, actionListener);
+        }
+    }
 
     /**
      * Create anomaly detector job index.

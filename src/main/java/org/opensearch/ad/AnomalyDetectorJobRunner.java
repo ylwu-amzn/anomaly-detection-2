@@ -216,7 +216,6 @@ public class AnomalyDetectorJobRunner implements ScheduledJobRunner {
             );
             return;
         }
-        //TODO: update AD custom AD result index schema?
         anomalyDetectionIndices.update();
 
         String user;
@@ -233,19 +232,14 @@ public class AnomalyDetectorJobRunner implements ScheduledJobRunner {
             runAnomalyDetectionJob(jobParameter, lockService, lock, detectionStartTime, executionStartTime, detectorId, user, roles);
             return;
         }
-        // TODO: frontend , show warn message that user need to manage all of the old data by themselves.
-        ActionListener<Boolean> listener = ActionListener.wrap(r->{
-            log.debug("Custom index is valid");
-        }, e->{
+        ActionListener<Boolean> listener = ActionListener.wrap(r -> { log.debug("Custom index is valid"); }, e -> {
             Exception exception = new EndRunException(detectorId, e.getMessage(), true);
             handleAdException(jobParameter, lockService, lock, detectionStartTime, executionStartTime, exception);
         });
-        anomalyDetectionIndices.validateCustomIndexForBackendJob(resultIndex, detectorId, user, roles,
-                () -> {
-                    listener.onResponse(true);
-                    runAnomalyDetectionJob(jobParameter, lockService, lock, detectionStartTime, executionStartTime, detectorId, user, roles);
-                },
-                listener);
+        anomalyDetectionIndices.validateCustomIndexForBackendJob(resultIndex, detectorId, user, roles, () -> {
+            listener.onResponse(true);
+            runAnomalyDetectionJob(jobParameter, lockService, lock, detectionStartTime, executionStartTime, detectorId, user, roles);
+        }, listener);
     }
 
     /**
@@ -258,8 +252,16 @@ public class AnomalyDetectorJobRunner implements ScheduledJobRunner {
      * This will inject user role and check if the user role has permissions to call the execute
      * Anomaly Result API.
      */
-    private void runAnomalyDetectionJob(AnomalyDetectorJob jobParameter, LockService lockService, LockModel lock, Instant detectionStartTime, Instant executionStartTime, String detectorId,
-                                        String user, List<String> roles) {
+    private void runAnomalyDetectionJob(
+        AnomalyDetectorJob jobParameter,
+        LockService lockService,
+        LockModel lock,
+        Instant detectionStartTime,
+        Instant executionStartTime,
+        String detectorId,
+        String user,
+        List<String> roles
+    ) {
 
         try (InjectSecurity injectSecurity = new InjectSecurity(detectorId, settings, client.threadPool().getThreadContext())) {
             // Injecting user role to verify if the user has permissions for our API.
@@ -638,10 +640,8 @@ public class AnomalyDetectorJobRunner implements ScheduledJobRunner {
             String resultIndex = jobParameter.getResultIndex();
             if (resultIndex != null && !anomalyDetectionIndices.doesIndexExist(resultIndex)) {
                 // If custom result index doesn't exist, write exception to default result index.
-                log.info("ylwudebug3: ++++++++++++++++++++++++++++++ result index doesn't exist {}", resultIndex);
                 anomalyResultHandler.index(anomalyResult, detectorId, null);
             } else {
-                log.info("ylwudebug3: ++++++++++++++++++++++++++++++ result index exist {}", resultIndex);
                 anomalyResultHandler.index(anomalyResult, detectorId, resultIndex);
             }
 

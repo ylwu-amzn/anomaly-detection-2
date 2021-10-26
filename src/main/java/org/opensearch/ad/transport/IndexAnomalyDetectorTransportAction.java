@@ -151,24 +151,24 @@ public class IndexAnomalyDetectorTransportAction extends HandledTransportAction<
             // Github issue: https://github.com/opensearch-project/anomaly-detection/issues/124
             User detectorUser = currentDetector == null ? user : currentDetector.getUser();
             IndexAnomalyDetectorActionHandler indexAnomalyDetectorActionHandler = new IndexAnomalyDetectorActionHandler(
-                    clusterService,
-                    client,
-                    transportService,
-                    listener,
-                    anomalyDetectionIndices,
-                    detectorId,
-                    seqNo,
-                    primaryTerm,
-                    refreshPolicy,
-                    detector,
-                    requestTimeout,
-                    maxSingleEntityAnomalyDetectors,
-                    maxMultiEntityAnomalyDetectors,
-                    maxAnomalyFeatures,
-                    method,
-                    xContentRegistry,
-                    detectorUser,
-                    adTaskManager
+                clusterService,
+                client,
+                transportService,
+                listener,
+                anomalyDetectionIndices,
+                detectorId,
+                seqNo,
+                primaryTerm,
+                refreshPolicy,
+                detector,
+                requestTimeout,
+                maxSingleEntityAnomalyDetectors,
+                maxMultiEntityAnomalyDetectors,
+                maxAnomalyFeatures,
+                method,
+                xContentRegistry,
+                detectorUser,
+                adTaskManager
             );
             indexAnomalyDetectorActionHandler.start();
         }, listener);

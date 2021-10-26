@@ -297,7 +297,8 @@ public class HistoricalAnalysisRestApiIT extends HistoricalAnalysisRestTestCase 
             detector.getSchemaVersion(),
             detector.getLastUpdateTime(),
             detector.getCategoryField(),
-            detector.getUser()
+            detector.getUser(),
+            detector.getResultIndex()
         );
     }
 

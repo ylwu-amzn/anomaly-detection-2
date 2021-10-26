@@ -82,7 +82,7 @@ public class MultiEntityResultHandler extends AnomalyIndexHandler<AnomalyResult>
 
         try {
             if (!anomalyDetectionIndices.doesDefaultAnomalyResultIndexExist()) {
-                anomalyDetectionIndices.initAnomalyResultIndexDirectly(ActionListener.wrap(initResponse -> {
+                anomalyDetectionIndices.initDefaultAnomalyResultIndexDirectly(ActionListener.wrap(initResponse -> {
                     if (initResponse.isAcknowledged()) {
                         bulk(currentBulkRequest, listener);
                     } else {

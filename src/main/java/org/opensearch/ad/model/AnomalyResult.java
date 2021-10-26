@@ -12,6 +12,7 @@
 package org.opensearch.ad.model;
 
 import static org.opensearch.ad.constant.CommonName.DUMMY_DETECTOR_ID;
+import static org.opensearch.ad.constant.CommonName.SCHEMA_VERSION_FIELD;
 import static org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken;
 
 import java.io.IOException;
@@ -21,7 +22,6 @@ import java.util.List;
 
 import org.apache.commons.lang.builder.ToStringBuilder;
 import org.opensearch.ad.annotation.Generated;
-import org.opensearch.ad.constant.CommonName;
 import org.opensearch.ad.constant.CommonValue;
 import org.opensearch.ad.util.ParseUtils;
 import org.opensearch.common.ParseField;
@@ -35,6 +35,7 @@ import org.opensearch.common.xcontent.XContentParser;
 import org.opensearch.commons.authuser.User;
 
 import com.google.common.base.Objects;
+import com.google.common.collect.ImmutableMap;
 
 /**
  * Include result returned from RCF model and feature data.
@@ -63,6 +64,27 @@ public class AnomalyResult implements ToXContentObject, Writeable {
     public static final String USER_FIELD = "user";
     public static final String TASK_ID_FIELD = "task_id";
     public static final String MODEL_ID_FIELD = "model_id";
+    public static final ImmutableMap<String, String> AD_RESULT_FIELD_CONFIGS = ImmutableMap
+        .<String, String>builder()
+        // .put(SCHEMA_VERSION_FIELD, "{type=integer}")
+        .put(ANOMALY_GRADE_FIELD, "{type=double}")
+        .put(ANOMALY_SCORE_FIELD, "{type=double}")
+        .put(CONFIDENCE_FIELD, "{type=double}")
+        .put(DATA_START_TIME_FIELD, "{type=date, format=strict_date_time||epoch_millis}")
+        .put(DATA_END_TIME_FIELD, "{type=date, format=strict_date_time||epoch_millis}")
+        .put(DETECTOR_ID_FIELD, "{type=keyword}")
+        .put(EXECUTION_START_TIME_FIELD, "{type=date, format=strict_date_time||epoch_millis}")
+        .put(FEATURE_DATA_FIELD, "{type=nested, properties={data={type=double}, feature_id={type=keyword}}}")
+        // .put("is_anomaly", "{type=boolean}")
+        .put(MODEL_ID_FIELD, "{type=keyword}")
+        .put(TASK_ID_FIELD, "{type=keyword}")
+        .put(
+            USER_FIELD,
+            "{type=nested, properties={backend_roles={type=text, fields={keyword={type=keyword}}}, custom_attribute_names={type=text,"
+                + " fields={keyword={type=keyword}}}, name={type=text, fields={keyword={type=keyword, ignore_above=256}}},"
+                + " roles={type=text, fields={keyword={type=keyword}}}}}"
+        )
+        .build();
 
     private final String detectorId;
     private final String taskId;
@@ -224,7 +246,7 @@ public class AnomalyResult implements ToXContentObject, Writeable {
         XContentBuilder xContentBuilder = builder
             .startObject()
             .field(DETECTOR_ID_FIELD, detectorId)
-            .field(CommonName.SCHEMA_VERSION_FIELD, schemaVersion);
+            .field(SCHEMA_VERSION_FIELD, schemaVersion);
         if (dataStartTime != null) {
             xContentBuilder.field(DATA_START_TIME_FIELD, dataStartTime.toEpochMilli());
         }
@@ -332,7 +354,7 @@ public class AnomalyResult implements ToXContentObject, Writeable {
                 case USER_FIELD:
                     user = User.parse(parser);
                     break;
-                case CommonName.SCHEMA_VERSION_FIELD:
+                case SCHEMA_VERSION_FIELD:
                     schemaVersion = parser.intValue();
                     break;
                 case TASK_ID_FIELD:
@@ -525,6 +547,19 @@ public class AnomalyResult implements ToXContentObject, Writeable {
     }
 
     public static AnomalyResult getDummyResult() {
-        return new AnomalyResult(DUMMY_DETECTOR_ID, Double.NaN, Double.NaN, Double.NaN, null, null, null, null, null, null, null, CommonValue.NO_SCHEMA_VERSION);
+        return new AnomalyResult(
+            DUMMY_DETECTOR_ID,
+            Double.NaN,
+            Double.NaN,
+            Double.NaN,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            CommonValue.NO_SCHEMA_VERSION
+        );
     }
 }

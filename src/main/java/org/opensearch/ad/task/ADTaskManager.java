@@ -280,6 +280,7 @@ public class ADTaskManager {
      * @param handler anomaly detector job action handler
      * @param user user
      * @param transportService transport service
+     * @param context thread context
      * @param listener action listener
      */
     public void startDetector(
@@ -306,15 +307,24 @@ public class ADTaskManager {
                     return;
                 }
                 context.restore();
-                detectionIndices.initCustomResultIndexAndExecute(
+                detectionIndices
+                    .initCustomResultIndexAndExecute(
                         resultIndex,
                         () -> startRealtimeOrHistoricalDetection(detectionDateRange, handler, user, transportService, listener, detector),
-                        listener);
+                        listener
+                    );
             }
         }, listener);
     }
 
-    private void startRealtimeOrHistoricalDetection(DetectionDateRange detectionDateRange, IndexAnomalyDetectorJobActionHandler handler, User user, TransportService transportService, ActionListener<AnomalyDetectorJobResponse> listener, Optional<AnomalyDetector> detector) {
+    private void startRealtimeOrHistoricalDetection(
+        DetectionDateRange detectionDateRange,
+        IndexAnomalyDetectorJobActionHandler handler,
+        User user,
+        TransportService transportService,
+        ActionListener<AnomalyDetectorJobResponse> listener,
+        Optional<AnomalyDetector> detector
+    ) {
         try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
             if (detectionDateRange == null) {
                 // start realtime job
@@ -2253,7 +2263,6 @@ public class ADTaskManager {
             if (exception instanceof LimitExceededException && isRetryableError(exception.getMessage())) {
                 action = ADTaskAction.PUSH_BACK_ENTITY;
             } else if (exception instanceof ADTaskCancelledException || exception instanceof EndRunException) {
-                logger.info("ylwwwwwww ---- action is CANCEL");
                 action = ADTaskAction.CANCEL;
             }
         }

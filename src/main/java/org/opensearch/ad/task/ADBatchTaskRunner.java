@@ -629,7 +629,7 @@ public class ADBatchTaskRunner {
                 // Entity task done on worker node. Send entity task done message to coordinating node to poll next entity.
                 adTaskManager.entityTaskDone(adTask, e, transportService);
                 if (adTaskCacheManager.getAvailableNewEntityTaskLanes(adTask.getDetectorId()) > 0) {
-                    // When reach this line, it means entity task failed to validateCustomRestulIndexAndCreateDetector on worker node
+                    // When reach this line, it means entity task failed to start on worker node
                     // Sleep some time before starting new task lane.
                     threadPool
                         .schedule(
@@ -1131,45 +1131,72 @@ public class ADBatchTaskRunner {
 
         if (resultIndex == null) {
             // if result index is null, store anomaly result directly
-            storeAnomalyResultAndRunNextPiece(adTask, pieceEndTime, dataStartTime, dataEndTime, interval, internalListener, anomalyResults, resultIndex, null);
+            storeAnomalyResultAndRunNextPiece(
+                adTask,
+                pieceEndTime,
+                dataStartTime,
+                dataEndTime,
+                interval,
+                internalListener,
+                anomalyResults,
+                resultIndex,
+                null
+            );
             return;
         }
 
         try (InjectSecurity injectSecurity = new InjectSecurity(adTask.getTaskId(), settings, client.threadPool().getThreadContext())) {
             // Injecting user role to verify if the user has permissions to write result to result index.
             injectSecurity.inject(user, roles);
-            logger.info(" --------+++++++++ inject roles for index dummy result");
-            storeAnomalyResultAndRunNextPiece(adTask, pieceEndTime, dataStartTime, dataEndTime, interval, internalListener, anomalyResults, resultIndex, injectSecurity);
+            storeAnomalyResultAndRunNextPiece(
+                adTask,
+                pieceEndTime,
+                dataStartTime,
+                dataEndTime,
+                interval,
+                internalListener,
+                anomalyResults,
+                resultIndex,
+                injectSecurity
+            );
         } catch (Exception exception) {
-            logger.error("111111111122222222223333333333, failed llll ", exception);
+            logger.error("Failed to inject user roles", exception);
             internalListener.onFailure(exception);
         }
     }
 
-    private void storeAnomalyResultAndRunNextPiece(ADTask adTask, long pieceEndTime, long dataStartTime, long dataEndTime, long interval, ActionListener<String> internalListener, List<AnomalyResult> anomalyResults, String resultIndex, InjectSecurity injectSecurity) {
+    private void storeAnomalyResultAndRunNextPiece(
+        ADTask adTask,
+        long pieceEndTime,
+        long dataStartTime,
+        long dataEndTime,
+        long interval,
+        ActionListener<String> internalListener,
+        List<AnomalyResult> anomalyResults,
+        String resultIndex,
+        InjectSecurity injectSecurity
+    ) {
         anomalyResultBulkIndexHandler
-                .bulkIndexAnomalyResult(
-                        resultIndex,
-                        anomalyResults,
-                        new ThreadedActionListener<>(logger, threadPool, AD_BATCH_TASK_THREAD_POOL_NAME, ActionListener.wrap(r -> {
-                            logger.info("yyyyyyyyyyyyyyyyyyyyy ------- closed injectSecurity");
-                            logger.info("aaaaaaaaaa ------------ 111111 aaaaaaaaaa run next piece");
-                            try {
-                                if (injectSecurity != null) {
-                                    injectSecurity.close();
-                                }
-                                runNextPiece(adTask, pieceEndTime, dataStartTime, dataEndTime, interval, internalListener);
-                            } catch (Exception e) {
-                                internalListener.onFailure(e);
-                            }
-                        }, e -> {
-                            if (injectSecurity != null) {
-                                injectSecurity.close();
-                            }
-                            logger.error("Fail to bulk index anomaly result", e);
-                            internalListener.onFailure(e);
-                        }), false)
-                );
+            .bulkIndexAnomalyResult(
+                resultIndex,
+                anomalyResults,
+                new ThreadedActionListener<>(logger, threadPool, AD_BATCH_TASK_THREAD_POOL_NAME, ActionListener.wrap(r -> {
+                    try {
+                        if (injectSecurity != null) {
+                            injectSecurity.close();
+                        }
+                        runNextPiece(adTask, pieceEndTime, dataStartTime, dataEndTime, interval, internalListener);
+                    } catch (Exception e) {
+                        internalListener.onFailure(e);
+                    }
+                }, e -> {
+                    if (injectSecurity != null) {
+                        injectSecurity.close();
+                    }
+                    logger.error("Fail to bulk index anomaly result", e);
+                    internalListener.onFailure(e);
+                }), false)
+            );
     }
 
     private void runNextPiece(
