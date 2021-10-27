@@ -87,7 +87,7 @@ public class AnomalyDetector implements Writeable, ToXContentObject {
     public static final String CATEGORY_FIELD = "category_field";
     public static final String USER_FIELD = "user";
     public static final String DETECTOR_TYPE_FIELD = "detector_type";
-    private static final String RESULT_INDEX_FIELD = "result_index";
+    public static final String RESULT_INDEX_FIELD = "result_index";
     @Deprecated
     public static final String DETECTION_DATE_RANGE_FIELD = "detection_date_range";
 
