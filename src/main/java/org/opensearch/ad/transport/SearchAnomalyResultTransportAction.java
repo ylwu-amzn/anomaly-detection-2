@@ -76,9 +76,15 @@ public class SearchAnomalyResultTransportAction extends HandledTransportAction<S
         // Set query indices as default result indices, will check custom result indices permission and add
         // custom indices which user has search permission later.
         request.indices(ALL_AD_RESULTS_INDEX_PATTERN);
+        boolean onlyQueryCustomResultIndex = true;
 
         Set<String> customResultIndices = new HashSet<>();
         if (indices != null && indices.length > 0) {
+            for (String indexName : indices) {
+                if (ALL_AD_RESULTS_INDEX_PATTERN.equals(indexName)) {
+                    onlyQueryCustomResultIndex = false;
+                }
+            }
             String[] concreteIndices = indexNameExpressionResolver
                 .concreteIndexNames(clusterService.state(), IndicesOptions.lenientExpandOpen(), indices);
             if (concreteIndices == null || concreteIndices.length == 0) {
@@ -91,6 +97,8 @@ public class SearchAnomalyResultTransportAction extends HandledTransportAction<S
                     customResultIndices.add(index);
                 }
             }
+        } else {
+            onlyQueryCustomResultIndex = false;
         }
 
         if (customResultIndices.size() > 0) {
@@ -105,6 +113,7 @@ public class SearchAnomalyResultTransportAction extends HandledTransportAction<S
             try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
                 // Search result indices of all detectors. User may create index with same prefix of custom result index
                 // which not used for AD, so we should avoid searching extra indices which not used by anomaly detectors.
+                boolean finalOnlyQueryCustomResultIndex = onlyQueryCustomResultIndex;
                 client.search(searchResultIndex, ActionListener.wrap(allResultIndicesResponse -> {
                     Aggregations aggregations = allResultIndicesResponse.getAggregations();
                     StringTerms resultIndicesAgg = aggregations.get(resultIndexAggName);
@@ -132,7 +141,9 @@ public class SearchAnomalyResultTransportAction extends HandledTransportAction<S
                             .add(new SearchRequest(index).source(new SearchSourceBuilder().query(new MatchAllQueryBuilder()).size(0)));
                     }
                     List<String> readableIndices = new ArrayList<>();
-                    readableIndices.add(ALL_AD_RESULTS_INDEX_PATTERN);
+                    if (!finalOnlyQueryCustomResultIndex) {
+                        readableIndices.add(ALL_AD_RESULTS_INDEX_PATTERN);
+                    }
 
                     context.restore();
                     // Send multiple search to check which index a user has permission to read. If search all indices directly,
