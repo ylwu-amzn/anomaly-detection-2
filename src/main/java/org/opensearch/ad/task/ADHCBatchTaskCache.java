@@ -11,6 +11,8 @@
 
 package org.opensearch.ad.task;
 
+import org.opensearch.ad.model.ADTaskState;
+
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -72,6 +74,10 @@ public class ADHCBatchTaskCache {
     // record lastest HC detector task run time, will use this field to check if task is running or not.
     private Instant latestTaskRunTime;
 
+    private ADTaskState detectorTaskState;
+
+    private String error;
+
     public ADHCBatchTaskCache() {
         this.pendingEntities = new ConcurrentLinkedQueue<>();
         this.runningEntities = new ConcurrentLinkedQueue<>();
@@ -81,6 +87,7 @@ public class ADHCBatchTaskCache {
         this.topEntitiesInited = false;
         this.lastScaleEntityTaskSlotsTime = Instant.now();
         this.latestTaskRunTime = Instant.now();
+        this.detectorTaskState = ADTaskState.INIT;
     }
 
     public void setTopEntityCount(Integer topEntityCount) {
@@ -135,6 +142,22 @@ public class ADHCBatchTaskCache {
 
     public int getTaskRetryTimes(String taskId) {
         return taskRetryTimes.computeIfAbsent(taskId, id -> new AtomicInteger(0)).get();
+    }
+
+    public ADTaskState getDetectorTaskState() {
+        return detectorTaskState;
+    }
+
+    public void setDetectorTaskState(ADTaskState detectorTaskState) {
+        this.detectorTaskState = detectorTaskState;
+    }
+
+    public String getError() {
+        return error;
+    }
+
+    public void setError(String error) {
+        this.error = error;
     }
 
     /**
