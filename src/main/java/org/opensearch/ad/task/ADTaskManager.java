@@ -21,7 +21,6 @@ import static org.opensearch.ad.constant.CommonErrorMessages.FAIL_TO_FIND_DETECT
 import static org.opensearch.ad.constant.CommonErrorMessages.HC_DETECTOR_TASK_IS_UPDATING;
 import static org.opensearch.ad.constant.CommonErrorMessages.NO_ELIGIBLE_NODE_TO_RUN_DETECTOR;
 import static org.opensearch.ad.constant.CommonName.DETECTION_STATE_INDEX;
-import static org.opensearch.ad.constant.CommonName.STATE;
 import static org.opensearch.ad.indices.AnomalyDetectionIndices.ALL_AD_RESULTS_INDEX_PATTERN;
 import static org.opensearch.ad.model.ADTask.COORDINATING_NODE_FIELD;
 import static org.opensearch.ad.model.ADTask.DETECTOR_ID_FIELD;
@@ -2313,63 +2312,76 @@ public class ADTaskManager {
                 logger.warn("HC task is updating, skip this update for task: " + taskId);
             } else {
                 logger.error("Failed to update task: " + taskId, e);
-                adTaskCacheManager.removeHistoricalTaskCache(detectorId);
             }
+            adTaskCacheManager.removeHistoricalTaskCache(detectorId);
         });
 
+        long timeoutInMillis = 2000;// wait for 2seconds to acquire updating HC detector task semaphore
         if (state == ADTaskState.FINISHED) {
             this.countEntityTasksByState(detectorTaskId, ImmutableList.of(ADTaskState.FINISHED), ActionListener.wrap(r -> {
                 logger.info("number of finished entity tasks: {}, for detector {}", r, adTask.getDetectorId());
                 // Set task as FAILED if no finished entity task; otherwise set as FINISHED
                 ADTaskState hcDetectorTaskState = r == 0 ? ADTaskState.FAILED : ADTaskState.FINISHED;
-                adTaskCacheManager.setHCDetectorTaskState(detectorId, hcDetectorTaskState);
-                adTaskCacheManager.setHCDetectorTaskError(detectorId, null);
-                updateADHCDetectorTask(
-                    detectorId,
-                    taskId,
-                    ImmutableMap
-                        .of(
-                            STATE_FIELD,
-                            hcDetectorTaskState.name(),
-                            TASK_PROGRESS_FIELD,
-                            1.0,
-                            EXECUTION_END_TIME_FIELD,
-                            Instant.now().toEpochMilli()
-                        ),
-                    wrappedListener
-                );
+                threadPool.executor(AD_BATCH_TASK_THREAD_POOL_NAME).execute(() -> {
+                    updateADHCDetectorTask(
+                        detectorId,
+                        taskId,
+                        ImmutableMap
+                            .of(
+                                STATE_FIELD,
+                                hcDetectorTaskState.name(),
+                                TASK_PROGRESS_FIELD,
+                                1.0,
+                                EXECUTION_END_TIME_FIELD,
+                                Instant.now().toEpochMilli()
+                            ),
+                        timeoutInMillis,
+                        wrappedListener
+                    );
+                });
+
             }, e -> {
                 logger.error("Failed to get finished entity tasks", e);
                 String errorMessage = getErrorMessage(e);
-                adTaskCacheManager.setHCDetectorTaskState(detectorId, ADTaskState.FAILED);
-                adTaskCacheManager.setHCDetectorTaskError(detectorId, errorMessage);
+                threadPool.executor(AD_BATCH_TASK_THREAD_POOL_NAME).execute(() -> {
+                    updateADHCDetectorTask(
+                        detectorId,
+                        taskId,
+                        ImmutableMap
+                            .of(
+                                STATE_FIELD,
+                                ADTaskState.FAILED.name(),// set as FAILED if fail to get finished entity tasks.
+                                TASK_PROGRESS_FIELD,
+                                1.0,
+                                ERROR_FIELD,
+                                errorMessage,
+                                EXECUTION_END_TIME_FIELD,
+                                Instant.now().toEpochMilli()
+                            ),
+                        timeoutInMillis,
+                        wrappedListener
+                    );
+                });
+            }));
+        } else {
+            threadPool.executor(AD_BATCH_TASK_THREAD_POOL_NAME).execute(() -> {
                 updateADHCDetectorTask(
                     detectorId,
                     taskId,
                     ImmutableMap
                         .of(
                             STATE_FIELD,
-                            ADTaskState.FAILED.name(),// set as FAILED if fail to get finished entity tasks.
-                            TASK_PROGRESS_FIELD,
-                            1.0,
+                            state.name(),
                             ERROR_FIELD,
-                            errorMessage,
+                            adTask.getError(),
                             EXECUTION_END_TIME_FIELD,
                             Instant.now().toEpochMilli()
                         ),
+                    timeoutInMillis,
                     wrappedListener
                 );
-            }));
-        } else {
-            adTaskCacheManager.setHCDetectorTaskState(detectorId, state);
-            adTaskCacheManager.setHCDetectorTaskError(detectorId, adTask.getError());
-            updateADHCDetectorTask(
-                detectorId,
-                taskId,
-                ImmutableMap
-                    .of(STATE_FIELD, state.name(), ERROR_FIELD, adTask.getError(), EXECUTION_END_TIME_FIELD, Instant.now().toEpochMilli()),
-                wrappedListener
-            );
+            });
+
         }
 
         listener.onResponse(new AnomalyDetectorJobResponse(taskId, 0, 0, 0, RestStatus.OK));
@@ -2412,7 +2424,7 @@ public class ADTaskManager {
      * @param updatedFields updated fields, key: filed name, value: new value
      */
     public void updateADHCDetectorTask(String detectorId, String taskId, Map<String, Object> updatedFields) {
-        updateADHCDetectorTask(detectorId, taskId, updatedFields, ActionListener.wrap(response -> {
+        updateADHCDetectorTask(detectorId, taskId, updatedFields, 0, ActionListener.wrap(response -> {
             if (response == null) {
                 logger.debug("Skip updating AD task: {}", taskId);
             } else if (response.status() == RestStatus.OK) {
@@ -2438,59 +2450,60 @@ public class ADTaskManager {
      * @param detectorId detector id
      * @param taskId AD task id
      * @param updatedFields updated fields, key: filed name, value: new value
+     * @param timeoutInMillis the maximum time to wait for task updating semaphore, zero or negative means don't wait at all
      * @param listener action listener
      */
     private void updateADHCDetectorTask(
         String detectorId,
         String taskId,
         Map<String, Object> updatedFields,
+        long timeoutInMillis,
         ActionListener<UpdateResponse> listener
     ) {
-        if (adTaskCacheManager.tryAcquireTaskUpdatingSemaphore(detectorId)) {
-            try {
-                updateADTask(
-                    taskId,
-                    updatedFields,
-                    ActionListener.runAfter(listener, () -> {
-                        // If current request is not updating detector task as done state (FINISHED/FAILED/STOPPED) and
-                        // current detector task state in cache is done, reset detector task state in index.
-                        if (updatedFields.containsKey(STATE_FIELD)
-                                && NOT_ENDED_STATES.contains(updatedFields.get(STATE_FIELD))
-                                && isHCDetectorTaskDone(detectorId)) {
-
-                        };
-                        adTaskCacheManager.releaseTaskUpdatingSemaphore(detectorId);
-                        // Re-cleanup cache in case HC detector task state set after just before the line above.
-                        // Then the setHCDetectorTaskDone method will catch LimitExceededException and won't
-                        // clean up cache.
-                        if (isHCDetectorTaskDone(detectorId)) {
-                            adTaskCacheManager.removeHistoricalTaskCache(detectorId);
-                        }
-
-                    })
-                );
-            } catch (Exception e) {
-                logger.error("Failed to update detector task " + taskId, e);
-                adTaskCacheManager.releaseTaskUpdatingSemaphore(detectorId);
-                listener.onFailure(e);
+        try {
+            boolean taskDone = updatedFields.containsKey(STATE_FIELD) && !NOT_ENDED_STATES.contains(updatedFields.get(STATE_FIELD));
+            if (taskDone) {
+                logger
+                    .info(
+                        "start to ggget semaphore for updating task as done for detector {}, {}",
+                        detectorId,
+                        Instant.now().toEpochMilli()
+                    );
             }
-        } else if (!adTaskCacheManager.isHCTaskCoordinatingNode(detectorId)) {
-            // It's possible that AD task cache cleaned up by other task. Return null to avoid too many failure logs.
-            logger.info("HC detector task cache does not exist, detectorId:{}, taskId:{}", detectorId, taskId);
-            listener.onResponse(null);
-        } else {
-            logger.info("HC detector task is updating, detectorId:{}, taskId:{}", detectorId, taskId);
-            listener.onFailure(new LimitExceededException(HC_DETECTOR_TASK_IS_UPDATING));
+            // If the specified waiting time elapses, will return false.
+            // If the time is less than or equal to zero, will not wait at all to get semaphore.
+            if (adTaskCacheManager.tryAcquireTaskUpdatingSemaphore(detectorId, timeoutInMillis)) {
+                if (taskDone) {
+                    logger
+                        .info(
+                            "finish to ggget semaphore for updating task as done for detector {}, {}",
+                            detectorId,
+                            Instant.now().toEpochMilli()
+                        );
+                }
+                try {
+                    updateADTask(
+                        taskId,
+                        updatedFields,
+                        ActionListener.runAfter(listener, () -> { adTaskCacheManager.releaseTaskUpdatingSemaphore(detectorId); })
+                    );
+                } catch (Exception e) {
+                    logger.error("Failed to update detector task " + taskId, e);
+                    adTaskCacheManager.releaseTaskUpdatingSemaphore(detectorId);
+                    listener.onFailure(e);
+                }
+            } else if (!adTaskCacheManager.isHCTaskCoordinatingNode(detectorId)) {
+                // It's possible that AD task cache cleaned up by other task. Return null to avoid too many failure logs.
+                logger.info("HC detector task cache does not exist, detectorId:{}, taskId:{}", detectorId, taskId);
+                listener.onResponse(null);
+            } else {
+                logger.info("HC detector task is updating, detectorId:{}, taskId:{}", detectorId, taskId);
+                listener.onFailure(new LimitExceededException(HC_DETECTOR_TASK_IS_UPDATING));
+            }
+        } catch (Exception e) {
+            logger.error("Failed to get AD HC detector task updating semaphore " + taskId, e);
+            listener.onFailure(e);
         }
-    }
-
-    private boolean isHCDetectorTaskDone(String detectorId) {
-        boolean taskDone = false;
-        ADTaskState state = adTaskCacheManager.getHCDetectorTaskState(detectorId);
-        if (state != null) {
-            taskDone = !NOT_ENDED_STATES.contains(state.name());
-        }
-        return taskDone;
     }
 
     /**

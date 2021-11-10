@@ -968,45 +968,17 @@ public class ADTaskCacheManager {
         return false;
     }
 
-    public ADTaskState getHCDetectorTaskState(String detectorId) {
-        ADHCBatchTaskCache hcTaskCache = hcBatchTaskCaches.get(detectorId);
-        if (hcTaskCache != null) {
-            return hcTaskCache.getDetectorTaskState();
-        }
-        return null;
-    }
-
-    public void setHCDetectorTaskState(String detectorId, ADTaskState newState) {
-        ADHCBatchTaskCache hcTaskCache = hcBatchTaskCaches.get(detectorId);
-        if (hcTaskCache != null) {
-            hcTaskCache.setDetectorTaskState(newState);
-        }
-    }
-
-    public String getHCDetectorTaskError(String detectorId) {
-        ADHCBatchTaskCache hcTaskCache = hcBatchTaskCaches.get(detectorId);
-        if (hcTaskCache != null) {
-            return hcTaskCache.getError();
-        }
-        return null;
-    }
-
-    public void setHCDetectorTaskError(String detectorId, String error) {
-        ADHCBatchTaskCache hcTaskCache = hcBatchTaskCaches.get(detectorId);
-        if (hcTaskCache != null) {
-            hcTaskCache.setError(error);
-        }
-    }
-
     /**
      * Try to get semaphore to update detector task.
      * @param detectorId detector id
+     * @param timeoutInMillis timeout in milliseconds to wait for a permit
      * @return true if can get semaphore
+     * @throws InterruptedException if the current thread is interrupted
      */
-    public boolean tryAcquireTaskUpdatingSemaphore(String detectorId) {
+    public boolean tryAcquireTaskUpdatingSemaphore(String detectorId, long timeoutInMillis) throws InterruptedException {
         ADHCBatchTaskCache taskCache = hcBatchTaskCaches.get(detectorId);
         if (taskCache != null) {
-            return taskCache.tryAcquireTaskUpdatingSemaphore();
+            return taskCache.tryAcquireTaskUpdatingSemaphore(timeoutInMillis);
         }
         return false;
     }
