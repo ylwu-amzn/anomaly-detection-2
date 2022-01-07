@@ -91,7 +91,7 @@ public class ModelManager implements DetectorModelSize {
     private final Clock clock;
     public FeatureManager featureManager;
 
-    private EntityColdStarter entityColdStarter;
+    private EntityColdStarter entityColdStarter; // TODO: HCAD cold start entity
     private MemoryTracker memoryTracker;
 
     private final double initialAcceptFraction;
@@ -133,7 +133,7 @@ public class ModelManager implements DetectorModelSize {
         this.rcfNumTrees = rcfNumTrees;
         this.rcfNumSamplesInTree = rcfNumSamplesInTree;
         this.rcfTimeDecay = rcfTimeDecay;
-        this.rcfNumMinSamples = rcfNumMinSamples;
+        this.rcfNumMinSamples = rcfNumMinSamples; // 32
         this.thresholdMinPvalue = thresholdMinPvalue;
         this.minPreviewSize = minPreviewSize;
         this.modelTtl = modelTtl;
@@ -507,7 +507,7 @@ public class ModelManager implements DetectorModelSize {
             .sampleSize(rcfNumSamplesInTree)
             .numberOfTrees(rcfNumTrees)
             .timeDecay(rcfTimeDecay)
-            .outputAfter(rcfNumMinSamples)
+            .outputAfter(rcfNumMinSamples) // 32
             .initialAcceptFraction(initialAcceptFraction)
             .parallelExecutionEnabled(false)
             .compact(true)
@@ -516,6 +516,7 @@ public class ModelManager implements DetectorModelSize {
             .shingleSize(detector.getShingleSize())
             .anomalyRate(1 - thresholdMinPvalue)
             .build();
+        //TODO: dont consider if the shingle is consecutive or not
         Arrays.stream(dataPoints).forEach(s -> trcf.process(s, 0));
 
         String modelId = SingleStreamModelIdMapper.getRcfModelId(detector.getDetectorId(), step);
@@ -771,7 +772,7 @@ public class ModelManager implements DetectorModelSize {
         }
 
         if (!model.getTrcf().isPresent() && model.getSamples() != null && model.getSamples().size() >= rcfNumMinSamples) {
-            entityColdStarter.trainModelFromExistingSamples(modelState, shingleSize);
+            entityColdStarter.trainModelFromExistingSamples(modelState, shingleSize); // TODO: HCAD train HC entity
         }
         return modelState;
     }

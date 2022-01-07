@@ -320,13 +320,15 @@ public class FeatureManager implements CleanState {
         searchFeatureDao
             .getLatestDataTime(detector, new ThreadedActionListener<>(logger, threadPool, adThreadPoolName, latestTimeListener, false));
     }
-
+//TODO: step2. get cold start samples
     private void getColdStartSamples(Optional<Long> latest, AnomalyDetector detector, ActionListener<Optional<double[][]>> listener) {
         int shingleSize = detector.getShingleSize();
         if (latest.isPresent()) {
+            //TODO: step2-1. get cold start samples intervals, max(last 24hours, 512)
             List<Entry<Long, Long>> sampleRanges = getColdStartSampleRanges(detector, latest.get());
             try {
                 ActionListener<List<Optional<double[]>>> getFeaturesListener = ActionListener
+                        //TODO: step2-2. process cold start samples data, fill into shingles
                     .wrap(samples -> processColdStartSamples(samples, shingleSize, listener), listener::onFailure);
                 searchFeatureDao
                     .getFeatureSamplesForPeriods(
@@ -352,11 +354,12 @@ public class FeatureManager implements CleanState {
                 currentShingle.remove();
             }
         }
-        listener.onResponse(Optional.of(shingles.toArray(new double[0][0])).filter(results -> results.length > 0));
+        listener.onResponse(Optional.of(shingles.toArray(new double[0][0])).filter(results -> results.length > 0));//TODO: cold start: only filter out non-empty shingle
     }
 
     private Optional<double[]> fillAndShingle(LinkedList<Optional<double[]>> shingle, int shingleSize) {
         Optional<double[]> result = null;
+        //TODO: tolerate 25% missing data.
         if (shingle.stream().filter(s -> s.isPresent()).count() >= shingleSize - getMaxMissingPoints(shingleSize)) {
             TreeMap<Integer, double[]> search = new TreeMap<>(
                 IntStream
@@ -386,6 +389,8 @@ public class FeatureManager implements CleanState {
 
     private List<Entry<Long, Long>> getColdStartSampleRanges(AnomalyDetector detector, long endMillis) {
         long interval = detector.getDetectorIntervalInMilliseconds();
+        //TODO: for example if interval is 1 minute, the numSamples = max(24*60 / 1, 512) = 1440;
+        //TODO: for example if interval is 20 minute, the numSamples = max(24*60 / 20, 512) = 512;
         int numSamples = Math.max((int) (Duration.ofHours(this.trainSampleTimeRangeInHours).toMillis() / interval), this.minTrainSamples);
         return IntStream
             .rangeClosed(1, numSamples)

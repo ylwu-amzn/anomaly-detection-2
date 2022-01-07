@@ -295,7 +295,7 @@ public class EntityColdStarter implements MaintenanceState {
             threadPool
                 .executor(AnomalyDetectorPlugin.AD_THREAD_POOL_NAME)
                 .execute(
-                    () -> getEntityColdStartData(
+                    () -> getEntityColdStartData( //TODO: HCAD get entity cold start data
                         detectorId,
                         entity,
                         new ThreadedActionListener<>(
@@ -356,7 +356,7 @@ public class EntityColdStarter implements MaintenanceState {
             // overlapping x3, x4, and only store x5, x6.
             .shingleSize(shingleSize)
             .internalShinglingEnabled(true)
-            .anomalyRate(1 - this.thresholdMinPvalue);
+            .anomalyRate(1 - this.thresholdMinPvalue); //TODO: HCAD, question, we put shingle logic in RCF model. If we need 32 shingles, and we just input 32 data points, that can just fill into 25 shingles.
 
         if (rcfSeed > 0) {
             rcfBuilder.randomSeed(rcfSeed);

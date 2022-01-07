@@ -190,6 +190,7 @@ public class SearchFeatureDao extends AbstractRetriever {
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder()
             .aggregation(AggregationBuilders.max(CommonName.AGG_NAME_MAX_TIME).field(detector.getTimeField()))
             .size(0);
+        //TODO: step1. get latest data time
         SearchRequest searchRequest = new SearchRequest().indices(detector.getIndices().toArray(new String[0])).source(searchSourceBuilder);
         client
             .search(

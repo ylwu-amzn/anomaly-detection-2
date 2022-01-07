@@ -56,6 +56,7 @@ public class EntityModel {
         this.samples = samples;
     }
 
+    //TODO: HCAD add sample data
     public void addSample(double[] sample) {
         if (this.samples == null) {
             this.samples = new ArrayDeque<>();

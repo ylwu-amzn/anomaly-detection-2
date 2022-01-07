@@ -134,7 +134,7 @@ public class CompositeRetriever extends AbstractRetriever {
         CompositeAggregationBuilder composite = AggregationBuilders
             .composite(
                 AGG_NAME_COMP,
-                anomalyDetector.getCategoryField().stream().map(f -> new TermsValuesSourceBuilder(f).field(f)).collect(Collectors.toList())
+                anomalyDetector.getCategoryField().stream().map(f -> new TermsValuesSourceBuilder(f).field(f)).collect(Collectors.toList()) //TODO: HCAD, terms aggregation to count each entity
             )
             .size(pageSize);
         for (Feature feature : anomalyDetector.getFeatureAttributes()) {
