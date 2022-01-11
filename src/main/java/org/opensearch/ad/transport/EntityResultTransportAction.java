@@ -197,7 +197,9 @@ public class EntityResultTransportAction extends HandledTransportAction<EntityRe
                     continue;
                 }
                 ThresholdingResult result = modelManager
-                    .getAnomalyResultForEntity(datapoint, entityModel, modelId, categoricalValues, detector.getShingleSize());//TODO: HCAD get entity AD result
+                    .getAnomalyResultForEntity(datapoint, entityModel, modelId, categoricalValues, detector.getShingleSize());// TODO: HCAD
+                                                                                                                              // get entity
+                                                                                                                              // AD result
                 // result.getRcfScore() = 0 means the model is not initialized
                 // result.getGrade() = 0 means it is not an anomaly
                 // So many OpenSearchRejectedExecutionException if we write no matter what
@@ -279,7 +281,7 @@ public class EntityResultTransportAction extends HandledTransportAction<EntityRe
             }
 
             checkpointReadQueue.putAll(hotEntityRequests);
-            coldEntityQueue.putAll(coldEntityRequests); //TODO: HCAD, check how entity worker thread poll entity and cold start
+            coldEntityQueue.putAll(coldEntityRequests); // TODO: HCAD, check how entity worker thread poll entity and cold start
 
             // respond back
             if (prevException.isPresent()) {

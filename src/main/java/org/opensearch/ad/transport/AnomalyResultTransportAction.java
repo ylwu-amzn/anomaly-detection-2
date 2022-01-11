@@ -308,7 +308,7 @@ public class AnomalyResultTransportAction extends HandledTransportAction<ActionR
                 // wrap expensive operation inside ad threadpool
                 threadPool.executor(AnomalyDetectorPlugin.AD_THREAD_POOL_NAME).execute(() -> {
                     try {
-                        //TODO: HCAD entity feature data which may be used to cold start model.
+                        // TODO: HCAD entity feature data which may be used to cold start model.
                         Set<Entry<DiscoveryNode, Map<Entity, double[]>>> node2Entities = entityFeatures
                             .getResults()
                             .entrySet()
@@ -352,7 +352,7 @@ public class AnomalyResultTransportAction extends HandledTransportAction<ActionR
                             transportService
                                 .sendRequest(
                                     node,
-                                    EntityResultAction.NAME,//TODO: HCAD, send entity to worker node
+                                    EntityResultAction.NAME,// TODO: HCAD, send entity to worker node
                                     new EntityResultRequest(detectorId, nodeEntity.getValue(), dataStartTime, dataEndTime),
                                     option,
                                     new ActionListenerResponseHandler<>(
@@ -562,7 +562,7 @@ public class AnomalyResultTransportAction extends HandledTransportAction<ActionR
             }
 
             if (!featureOptional.getProcessedFeatures().isPresent()) {
-                Optional<Exception> exception = coldStartIfNoCheckPoint(detector); //TODO: cold start
+                Optional<Exception> exception = coldStartIfNoCheckPoint(detector); // TODO: cold start
                 if (exception.isPresent()) {
                     listener.onFailure(exception.get());
                     return;
@@ -979,7 +979,7 @@ public class AnomalyResultTransportAction extends HandledTransportAction<ActionR
         return true;
     }
 
-    private void coldStart(AnomalyDetector detector) { //TODO: cold start
+    private void coldStart(AnomalyDetector detector) { // TODO: cold start
         String detectorId = detector.getDetectorId();
 
         // If last cold start is not finished, we don't trigger another one
@@ -1015,7 +1015,8 @@ public class AnomalyResultTransportAction extends HandledTransportAction<ActionR
                     });
 
                 modelManager
-                    .trainModel(//TODO: cold start step3, train model with sample data shingles
+                    .trainModel(
+                        // TODO: cold start step3, train model with sample data shingles
                         detector,
                         dataPoints,
                         new ThreadedActionListener<>(LOG, threadPool, AnomalyDetectorPlugin.AD_THREAD_POOL_NAME, trainModelListener, false)
@@ -1041,7 +1042,8 @@ public class AnomalyResultTransportAction extends HandledTransportAction<ActionR
             .executor(AnomalyDetectorPlugin.AD_THREAD_POOL_NAME)
             .execute(
                 () -> featureManager
-                    .getColdStartData(//TODO: cold start get cold start data
+                    .getColdStartData(
+                        // TODO: cold start get cold start data
                         detector,
                         new ThreadedActionListener<>(
                             LOG,

@@ -36,7 +36,7 @@ public class EntityResultRequest extends ActionRequest implements ToXContentObje
     private static final Logger LOG = LogManager.getLogger(EntityResultRequest.class);
     private String detectorId;
     // changed from Map<String, double[]> to Map<Entity, double[]>
-    private Map<Entity, double[]> entities; //TODO: HCAD
+    private Map<Entity, double[]> entities; // TODO: HCAD
     private long start;
     private long end;
 

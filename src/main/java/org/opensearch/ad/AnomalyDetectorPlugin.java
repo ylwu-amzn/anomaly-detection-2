@@ -397,8 +397,8 @@ public class AnomalyDetectorPlugin extends Plugin implements ActionPlugin, Scrip
             getClock(),
             AnomalyDetectorSettings.MAX_TRAIN_SAMPLE,
             AnomalyDetectorSettings.MAX_SAMPLE_STRIDE,
-            AnomalyDetectorSettings.TRAIN_SAMPLE_TIME_RANGE_IN_HOURS, //TODO: cold start max time range, last 24 hours
-            AnomalyDetectorSettings.MIN_TRAIN_SAMPLES, //TODO: cold start minimal training sample data size : 512
+            AnomalyDetectorSettings.TRAIN_SAMPLE_TIME_RANGE_IN_HOURS, // TODO: cold start max time range, last 24 hours
+            AnomalyDetectorSettings.MIN_TRAIN_SAMPLES, // TODO: cold start minimal training sample data size : 512
             AnomalyDetectorSettings.MAX_SHINGLE_PROPORTION_MISSING,
             AnomalyDetectorSettings.MAX_IMPUTATION_NEIGHBOR_DISTANCE,
             AnomalyDetectorSettings.PREVIEW_SAMPLE_RATE,
@@ -540,7 +540,7 @@ public class AnomalyDetectorPlugin extends Plugin implements ActionPlugin, Scrip
             AnomalyDetectorSettings.NUM_TREES,
             AnomalyDetectorSettings.NUM_SAMPLES_PER_TREE,
             AnomalyDetectorSettings.TIME_DECAY,
-            AnomalyDetectorSettings.NUM_MIN_SAMPLES, //TODO: 32
+            AnomalyDetectorSettings.NUM_MIN_SAMPLES, // TODO: 32
             AnomalyDetectorSettings.THRESHOLD_MIN_PVALUE,
             AnomalyDetectorSettings.MIN_PREVIEW_SIZE,
             AnomalyDetectorSettings.HOURLY_MAINTENANCE,

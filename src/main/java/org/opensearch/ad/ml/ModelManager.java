@@ -516,7 +516,7 @@ public class ModelManager implements DetectorModelSize {
             .shingleSize(detector.getShingleSize())
             .anomalyRate(1 - thresholdMinPvalue)
             .build();
-        //TODO: dont consider if the shingle is consecutive or not
+        // TODO: dont consider if the shingle is consecutive or not
         Arrays.stream(dataPoints).forEach(s -> trcf.process(s, 0));
 
         String modelId = SingleStreamModelIdMapper.getRcfModelId(detector.getDetectorId(), step);
