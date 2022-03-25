@@ -556,7 +556,7 @@ public class CheckpointDao {
         }
     }
 
-    private ThresholdedRandomCutForest toTrcf(String checkpoint) {
+    public ThresholdedRandomCutForest toTrcf(String checkpoint) {
         ThresholdedRandomCutForest trcf = null;
         if (checkpoint != null && !checkpoint.isEmpty()) {
             try {
@@ -569,6 +569,7 @@ public class CheckpointDao {
                 trcf = trcfMapper.toModel(state);
             } catch (RuntimeException e) {
                 logger.error("Failed to deserialize TRCF model", e);
+                throw e;
             }
         }
         return trcf;

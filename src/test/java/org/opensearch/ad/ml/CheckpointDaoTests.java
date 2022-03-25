@@ -33,6 +33,8 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.net.URISyntaxException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.time.Clock;
@@ -40,6 +42,7 @@ import java.time.Instant;
 import java.time.Month;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -996,4 +999,22 @@ public class CheckpointDaoTests extends OpenSearchTestCase {
         }
         return point;
     }
+
+    /**
+     * If need to test different RCF jar, you can copy jars from different folder to override lib/*jar.
+     * For example:
+     * cd lib; cp rcf284/*jar .
+     *
+     * Then you can run this test case to test.
+     * @throws Exception
+     */
+    public void testDeserializeRCFModel() throws Exception {
+        Gson gson = new Gson();
+        String filePath = getClass().getResource("1_3_0_rcf_model.json").getPath();
+        String json = new String(Files.readAllBytes(Paths.get(filePath)));
+        Map map = gson.fromJson(json, Map.class);
+        String model = (String)((Map)((Map)((ArrayList)((Map)map.get("hits")).get("hits")).get(0)).get("_source")).get("modelV2");
+        ThresholdedRandomCutForest forest = checkpointDao.toTrcf(model);
+    }
+
 }
