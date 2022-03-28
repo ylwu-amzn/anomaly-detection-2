@@ -519,7 +519,7 @@ public class ModelManager implements DetectorModelSize {
         Arrays.stream(dataPoints).forEach(s -> trcf.process(s, 0));
 
         String modelId = SingleStreamModelIdMapper.getRcfModelId(detector.getDetectorId(), step);
-        checkpointDao.putTRCFCheckpoint(modelId, trcf, ActionListener.wrap(r -> listener.onResponse(null), listener::onFailure));
+        checkpointDao.putTRCFCheckpoint(modelId, trcf, ActionListener.wrap(r -> listener.onResponse(null), listener::onFailure)); // store model
     }
 
     /**

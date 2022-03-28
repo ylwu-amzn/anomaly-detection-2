@@ -31,10 +31,14 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.time.Clock;
@@ -65,6 +69,7 @@ import org.apache.commons.pool2.impl.DefaultPooledObject;
 import org.apache.commons.pool2.impl.GenericObjectPool;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.core.util.FileUtils;
 import org.junit.Before;
 import org.mockito.Answers;
 import org.mockito.ArgumentCaptor;
@@ -1006,15 +1011,119 @@ public class CheckpointDaoTests extends OpenSearchTestCase {
      * cd lib; cp rcf284/*jar .
      *
      * Then you can run this test case to test.
+     * Works: PR282, PR283,
+     * Doesn't work: PR284, PR285, PR286, PR287,PR288, PR289, PR291, PR292, PR293, PR298, PR294
      * @throws Exception
      */
     public void testDeserializeRCFModel() throws Exception {
-        Gson gson = new Gson();
+        // Model in file 1_3_0_rcf_model.json not passed initialization yet
         String filePath = getClass().getResource("1_3_0_rcf_model.json").getPath();
         String json = new String(Files.readAllBytes(Paths.get(filePath)));
         Map map = gson.fromJson(json, Map.class);
         String model = (String)((Map)((Map)((ArrayList)((Map)map.get("hits")).get("hits")).get(0)).get("_source")).get("modelV2");
         ThresholdedRandomCutForest forest = checkpointDao.toTrcf(model);
+        System.out.println(gson.toJson(forest));
     }
 
+    /**
+     * Test deserialize not null forest which passed initialization and detectors are in running state.
+     * Works: PR282, PR283,
+     * Doesn't work: PR284, PR285, PR286, PR287, PR288, PR289, PR291, PR292, PR293, PR298, PR294
+     * @throws Exception
+     */
+    public void testDeserializeRCFModel_RunningDetectorModel() throws Exception {
+        String filePath = getClass().getResource("1_3_0_rcf_model_not_null.json").getPath();
+        String json = new String(Files.readAllBytes(Paths.get(filePath)));
+        Map map = gson.fromJson(json, Map.class);
+        String model = (String)((Map)((Map)((ArrayList)((Map)map.get("hits")).get("hits")).get(0)).get("_source")).get("modelV2");
+        ThresholdedRandomCutForest forest = checkpointDao.toTrcf(model);
+        System.out.println(gson.toJson(forest));
+    }
+
+    public void testDeserializeRCFModel_NotNullForest_t1() throws Exception {
+        String filePath = getClass().getResource("t1.json").getPath();
+        String json = new String(Files.readAllBytes(Paths.get(filePath)));
+        Map map = gson.fromJson(json, Map.class);
+        String model = (String)((Map)((Map)((ArrayList)((Map)map.get("hits")).get("hits")).get(0)).get("_source")).get("modelV2");
+        ThresholdedRandomCutForest forest = checkpointDao.toTrcf(model);
+        System.out.println(gson.toJson(forest));
+    }
+
+    public void testDeserializeRCFModel_ModelGeneratedByUnitTest() throws Exception {
+        String filePath = getClass().getResource("test_model.json").getPath();
+        String model = new String(Files.readAllBytes(Paths.get(filePath)));
+        ThresholdedRandomCutForest forest = checkpointDao.toTrcf(model);
+
+        filePath = getClass().getResource("test_model_empty.json").getPath();
+        model = new String(Files.readAllBytes(Paths.get(filePath)));
+        forest = checkpointDao.toTrcf(model);
+    }
+
+    public void testSerializeRCFModel() throws IOException {
+        Random r = new Random();
+        double rangeMin = 100;
+        double rangeMax = 200;
+        ThresholdedRandomCutForest trcf = new ThresholdedRandomCutForest(
+                ThresholdedRandomCutForest
+                        .builder()
+                        .dimensions(1)
+                        .sampleSize(AnomalyDetectorSettings.NUM_SAMPLES_PER_TREE)
+                        .numberOfTrees(AnomalyDetectorSettings.NUM_TREES)
+                        .timeDecay(AnomalyDetectorSettings.TIME_DECAY)
+                        .outputAfter(AnomalyDetectorSettings.NUM_MIN_SAMPLES)
+                        .initialAcceptFraction(0.125d)
+                        .parallelExecutionEnabled(false)
+                        .internalShinglingEnabled(true)
+                        .anomalyRate(1 - AnomalyDetectorSettings.THRESHOLD_MIN_PVALUE)
+        );
+        long timestamp = 1648255374000l;
+        for (int i = 0; i < 10000; i++) {
+            double randomValue = rangeMin + (rangeMax - rangeMin) * r.nextDouble();
+            trcf.process(new double[]{randomValue}, timestamp + i * 60_000);
+        }
+        assertEquals(AnomalyDetectorSettings.NUM_TREES, trcf.getForest().getComponents().size());
+        assertNotNull(trcf.getForest().getComponents().get(0));
+
+        String modelCheckpoint = checkpointDao.toCheckpoint(trcf);
+        System.out.println(modelCheckpoint);
+        String filePath = getClass().getResource("test_model.json").getPath();
+        Files.writeString(Paths.get(filePath), modelCheckpoint, StandardCharsets.UTF_8);
+
+        ThresholdedRandomCutForest deserializedTRCF = checkpointDao.toTrcf(modelCheckpoint);
+        assertEquals(AnomalyDetectorSettings.NUM_TREES, deserializedTRCF.getForest().getComponents().size());
+        assertNotNull(deserializedTRCF.getForest().getComponents().get(0));
+    }
+
+    public void testSerializeRCFModel_Empty() throws IOException {
+        ThresholdedRandomCutForest trcf = new ThresholdedRandomCutForest(
+                ThresholdedRandomCutForest
+                        .builder()
+                        .dimensions(1)
+                        .sampleSize(AnomalyDetectorSettings.NUM_SAMPLES_PER_TREE)
+                        .numberOfTrees(AnomalyDetectorSettings.NUM_TREES)
+                        .timeDecay(AnomalyDetectorSettings.TIME_DECAY)
+                        .outputAfter(AnomalyDetectorSettings.NUM_MIN_SAMPLES)
+                        .initialAcceptFraction(0.125d)
+                        .parallelExecutionEnabled(false)
+                        .internalShinglingEnabled(true)
+                        .anomalyRate(1 - AnomalyDetectorSettings.THRESHOLD_MIN_PVALUE)
+        );
+        assertEquals(AnomalyDetectorSettings.NUM_TREES, trcf.getForest().getComponents().size());
+        assertNotNull(trcf.getForest().getComponents().get(0));
+
+        String modelCheckpoint = checkpointDao.toCheckpoint(trcf);
+        System.out.println("++++++++++++++++++++++++++++++++++++");
+        System.out.println(modelCheckpoint);
+        System.out.println("++++++++++++++++++++++++++++++++++++");
+        String filePath = getClass().getResource("test_model_empty.json").getPath();
+        try {
+            Files.writeString(Paths.get(filePath), modelCheckpoint, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        ThresholdedRandomCutForest deserializedTRCF = checkpointDao.toTrcf(modelCheckpoint);
+        assertEquals(AnomalyDetectorSettings.NUM_TREES, deserializedTRCF.getForest().getComponents().size());
+        assertNotNull(deserializedTRCF.getForest().getComponents().get(0));
+    }
 }

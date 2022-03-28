@@ -342,7 +342,7 @@ public class CheckpointDao {
         });
     }
 
-    private String toCheckpoint(ThresholdedRandomCutForest trcf) {
+    public String toCheckpoint(ThresholdedRandomCutForest trcf) {
         String checkpoint = null;
         Map.Entry<LinkedBuffer, Boolean> result = checkoutOrNewBuffer();
         LinkedBuffer buffer = result.getKey();
@@ -590,7 +590,7 @@ public class CheckpointDao {
         }));
     }
 
-    private void deserializeTRCFModel(
+    private void deserializeTRCFModel( // deserializeTRCFModel
         GetResponse response,
         String rcfModelId,
         ActionListener<Optional<ThresholdedRandomCutForest>> listener
