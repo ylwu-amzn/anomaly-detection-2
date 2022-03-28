@@ -566,6 +566,8 @@ public class CheckpointDao {
                     ProtostuffIOUtil.mergeFrom(bytes, state, trcfSchema);
                     return null;
                 });
+                String stateString = gson.toJson(state);
+                System.out.println(stateString);
                 trcf = trcfMapper.toModel(state);
             } catch (RuntimeException e) {
                 logger.error("Failed to deserialize TRCF model", e);

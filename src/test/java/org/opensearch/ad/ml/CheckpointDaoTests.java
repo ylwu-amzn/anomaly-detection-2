@@ -1022,7 +1022,6 @@ public class CheckpointDaoTests extends OpenSearchTestCase {
         Map map = gson.fromJson(json, Map.class);
         String model = (String)((Map)((Map)((ArrayList)((Map)map.get("hits")).get("hits")).get(0)).get("_source")).get("modelV2");
         ThresholdedRandomCutForest forest = checkpointDao.toTrcf(model);
-        System.out.println(gson.toJson(forest));
     }
 
     /**
@@ -1037,7 +1036,6 @@ public class CheckpointDaoTests extends OpenSearchTestCase {
         Map map = gson.fromJson(json, Map.class);
         String model = (String)((Map)((Map)((ArrayList)((Map)map.get("hits")).get("hits")).get(0)).get("_source")).get("modelV2");
         ThresholdedRandomCutForest forest = checkpointDao.toTrcf(model);
-        System.out.println(gson.toJson(forest));
     }
 
     public void testDeserializeRCFModel_NotNullForest_t1() throws Exception {
@@ -1046,7 +1044,6 @@ public class CheckpointDaoTests extends OpenSearchTestCase {
         Map map = gson.fromJson(json, Map.class);
         String model = (String)((Map)((Map)((ArrayList)((Map)map.get("hits")).get("hits")).get(0)).get("_source")).get("modelV2");
         ThresholdedRandomCutForest forest = checkpointDao.toTrcf(model);
-        System.out.println(gson.toJson(forest));
     }
 
     public void testDeserializeRCFModel_ModelGeneratedByUnitTest() throws Exception {
@@ -1084,6 +1081,8 @@ public class CheckpointDaoTests extends OpenSearchTestCase {
         assertEquals(AnomalyDetectorSettings.NUM_TREES, trcf.getForest().getComponents().size());
         assertNotNull(trcf.getForest().getComponents().get(0));
 
+        System.out.println(gson.toJson(trcfMapper.toState(trcf)));
+
         String modelCheckpoint = checkpointDao.toCheckpoint(trcf);
         System.out.println(modelCheckpoint);
         String filePath = getClass().getResource("test_model.json").getPath();
@@ -1112,9 +1111,6 @@ public class CheckpointDaoTests extends OpenSearchTestCase {
         assertNotNull(trcf.getForest().getComponents().get(0));
 
         String modelCheckpoint = checkpointDao.toCheckpoint(trcf);
-        System.out.println("++++++++++++++++++++++++++++++++++++");
-        System.out.println(modelCheckpoint);
-        System.out.println("++++++++++++++++++++++++++++++++++++");
         String filePath = getClass().getResource("test_model_empty.json").getPath();
         try {
             Files.writeString(Paths.get(filePath), modelCheckpoint, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
