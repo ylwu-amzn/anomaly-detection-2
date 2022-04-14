@@ -1323,7 +1323,7 @@ public class ADBatchTaskRunner {
         }
     }
 
-    private float calculateInitProgress(String taskId) {
+    private float calculateInitProgress(String taskId) { //calculate init progress
         RandomCutForest rcf = adTaskCacheManager.getTRcfModel(taskId).getForest();
         if (rcf == null) {
             return 0.0f;

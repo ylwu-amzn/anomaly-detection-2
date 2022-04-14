@@ -547,7 +547,7 @@ public class AnomalyDetectorJobRunner implements ScheduledJobRunner {
             profiles.add(DetectorProfileName.INIT_PROGRESS);
             ProfileRequest profileRequest = new ProfileRequest(detectorId, profiles, true, dataNodes);
             client.execute(ProfileAction.INSTANCE, profileRequest, ActionListener.wrap(r -> {
-                log.debug("Update latest realtime task for HC detector {}, total updates: {}", detectorId, r.getTotalUpdates());
+                log.info("ylwudebugAD: Update latest realtime task for HC detector {}, total updates: {}", detectorId, r.getTotalUpdates());
                 updateLatestRealtimeTask(
                     detectorId,
                     null,

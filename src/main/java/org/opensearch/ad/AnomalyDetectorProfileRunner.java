@@ -400,7 +400,7 @@ public class AnomalyDetectorProfileRunner extends AbstractProfileRunner {
     ) {
         DiscoveryNode[] dataNodes = nodeFilter.getEligibleDataNodes();
         ProfileRequest profileRequest = new ProfileRequest(detector.getDetectorId(), profiles, forMultiEntityDetector, dataNodes);
-        client.execute(ProfileAction.INSTANCE, profileRequest, onModelResponse(detector, profiles, job, listener));// get init progress
+        client.execute(ProfileAction.INSTANCE, profileRequest, onModelResponse(detector, profiles, job, listener));// ylwu get init progress
     }
 
     private ActionListener<ProfileResponse> onModelResponse(
@@ -589,7 +589,7 @@ public class AnomalyDetectorProfileRunner extends AbstractProfileRunner {
             builder.state(DetectorState.INIT);
         }
 
-        if (profilesToCollect.contains(DetectorProfileName.INIT_PROGRESS)) {
+        if (profilesToCollect.contains(DetectorProfileName.INIT_PROGRESS)) {// init progress
             if (hideMinutesLeft) {
                 InitProgressProfile initProgress = computeInitProgressProfile(totalUpdates, 0);
                 builder.initProgress(initProgress);

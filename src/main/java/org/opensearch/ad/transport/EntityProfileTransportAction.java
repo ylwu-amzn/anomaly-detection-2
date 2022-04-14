@@ -108,7 +108,7 @@ public class EntityProfileTransportAction extends HandledTransportAction<EntityP
                 builder.setLastActiveMs(cache.getLastActiveMs(adID, modelId));
             }
             if (profilesToCollect.contains(EntityProfileName.INIT_PROGRESS) || profilesToCollect.contains(EntityProfileName.STATE)) {
-                builder.setTotalUpdates(cache.getTotalUpdates(adID, modelId));
+                builder.setTotalUpdates(cache.getTotalUpdates(adID, modelId));//ylwu: get total entity total updates
             }
             if (profilesToCollect.contains(EntityProfileName.MODELS)) {
                 Optional<ModelProfile> modleProfile = cache.getModelProfile(adID, modelId);

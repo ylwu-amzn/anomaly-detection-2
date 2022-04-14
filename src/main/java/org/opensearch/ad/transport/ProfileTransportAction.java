@@ -118,6 +118,7 @@ public class ProfileTransportAction extends TransportNodesAction<ProfileRequest,
             }
             if (profiles.contains(DetectorProfileName.INIT_PROGRESS)) {
                 totalUpdates = cacheProvider.get().getTotalUpdates(detectorId);// get toal updates
+                LOG.info("ylwudebugAD: ----- ProfileTransportAction, totalUpdates: {}", totalUpdates);
             }
             if (profiles.contains(DetectorProfileName.TOTAL_SIZE_IN_BYTES)) {
                 modelSize = cacheProvider.get().getModelSize(detectorId);

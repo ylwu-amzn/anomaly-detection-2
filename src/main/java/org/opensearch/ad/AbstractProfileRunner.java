@@ -13,18 +13,23 @@ package org.opensearch.ad;
 
 import java.util.Locale;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.opensearch.ad.model.InitProgressProfile;
 
 public abstract class AbstractProfileRunner {
     protected long requiredSamples;
+    private static final Logger log = LogManager.getLogger(AbstractProfileRunner.class);
 
     public AbstractProfileRunner(long requiredSamples) {
         this.requiredSamples = requiredSamples;
     }
 
-    protected InitProgressProfile computeInitProgressProfile(long totalUpdates, long intervalMins) {
+    protected InitProgressProfile computeInitProgressProfile(long totalUpdates, long intervalMins) { //calculate init progress
         float percent = Math.min((100.0f * totalUpdates) / requiredSamples, 100.0f);
         int neededPoints = (int) (requiredSamples - totalUpdates);
+        log.info("ylwudebugAD: computeInitProgressProfile totalUpdates: {}, intervalMins: {}, requiredSamples: {}, percent: {}",
+                totalUpdates, intervalMins, requiredSamples, percent);
         return new InitProgressProfile(
             // rounding: 93.456 => 93%, 93.556 => 94%
             // Without Locale.ROOT, sometimes conversions use localized decimal digits

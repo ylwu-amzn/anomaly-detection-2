@@ -209,7 +209,7 @@ public class GetAnomalyDetectorTransportAction extends HandledTransportAction<Ge
                         transportService,
                         adTaskManager
                     );
-                    profileRunner.profile(detectorID, getProfileActionListener(listener), profilesToCollect);
+                    profileRunner.profile(detectorID, getProfileActionListener(listener), profilesToCollect);//get profile
                 }
             } else {
                 if (returnTask) {

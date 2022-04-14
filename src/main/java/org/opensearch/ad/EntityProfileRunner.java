@@ -322,6 +322,7 @@ public class EntityProfileRunner extends AbstractProfileRunner {
         AnomalyDetectorJob job,
         MultiResponsesDelegateActionListener<EntityProfile> delegateListener
     ) {
+        logger.info("ylwudebugAD: profileStateRelated , totalUpdates: {}, requiredSamples: {}", totalUpdates, requiredSamples);
         if (totalUpdates == 0) {
             sendUnknownState(profilesToCollect, entityValue, false, delegateListener);
         } else if (false == job.isEnabled()) {
