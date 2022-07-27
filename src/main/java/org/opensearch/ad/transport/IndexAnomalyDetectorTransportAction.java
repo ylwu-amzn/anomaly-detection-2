@@ -43,6 +43,7 @@ import org.opensearch.common.settings.Settings;
 import org.opensearch.common.unit.TimeValue;
 import org.opensearch.common.util.concurrent.ThreadContext;
 import org.opensearch.common.xcontent.NamedXContentRegistry;
+import org.opensearch.commons.ConfigConstants;
 import org.opensearch.commons.authuser.User;
 import org.opensearch.index.query.QueryBuilders;
 import org.opensearch.rest.RestRequest;
@@ -137,6 +138,7 @@ public class IndexAnomalyDetectorTransportAction extends HandledTransportAction<
         ThreadContext.StoredContext storedContext,
         ActionListener<IndexAnomalyDetectorResponse> listener
     ) {
+//        client.threadPool().getThreadContext();
         anomalyDetectionIndices.update();
         String detectorId = request.getDetectorID();
         long seqNo = request.getSeqNo();
@@ -149,7 +151,9 @@ public class IndexAnomalyDetectorTransportAction extends HandledTransportAction<
         Integer maxMultiEntityAnomalyDetectors = request.getMaxMultiEntityAnomalyDetectors();
         Integer maxAnomalyFeatures = request.getMaxAnomalyFeatures();
 
-        storedContext.restore();
+        storedContext.restore(); // why security plugin throw exception
+        //https://github.com/opensearch-project/security/blob/ef0d40a339ef651fce8a4e44b1af39eca765c438/src/main/java/org/opensearch/security/filter/SecurityFilter.java#L292
+        //"reason" : "No user found for indices:data/read/search"
         checkIndicesAndExecute(detector.getIndices(), () -> {
             // Don't replace detector's user when update detector
             // Github issue: https://github.com/opensearch-project/anomaly-detection/issues/124
@@ -184,9 +188,11 @@ public class IndexAnomalyDetectorTransportAction extends HandledTransportAction<
         AnomalyDetectorFunction function,
         ActionListener<IndexAnomalyDetectorResponse> listener
     ) {
+        ThreadContext threadContext = client.threadPool().getThreadContext();
         SearchRequest searchRequest = new SearchRequest()
             .indices(indices.toArray(new String[0]))
             .source(new SearchSourceBuilder().size(1).query(QueryBuilders.matchAllQuery()));
+        User user = threadContext.getTransient(ConfigConstants.OPENDISTRO_SECURITY_USER);
         client.search(searchRequest, ActionListener.wrap(r -> { function.execute(); }, e -> {
             // Due to below issue with security plugin, we get security_exception when invalid index name is mentioned.
             // https://github.com/opendistro-for-elasticsearch/security/issues/718

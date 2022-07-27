@@ -76,7 +76,7 @@ public class ADStats {
 
         for (Map.Entry<String, ADStat<?>> entry : stats.entrySet()) {
             if (entry.getValue().isClusterLevel() == getClusterStats) {
-                statsMap.put(entry.getKey(), entry.getValue());
+                statsMap.put(entry.getKey(), entry.getValue()); // cluster stat
             }
         }
         return statsMap;

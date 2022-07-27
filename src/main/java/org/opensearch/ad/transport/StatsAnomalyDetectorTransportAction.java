@@ -136,7 +136,7 @@ public class StatsAnomalyDetectorTransportAction extends HandledTransportAction<
                 .indices(AnomalyDetector.ANOMALY_DETECTORS_INDEX)
                 .source(new SearchSourceBuilder().aggregation(termsAgg).size(0).trackTotalHits(true));
 
-            client.search(request, ActionListener.wrap(r -> {
+            client.search(request, ActionListener.wrap(r -> {// search detector count
                 StringTerms aggregation = r.getAggregations().get(DETECTOR_TYPE_AGG);
                 List<StringTerms.Bucket> buckets = aggregation.getBuckets();
                 long totalDetectors = r.getHits().getTotalHits().value;
@@ -167,7 +167,7 @@ public class StatsAnomalyDetectorTransportAction extends HandledTransportAction<
                 listener.onResponse(adStatsResponse);
             }, e -> listener.onFailure(e)));
         } else {
-            adStatsResponse.setClusterStats(getClusterStatsMap(adStatsRequest));
+            adStatsResponse.setClusterStats(getClusterStatsMap(adStatsRequest));// cluster stat
             listener.onResponse(adStatsResponse);
         }
     }

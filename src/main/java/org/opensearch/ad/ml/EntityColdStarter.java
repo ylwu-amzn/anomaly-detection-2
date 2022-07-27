@@ -253,7 +253,7 @@ public class EntityColdStarter implements MaintenanceState, CleanState {
                 try {
                     if (trainingData.isPresent()) {
                         List<double[][]> dataPoints = trainingData.get();
-                        combineTrainSamples(dataPoints, modelId, modelState);
+                        combineTrainSamples(dataPoints, modelId, modelState);//ylwu
                         Queue<double[]> samples = modelState.getModel().getSamples();
                         // only train models if we have enough samples
                         if (samples.size() >= numMinSamples) {
@@ -428,6 +428,7 @@ public class EntityColdStarter implements MaintenanceState, CleanState {
                         // cold start data as existing samples all happen after job enabled time. There might
                         // be some gaps in between the last cold start sample and the first accumulated sample.
                         // We will need to accept that precision loss in current solution.
+                        clock.millis();
                         long endTimeMs = job.getEnabledTime().toEpochMilli();
                         Pair<Integer, Integer> params = selectRangeParam(detector);
                         int stride = params.getLeft();

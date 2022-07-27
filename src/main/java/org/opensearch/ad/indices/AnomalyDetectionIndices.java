@@ -917,7 +917,7 @@ public class AnomalyDetectionIndices implements LocalNodeMasterListener {
                 if (shouldUpdate) {
                     adminClient
                         .indices()
-                        .putMapping(
+                        .putMapping(//update index mapping: ylwu
                             new PutMappingRequest().indices(adIndex.getIndexName()).source(adIndex.getMapping(), XContentType.JSON),
                             ActionListener.wrap(putMappingResponse -> {
                                 if (putMappingResponse.isAcknowledged()) {
